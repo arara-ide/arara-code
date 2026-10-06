@@ -16,7 +16,7 @@ Scripts que transformam o VSCodium (submódulo em `upstream/vscodium`, tag fixa)
 
 ## O que você NÃO mexe
 
-- Nada dentro de `vscode/` ou `upstream/vscodium/` é commitado. Editou lá? Gere o patch com `scripts/new-patch.sh <nome>`.
+- Nada dentro de `vscode/` ou `upstream/vscodium/` é commitado. Editou lá? Gere o patch com `scripts/new-patch.sh NNNN-nome arquivo…`.
 - Não aponte o submódulo para um commit solto; só tags de release do VSCodium.
 - Não adicione `extensionsGallery` do Visual Studio Marketplace (viola os termos). Só Open VSX.
 
@@ -30,12 +30,14 @@ Scripts que transformam o VSCodium (submódulo em `upstream/vscodium`, tag fixa)
 ## Comandos
 
 ```bash
-scripts/build.sh                     # build completo (~15 min, ~10 GB, pico ~13 GB de RAM)
+scripts/dev.sh                       # modo dev: abre a IDE com ../arara-ai em ~7 s (use isto no dia a dia)
+scripts/prepare.sh                   # clone + patches + branding + npm ci, sem compilar
+scripts/build.sh                     # build de release (~15 min, ~10 GB, pico ~13 GB de RAM)
 scripts/build.sh --skip-source       # reusa vscode/ existente
-scripts/new-patch.sh 0002-xyz        # (ainda não existe) gera patch a partir de vscode/
-scripts/bump-upstream.sh <tag>       # (ainda não existe) nova tag do VSCodium
+scripts/new-patch.sh 0003-xyz src/vs/…/arquivo.ts   # gera/atualiza patch a partir de .work/vscodium/vscode
 ```
-(Os nomes acima são o plano; ajustar quando os scripts existirem.)
+
+Fluxo para mudar o core: edite em `.work/vscodium/vscode`, teste com `scripts/dev.sh`, rode `scripts/new-patch.sh`, confira o cabeçalho do patch e depois `scripts/prepare.sh --skip-source` para provar que ele aplica do zero. `bump-upstream.sh` ainda não existe (trocar a tag do submódulo à mão numa branch `upstream/<versão>`).
 
 ## Pronto quando
 

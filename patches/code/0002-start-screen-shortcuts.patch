@@ -1,0 +1,376 @@
+Arara Code: start screen with clickable shortcuts in the empty editor area.
+
+Replaces the editor watermark with sections (Começar, Navegar, Arara IA,
+Personalizar). Each entry is a button that runs the command and shows its
+keybinding. Entries whose command is not registered are hidden (re-renders
+when extensions register commands, e.g. git.clone, arara.signIn).
+
+Why a patch: the watermark is core workbench UI with no extension API.
+Touches: src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts,
+         src/vs/workbench/browser/parts/editor/media/editorgroupview.css
+
+--- a/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
++++ b/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
+@@ -1,80 +1,85 @@
+ /*---------------------------------------------------------------------------------------------
+  *  Copyright (c) Microsoft Corporation. All rights reserved.
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *  Modified by Arara Code: empty editor area becomes a start screen with clickable shortcuts.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import { $, append, clearNode, h } from '../../../../base/browser/dom.js';
++import { $, addDisposableListener, append, clearNode, EventType, h } from '../../../../base/browser/dom.js';
+ import { KeybindingLabel } from '../../../../base/browser/ui/keybindingLabel/keybindingLabel.js';
+-import { coalesce, shuffle } from '../../../../base/common/arrays.js';
+ import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
+ import { isMacintosh, isWeb, OS } from '../../../../base/common/platform.js';
+ import { localize } from '../../../../nls.js';
+ import { MenuId } from '../../../../platform/actions/common/actions.js';
+ import { HiddenItemStrategy, MenuWorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
+-import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+-import { ContextKeyExpr, ContextKeyExpression, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+-import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
+ import { defaultKeybindingLabelStyles } from '../../../../platform/theme/browser/defaultStyles.js';
+ import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
++import { IProductService } from '../../../../platform/product/common/productService.js';
+ 
+-interface WatermarkEntry {
++interface StartEntry {
+ 	readonly id: string;
+ 	readonly text: string;
+-	readonly when?: {
+-		native?: ContextKeyExpression;
+-		web?: ContextKeyExpression;
+-	};
++	/** Mostrar só em janela vazia (sem pasta/workspace). */
++	readonly emptyOnly?: boolean;
++	/** Mostrar só com pasta/workspace aberto. */
++	readonly workspaceOnly?: boolean;
++	/** Ocultar no web. */
++	readonly nativeOnly?: boolean;
+ }
+ 
+-const showChatContextKey = ContextKeyExpr.and(ContextKeyExpr.equals('chatSetupHidden', false), ContextKeyExpr.equals('chatSetupDisabledInWorkspace', false));
+-
+-const openChat: WatermarkEntry = { text: localize('watermark.openChat', "Open Chat"), id: 'workbench.action.chat.open', when: { native: showChatContextKey, web: showChatContextKey } };
+-const showCommands: WatermarkEntry = { text: localize('watermark.showCommands', "Show All Commands"), id: 'workbench.action.showCommands' };
+-const gotoFile: WatermarkEntry = { text: localize('watermark.quickAccess', "Go to File"), id: 'workbench.action.quickOpen' };
+-const openFile: WatermarkEntry = { text: localize('watermark.openFile', "Open File"), id: 'workbench.action.files.openFile' };
+-const openFolder: WatermarkEntry = { text: localize('watermark.openFolder', "Open Folder"), id: 'workbench.action.files.openFolder' };
+-const openFileOrFolder: WatermarkEntry = { text: localize('watermark.openFileFolder', "Open File or Folder"), id: 'workbench.action.files.openFileFolder' };
+-const openRecent: WatermarkEntry = { text: localize('watermark.openRecent', "Open Recent"), id: 'workbench.action.openRecent' };
+-const newUntitledFile: WatermarkEntry = { text: localize('watermark.newUntitledFile', "New Untitled Text File"), id: 'workbench.action.files.newUntitledFile' };
+-const findInFiles: WatermarkEntry = { text: localize('watermark.findInFiles', "Find in Files"), id: 'workbench.action.findInFiles' };
+-const toggleTerminal: WatermarkEntry = { text: localize({ key: 'watermark.toggleTerminal', comment: ['toggle is a verb here'] }, "Toggle Terminal"), id: 'workbench.action.terminal.toggleTerminal', when: { web: ContextKeyExpr.equals('terminalProcessSupported', true) } };
+-const startDebugging: WatermarkEntry = { text: localize('watermark.startDebugging', "Start Debugging"), id: 'workbench.action.debug.start', when: { web: ContextKeyExpr.equals('terminalProcessSupported', true) } };
+-const openSettings: WatermarkEntry = { text: localize('watermark.openSettings', "Open Settings"), id: 'workbench.action.openSettings' };
+-
+-const baseEntries: WatermarkEntry[] = [
+-	openChat,
+-	showCommands,
+-];
+-
+-const emptyWindowEntries: WatermarkEntry[] = coalesce([
+-	...baseEntries,
+-	openRecent,
+-	...(isMacintosh && !isWeb ? [openFileOrFolder] : [openFile, openFolder]),
+-	isMacintosh && !isWeb ? newUntitledFile : undefined, // fill in one more on macOS to get to 5 entries
+-]);
+-
+-const workspaceEntries: WatermarkEntry[] = [
+-	...baseEntries,
+-];
++interface StartSection {
++	readonly title: string;
++	readonly entries: StartEntry[];
++}
+ 
+-const otherEntries: WatermarkEntry[] = [
+-	gotoFile,
+-	findInFiles,
+-	startDebugging,
+-	toggleTerminal,
+-	openSettings,
++const sections: StartSection[] = [
++	{
++		title: localize('arara.start.start', "Começar"),
++		entries: [
++			...(isMacintosh && !isWeb
++				? [{ id: 'workbench.action.files.openFileFolder', text: localize('arara.start.openFileFolder', "Abrir arquivo ou pasta…"), emptyOnly: true }]
++				: [
++					{ id: 'workbench.action.files.openFolder', text: localize('arara.start.openFolder', "Abrir pasta…"), emptyOnly: true },
++					{ id: 'workbench.action.files.openFile', text: localize('arara.start.openFile', "Abrir arquivo…") },
++				]),
++			{ id: 'workbench.action.openRecent', text: localize('arara.start.openRecent', "Abrir recente…") },
++			{ id: 'workbench.action.files.newUntitledFile', text: localize('arara.start.newFile', "Novo arquivo") },
++			{ id: 'git.clone', text: localize('arara.start.clone', "Clonar repositório Git…"), emptyOnly: true, nativeOnly: true },
++		],
++	},
++	{
++		title: localize('arara.start.navigate', "Navegar"),
++		entries: [
++			{ id: 'workbench.action.quickOpen', text: localize('arara.start.gotoFile', "Ir para arquivo…"), workspaceOnly: true },
++			{ id: 'workbench.action.findInFiles', text: localize('arara.start.findInFiles', "Buscar nos arquivos"), workspaceOnly: true },
++			{ id: 'workbench.action.showCommands', text: localize('arara.start.commands', "Todos os comandos") },
++			{ id: 'workbench.action.terminal.toggleTerminal', text: localize('arara.start.terminal', "Terminal"), nativeOnly: true },
++		],
++	},
++	{
++		title: localize('arara.start.ai', "Arara IA"),
++		entries: [
++			{ id: 'arara.chat.focus', text: localize('arara.start.chat', "Abrir chat") },
++			{ id: 'arara.signIn', text: localize('arara.start.signIn', "Entrar na conta") },
++		],
++	},
++	{
++		title: localize('arara.start.customize', "Personalizar"),
++		entries: [
++			{ id: 'workbench.action.openSettings', text: localize('arara.start.settings', "Configurações") },
++			{ id: 'workbench.action.selectTheme', text: localize('arara.start.theme', "Tema de cores") },
++			{ id: 'workbench.action.openGlobalKeybindings', text: localize('arara.start.keybindings', "Atalhos de teclado") },
++			{ id: 'workbench.view.extensions', text: localize('arara.start.extensions', "Extensões") },
++		],
++	},
+ ];
+ 
+ export class EditorGroupWatermark extends Disposable {
+ 
+-	private static readonly CACHED_WHEN = 'editorGroupWatermark.whenConditions';
+ 	private static readonly SETTINGS_KEY = 'workbench.tips.enabled';
+-	private static readonly MINIMUM_ENTRIES = 3;
+-
+-	private readonly cachedWhen: { [when: string]: boolean };
+ 
+ 	private readonly shortcuts: HTMLElement;
+ 	private readonly toolbarContainer: HTMLElement;
+@@ -88,19 +93,18 @@
+ 		container: HTMLElement,
+ 		@IKeybindingService private readonly keybindingService: IKeybindingService,
+ 		@IWorkspaceContextService private readonly contextService: IWorkspaceContextService,
+-		@IContextKeyService private readonly contextKeyService: IContextKeyService,
+ 		@IConfigurationService private readonly configurationService: IConfigurationService,
+-		@IStorageService private readonly storageService: IStorageService,
+-		@IInstantiationService private readonly instantiationService: IInstantiationService
++		@IInstantiationService private readonly instantiationService: IInstantiationService,
++		@ICommandService private readonly commandService: ICommandService,
++		@IProductService private readonly productService: IProductService,
+ 	) {
+ 		super();
+ 
+-		this.cachedWhen = this.storageService.getObject(EditorGroupWatermark.CACHED_WHEN, StorageScope.PROFILE, Object.create(null));
+ 		this.workbenchState = this.contextService.getWorkbenchState();
+ 
+ 		const elements = h('.editor-group-watermark-wrapper', [
+ 			h('.editor-group-watermark-toolbar-container@toolbarContainer'),
+-			h('.editor-group-watermark', [
++			h('.editor-group-watermark.arara-start', [
+ 				h('.watermark-container', [
+ 					h('.letterpress'),
+ 					h('.shortcuts@shortcuts'),
+@@ -119,7 +123,6 @@
+ 		}));
+ 
+ 		this.registerListeners();
+-
+ 		this.render();
+ 	}
+ 
+@@ -140,19 +143,16 @@
+ 			}
+ 		}));
+ 
+-		this._register(this.storageService.onWillSaveState(e => {
+-			if (e.reason === WillSaveStateReason.SHUTDOWN) {
+-				const entries = [...emptyWindowEntries, ...workspaceEntries, ...otherEntries];
+-				for (const entry of entries) {
+-					const when = isWeb ? entry.when?.web : entry.when?.native;
+-					if (when) {
+-						this.cachedWhen[entry.id] = this.contextKeyService.contextMatchesRules(when);
+-					}
+-				}
++		// comandos de extensões (git.clone, arara.*) registram depois do primeiro render
++		this._register(CommandsRegistry.onDidRegisterCommand(() => this.render()));
++	}
+ 
+-				this.storageService.store(EditorGroupWatermark.CACHED_WHEN, JSON.stringify(this.cachedWhen), StorageScope.PROFILE, StorageTarget.MACHINE);
+-			}
+-		}));
++	private visible(entry: StartEntry): boolean {
++		const empty = this.workbenchState === WorkbenchState.EMPTY;
++		if (entry.emptyOnly && !empty) { return false; }
++		if (entry.workspaceOnly && empty) { return false; }
++		if (entry.nativeOnly && isWeb) { return false; }
++		return !!CommandsRegistry.getCommand(entry.id);
+ 	}
+ 
+ 	private render(): void {
+@@ -160,58 +160,47 @@
+ 
+ 		clearNode(this.shortcuts);
+ 		this.transientDisposables.clear();
++		this.keybindingLabels.clear();
+ 
+ 		if (!this.enabled) {
+ 			return;
+ 		}
+ 
+-		const entries = this.filterEntries(this.workbenchState !== WorkbenchState.EMPTY ? workspaceEntries : emptyWindowEntries);
+-		if (entries.length < EditorGroupWatermark.MINIMUM_ENTRIES) {
+-			const additionalEntries = this.filterEntries(otherEntries);
+-			shuffle(additionalEntries);
+-			entries.push(...additionalEntries.slice(0, EditorGroupWatermark.MINIMUM_ENTRIES - entries.length));
+-		}
+-
+-		const box = append(this.shortcuts, $('.watermark-box'));
++		const root = append(this.shortcuts, $('.arara-start-box'));
++		const title = append(root, $('h1.arara-start-title'));
++		title.textContent = this.productService.nameLong;
++
++		const grid = append(root, $('.arara-start-grid'));
++
++		for (const section of sections) {
++			const entries = section.entries.filter(e => this.visible(e));
++			if (!entries.length) {
++				continue;
++			}
+ 
+-		const update = () => {
+-			clearNode(box);
+-			this.keybindingLabels.clear();
++			const col = append(grid, $('section.arara-start-section'));
++			append(col, $('h2')).textContent = section.title;
++			const list = append(col, $('ul'));
+ 
+ 			for (const entry of entries) {
++				const li = append(list, $('li'));
++				const button = append(li, $('button.arara-start-item', { type: 'button' })) as HTMLButtonElement;
++				append(button, $('span.arara-start-label')).textContent = entry.text;
++
+ 				const keys = this.keybindingService.lookupKeybinding(entry.id);
+-				if (!keys) {
+-					continue;
++				if (keys) {
++					const kb = append(button, $('span.arara-start-keys'));
++					const label = this.keybindingLabels.add(new KeybindingLabel(kb, OS, { renderUnboundKeybindings: true, ...defaultKeybindingLabelStyles }));
++					label.set(keys);
++					button.setAttribute('aria-label', `${entry.text} (${keys.getAriaLabel() ?? ''})`);
+ 				}
+ 
+-				const dl = append(box, $('dl'));
+-				const dt = append(dl, $('dt'));
+-				dt.textContent = entry.text;
+-
+-				const dd = append(dl, $('dd'));
+-
+-				const label = this.keybindingLabels.add(new KeybindingLabel(dd, OS, { renderUnboundKeybindings: true, ...defaultKeybindingLabelStyles }));
+-				label.set(keys);
++				this.transientDisposables.add(addDisposableListener(button, EventType.CLICK, () => {
++					this.commandService.executeCommand(entry.id);
++				}));
+ 			}
+-		};
+-
+-		update();
+-		this.transientDisposables.add(this.keybindingService.onDidUpdateKeybindings(update));
+-	}
+-
+-	private filterEntries(entries: WatermarkEntry[]): WatermarkEntry[] {
+-		const filteredEntries = entries
+-			.filter(entry => {
+-				if (this.cachedWhen[entry.id]) {
+-					return true; // cached from previous session
+-				}
+-
+-				const contextKey = isWeb ? entry.when?.web : entry.when?.native;
+-				return !contextKey /* works without context */ || this.contextKeyService.contextMatchesRules(contextKey);
+-			})
+-			.filter(entry => !!CommandsRegistry.getCommand(entry.id))
+-			.filter(entry => !!this.keybindingService.lookupKeybinding(entry.id));
++		}
+ 
+-		return filteredEntries;
++		this.transientDisposables.add(this.keybindingService.onDidUpdateKeybindings(() => this.render()));
+ 	}
+ }
+--- a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
++++ b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
+@@ -320,3 +320,75 @@
+ 	width: 100%;
+ 	height: 100%;
+ }
++
++/* Arara Code: tela inicial do editor vazio (atalhos clicáveis) */
++
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark-wrapper > .editor-group-watermark.arara-start {
++	max-width: 720px;
++	padding: 0 24px;
++}
++
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark-wrapper > .editor-group-watermark.arara-start .letterpress {
++	max-width: 96px;
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-title {
++	margin: 0 0 20px;
++	text-align: center;
++	font-size: 22px;
++	font-weight: 600;
++	color: var(--vscode-foreground);
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-grid {
++	display: grid;
++	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
++	gap: 20px 32px;
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-section h2 {
++	margin: 0 0 6px;
++	font-size: 11px;
++	font-weight: 600;
++	letter-spacing: 0.06em;
++	text-transform: uppercase;
++	color: var(--vscode-descriptionForeground);
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-section ul {
++	list-style: none;
++	margin: 0;
++	padding: 0;
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item {
++	display: flex;
++	width: 100%;
++	align-items: center;
++	justify-content: space-between;
++	gap: 12px;
++	padding: 4px 8px;
++	margin: 0 -8px;
++	border: 0;
++	border-radius: 4px;
++	background: none;
++	color: var(--vscode-textLink-foreground);
++	font: inherit;
++	text-align: left;
++	cursor: pointer;
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item:hover {
++	background: var(--vscode-list-hoverBackground);
++	color: var(--vscode-textLink-activeForeground);
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item:focus-visible {
++	outline: 1px solid var(--vscode-focusBorder);
++	outline-offset: -1px;
++}
++
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-keys {
++	flex-shrink: 0;
++	color: var(--vscode-descriptionForeground);
++}

@@ -36,6 +36,15 @@ mongod --dbpath ~/.local/arara-mongo --bind_ip 127.0.0.1 &
 
 Na IDE, clique em **Arara: entrar** na barra de status (ou `Ctrl+Shift+P` → *Arara: Entrar*). O navegador abre o ac-web; depois de autorizar, ele volta para um servidor local que a IDE abriu em `127.0.0.1:53682`. Se essa porta estiver ocupada, a IDE tenta 53683…53692 e, por fim, uma porta livre qualquer do sistema. A porta preferida pode ser trocada em `arara.auth.callbackPort`.
 
+## Patches no core
+
+| Patch | O quê |
+|---|---|
+| `0001-no-welcome-page` | Sem página Welcome: `workbench.startupEditor` = `none`, walkthroughs não abrem ao instalar extensão |
+| `0002-start-screen-shortcuts` | Editor vazio vira tela inicial com atalhos clicáveis (abrir pasta, recentes, clonar, comandos, terminal, chat Arara, entrar, tema, atalhos…) |
+
+Para criar/alterar um patch: edite em `.work/vscodium/vscode`, teste com `scripts/dev.sh` e rode `scripts/new-patch.sh NNNN-nome arquivo…`. Detalhes em `AGENTS.md`.
+
 ## Build de release (Linux)
 
 ```bash
