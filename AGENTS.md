@@ -4,7 +4,7 @@ Este arquivo vai na raiz do repo `arara-code`. Leia também o AGENTS.md geral.
 
 ## O que este repo é
 
-Scripts que transformam o VSCodium (submódulo em `upstream/vscodium`, tag fixa) no Arara Code. **Não há código de IA aqui.** Estrutura e fluxo em `_docs/docs/03-organizacao-git.md` (workspace de planejamento).
+Scripts que transformam o VSCodium (submódulo em `upstream/vscodium`, tag fixa) no Arara Code. **Não há código de IA aqui.** Estrutura e fluxo em `ac-docs/docs/03-organizacao-git.md` (workspace de planejamento).
 
 ## O que você pode mexer
 
