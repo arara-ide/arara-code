@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build do Arara Code.
 #
-# Fluxo (ver _docs/docs/03-organizacao-git.md):
+# Fluxo (ver ac-docs/docs/03-organizacao-git.md):
 #   1. copia upstream/vscodium (submódulo, tag fixa) para .work/vscodium  — o submódulo nunca é alterado
 #   2. aplica patches/vscodium/*.patch nos scripts do VSCodium
 #   3. gera ícones do Arara por cima de .work/vscodium/src/stable
@@ -9,17 +9,21 @@
 #   5. copia patches/code/*.patch para .work/vscodium/patches/user/ (hook oficial do VSCodium p/ downstream)
 #   6. roda get_repo.sh + build.sh do VSCodium com as variáveis de branding exportadas
 #
-# Uso: scripts/build.sh [--skip-source]   (--skip-source reusa o vscode/ já clonado)
+# Uso: scripts/build.sh [--skip-source] [--prepare-only]
+#   --skip-source   reusa o vscode/ já clonado
+#   --prepare-only  para depois de clone + patches + branding + npm ci (sem compilar); usado pelo scripts/dev.sh
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 UPSTREAM="${ROOT}/upstream/vscodium"
 WORK="${ROOT}/.work/vscodium"
 SKIP_SOURCE="no"
+PREPARE_ONLY="no"
 
 for arg in "$@"; do
   case "${arg}" in
     --skip-source) SKIP_SOURCE="yes" ;;
+    --prepare-only) PREPARE_ONLY="yes" ;;
     *) echo "opção desconhecida: ${arg}" >&2; exit 1 ;;
   esac
 done
@@ -99,6 +103,15 @@ else
   # volta o vscode/ ao estado limpo da tag antes de reaplicar os patches
   ( cd vscode && git add -A && git reset -q --hard HEAD && git clean -fdq -e node_modules && rm -rf .build out* )
   rm -rf VSCode-*
+fi
+
+if [[ "${PREPARE_ONLY}" == "yes" ]]; then
+  # o mesmo que o build.sh do VSCodium faz antes de chamar o gulp
+  . version.sh
+  . prepare_vscode.sh
+  echo
+  echo "pronto (preparado, sem compilar): ${WORK}/vscode"
+  exit 0
 fi
 
 . build.sh
