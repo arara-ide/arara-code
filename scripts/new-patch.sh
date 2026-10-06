@@ -25,10 +25,14 @@ trap 'rm -rf "${TMP}"' EXIT
 BASE="${TMP}/base"
 mkdir -p "${BASE}"
 
-# 1. versão da tag
+# 1. versão da tag (arquivos que não existem na tag viram "novo arquivo" no patch)
+NEW_FILES=" "
 for f in "${FILES[@]}"; do
   mkdir -p "${BASE}/$( dirname "${f}" )"
-  git -C "${VSCODE}" show "HEAD:${f}" > "${BASE}/${f}" 2>/dev/null || : > "${BASE}/${f}"
+  if ! git -C "${VSCODE}" show "HEAD:${f}" > "${BASE}/${f}" 2>/dev/null; then
+    rm -f "${BASE}/${f}"
+    NEW_FILES+="${f} "
+  fi
 done
 
 # 2. patches na mesma ordem do VSCodium, depois os nossos anteriores a este
@@ -71,7 +75,11 @@ fi
 {
   printf '%s\n\n' "${HEADER%$'\n'}"
   for f in "${FILES[@]}"; do
-    diff -u --label "a/${f}" --label "b/${f}" "${BASE}/${f}" "${VSCODE}/${f}" || true
+    if [[ "${NEW_FILES}" == *" ${f} "* && ! -e "${BASE}/${f}" ]]; then
+      diff -u --label /dev/null --label "b/${f}" /dev/null "${VSCODE}/${f}" || true
+    else
+      diff -u --label "a/${f}" --label "b/${f}" "${BASE}/${f}" "${VSCODE}/${f}" || true
+    fi
   done
 } > "${OUT}"
 

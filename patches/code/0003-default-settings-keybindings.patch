@@ -1,0 +1,204 @@
+Arara Code: product default settings and keybindings (Windows/Linux).
+
+- src/vs/workbench/common/arara.defaults.ts: registerDefaultConfigurations()
+  with native settings only (editor, workbench, explorer, scm/git,
+  typescript/javascript built-ins). Third-party extension settings are not
+  included. Keybindings list in keybindings.json format ("-cmd" = removal).
+- keybindingService: inject the Arara keybindings into the *default* layer of
+  the resolver (not macOS), so the user can still override/remove them.
+- workbench.common.main: import the defaults.
+- test: entries parse; no third-party commands.
+
+Why a patch: product.json cannot set configuration defaults or default
+keybindings; an extension could, but would load late and show up as
+"extension" defaults.
+Touches: src/vs/workbench/common/arara.defaults.ts (new),
+         src/vs/workbench/test/common/arara.defaults.test.ts (new),
+         src/vs/workbench/services/keybinding/browser/keybindingService.ts,
+         src/vs/workbench/workbench.common.main.ts
+
+--- /dev/null
++++ b/src/vs/workbench/common/arara.defaults.ts
+@@ -0,0 +1,113 @@
++/*---------------------------------------------------------------------------------------------
++ *  Arara Code: configurações e atalhos padrão do produto.
++ *  Licensed under the MIT License.
++ *
++ *  Só configurações nativas do Code-OSS (core + extensões built-in). Configurações
++ *  de extensões de terceiros (prettier, python, etc.) não entram aqui.
++ *  Usuário sempre pode sobrescrever em settings.json / keybindings.json.
++ *--------------------------------------------------------------------------------------------*/
++
++import { Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../platform/configuration/common/configurationRegistry.js';
++import { Registry } from '../../platform/registry/common/platform.js';
++
++// ---------------------------------------------------------------- settings
++
++Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerDefaultConfigurations([{
++	overrides: {
++		// editor
++		'editor.wordWrap': 'on',
++		'editor.maxTokenizationLineLength': 30000,
++		'editor.multiCursorLimit': 100000,
++		'editor.unicodeHighlight.ambiguousCharacters': false,
++		'editor.unicodeHighlight.allowedLocales': { es: true },
++		'editor.formatOnSaveMode': 'modificationsIfAvailable',
++		'diffEditor.ignoreTrimWhitespace': false,
++		'diffEditor.codeLens': true,
++
++		// workbench
++		'workbench.startupEditor': 'none',
++		'workbench.activityBar.location': 'top',
++		'workbench.editorAssociations': { '*.svg': 'default' },
++		'workbench.settings.applyToAllProfiles': ['editor.maxTokenizationLineLength'],
++		'update.showReleaseNotes': false,
++		'extensions.ignoreRecommendations': true,
++		'security.workspace.trust.untrustedFiles': 'open',
++
++		// explorer
++		'explorer.confirmDelete': false,
++		'explorer.confirmDragAndDrop': false,
++		'explorer.confirmPasteNative': false,
++		'explorer.compactFolders': false,
++
++		// scm / git (extensão built-in)
++		'scm.repositories.selectionMode': 'single',
++		'git.autofetch': true,
++		'git.confirmSync': false,
++		'git.enableSmartCommit': true,
++		'git.openRepositoryInParentFolders': 'never',
++
++		// typescript/javascript (extensão built-in)
++		'javascript.updateImportsOnFileMove.enabled': 'always',
++		'typescript.updateImportsOnFileMove.enabled': 'always',
++		'[html]': { 'editor.defaultFormatter': 'vscode.html-language-features' },
++	},
++}]);
++
++// ---------------------------------------------------------------- keybindings
++
++/**
++ * Mesmo formato do keybindings.json. Entradas com "-comando" removem o padrão
++ * correspondente. Aplicadas como camada entre os padrões do VS Code e os do
++ * usuário (ver keybindingService._getResolver).
++ */
++export interface AraraKeybinding {
++	key?: string;
++	command: string;
++	when?: string;
++}
++
++const terminalCopyWhen = 'terminalTextSelectedInFocused || terminalFocus && terminalHasBeenCreated && terminalTextSelected || terminalFocus && terminalProcessSupported && terminalTextSelected || terminalFocus && terminalTextSelected && terminalTextSelectedInFocused || terminalHasBeenCreated && terminalTextSelected && terminalTextSelectedInFocused || terminalProcessSupported && terminalTextSelected && terminalTextSelectedInFocused';
++const terminalPasteWhen = 'terminalFocus && terminalHasBeenCreated || terminalFocus && terminalProcessSupported';
++const editable = 'editorTextFocus && !editorReadonly';
++const inlineChatWhen = 'editorFocus && inlineChatHasEditsAgent && inlineChatPossible && !editorReadonly && !editorSimpleInput || editorFocus && inlineChatHasProvider && inlineChatPossible && !editorReadonly && !editorSimpleInput';
++
++export const araraDefaultKeybindings: AraraKeybinding[] = [
++	// terminal: ctrl+c / ctrl+v copiam e colam (ctrl+c sem seleção continua mandando SIGINT)
++	{ key: 'ctrl+c', command: 'workbench.action.terminal.copySelection', when: terminalCopyWhen },
++	{ key: 'ctrl+shift+c', command: '-workbench.action.terminal.copySelection', when: terminalCopyWhen },
++	{ key: 'ctrl+v', command: 'workbench.action.terminal.paste', when: terminalPasteWhen },
++	{ key: 'ctrl+shift+v', command: '-workbench.action.terminal.paste', when: terminalPasteWhen },
++
++	// editor
++	{ key: 'shift+alt+down', command: 'editor.action.copyLinesDownAction', when: editable },
++	{ key: 'ctrl+shift+alt+down', command: '-editor.action.copyLinesDownAction', when: editable },
++	{ key: 'shift+alt+up', command: 'editor.action.copyLinesUpAction', when: editable },
++	{ key: 'ctrl+shift+alt+up', command: '-editor.action.copyLinesUpAction', when: editable },
++	{ key: 'ctrl+shift+down', command: '-editor.action.insertCursorBelow', when: 'editorTextFocus' },
++	{ key: 'ctrl+shift+up', command: '-editor.action.insertCursorAbove', when: 'editorTextFocus' },
++	{ key: 'ctrl+l', command: '-expandLineSelection', when: 'textInputFocus' },
++
++	// abas: ctrl+tab / ctrl+shift+tab trocam de aba na ordem visual
++	{ key: 'ctrl+tab', command: '-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup', when: '!activeEditorGroupEmpty' },
++	{ key: 'ctrl+tab', command: 'workbench.action.nextEditor' },
++	{ key: 'ctrl+pagedown', command: '-workbench.action.nextEditor' },
++	{ key: 'ctrl+shift+tab', command: '-workbench.action.quickOpenLeastRecentlyUsedEditorInGroup', when: '!activeEditorGroupEmpty' },
++	{ key: 'ctrl+shift+tab', command: 'workbench.action.previousEditor' },
++	{ key: 'ctrl+pageup', command: '-workbench.action.previousEditor' },
++
++	// arquivos / app
++	{ key: 'ctrl+shift+s', command: '-workbench.action.files.saveAs' },
++	{ key: 'ctrl+shift+s', command: 'workbench.action.files.saveFiles' },
++	{ key: 'ctrl+q', command: '-workbench.action.quit' },
++
++	// chat nativo do VS Code: ctrl+i abre o painel, ctrl+k chat inline; tira os conflitos
++	{ key: 'ctrl+i', command: 'workbench.panel.chat', when: 'workbench.panel.chat.view.copilot.active' },
++	{ key: 'ctrl+alt+i', command: '-workbench.panel.chat', when: 'workbench.panel.chat.view.copilot.active' },
++	{ key: 'ctrl+k', command: 'inlineChat.start', when: inlineChatWhen },
++	{ key: 'ctrl+i', command: '-inlineChat.start', when: inlineChatWhen },
++	{ key: 'ctrl+l', command: '-workbench.action.chat.newChat', when: 'chatEditingParticipantRegistered && chatIsEnabled && inChat' },
++	{ key: 'ctrl+i', command: '-workbench.action.chat.startVoiceChat' },
++	{ key: 'ctrl+i', command: '-workbench.action.chat.stopListeningAndSubmit' },
++	{ key: 'ctrl+i', command: '-workbench.action.terminal.chat.start' },
++	{ key: 'ctrl+shift+l', command: '-workbench.action.terminal.suggestLearnMore' },
++];
+--- /dev/null
++++ b/src/vs/workbench/test/common/arara.defaults.test.ts
+@@ -0,0 +1,35 @@
++/*---------------------------------------------------------------------------------------------
++ *  Arara Code: os atalhos padrão do produto parseiam e as remoções ("-cmd") batem
++ *  com atalhos padrão reais do VS Code.
++ *  Licensed under the MIT License.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../base/test/common/utils.js';
++import { KeybindingIO } from '../../services/keybinding/common/keybindingIO.js';
++import { araraDefaultKeybindings } from '../../common/arara.defaults.js';
++
++suite('Arara default keybindings', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('every entry parses (key and when)', () => {
++		for (const k of araraDefaultKeybindings) {
++			const item = KeybindingIO.readUserKeybindingItem(k);
++			assert.ok(item.command, `command missing: ${JSON.stringify(k)}`);
++			if (k.key) {
++				assert.ok(item.keybinding, `key did not parse: ${k.key}`);
++			}
++			if (k.when) {
++				assert.ok(item.when, `when did not parse: ${k.when}`);
++			}
++		}
++	});
++
++	test('no entry references third-party extensions', () => {
++		const thirdParty = /^-?(github\.copilot|aws\.|amazonq|windsurf|devin|composer\.|aichat|aipopup|extension\.translate)/;
++		for (const k of araraDefaultKeybindings) {
++			assert.ok(!thirdParty.test(k.command), `third-party command in defaults: ${k.command}`);
++		}
++	});
++});
+--- a/src/vs/workbench/services/keybinding/browser/keybindingService.ts
++++ b/src/vs/workbench/services/keybinding/browser/keybindingService.ts
+@@ -54,6 +54,7 @@
+ import { IHostService } from '../../host/browser/host.js';
+ import { IUserDataProfileService } from '../../userDataProfile/common/userDataProfile.js';
+ import { IUserKeybindingItem, KeybindingIO, OutputBuilder } from '../common/keybindingIO.js';
++import { araraDefaultKeybindings } from '../../../common/arara.defaults.js';
+ import { IKeyboard, INavigatorWithKeyboard } from './navigatorKeyboard.js';
+ import { getAllUnboundCommands } from './unboundCommands.js';
+ import { EditorContextKeys } from '../../../../editor/common/editorContextKeys.js';
+@@ -442,6 +443,10 @@
+ 	protected _getResolver(): KeybindingResolver {
+ 		if (!this._cachedResolver) {
+ 			const defaults = this._resolveKeybindingItems(KeybindingsRegistry.getDefaultKeybindings(), true);
++			// Arara Code: atalhos padrão do produto (Windows/Linux), como camada "default"; o usuário pode remover com "-comando"
++			if (!isMacintosh) {
++				defaults.push(...this._resolveUserKeybindingItems(araraDefaultKeybindings.map(k => KeybindingIO.readUserKeybindingItem(k)), true));
++			}
+ 			const overrides = this._resolveUserKeybindingItems(this.userKeybindings.keybindings, false);
+ 			this._cachedResolver = new KeybindingResolver(defaults, overrides, (str) => this._log(str));
+ 		}
+--- a/src/vs/workbench/workbench.common.main.ts
++++ b/src/vs/workbench/workbench.common.main.ts
+@@ -9,6 +9,7 @@
+ 
+ import './api/browser/extensionHost.contribution.js';
+ import './browser/workbench.contribution.js';
++import './common/arara.defaults.js'; // Arara Code: configurações padrão do produto
+ import './browser/workbench.zenMode.contribution.js';
+ 
+ // Agent-sessions color tokens — side-effect import so they register in the

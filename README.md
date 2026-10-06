@@ -42,6 +42,7 @@ Na IDE, clique em **Arara: entrar** na barra de status (ou `Ctrl+Shift+P` → *A
 |---|---|
 | `0001-no-welcome-page` | Sem página Welcome: `workbench.startupEditor` = `none`, walkthroughs não abrem ao instalar extensão |
 | `0002-start-screen-shortcuts` | Editor vazio vira tela inicial com atalhos clicáveis (abrir pasta, recentes, clonar, comandos, terminal, chat Arara, entrar, tema, atalhos…) |
+| `0003-default-settings-keybindings` | Configurações e atalhos padrão do produto (só nativos). Lista em `src/vs/workbench/common/arara.defaults.ts`. Atalhos só em Windows/Linux |
 
 Para criar/alterar um patch: edite em `.work/vscodium/vscode`, teste com `scripts/dev.sh` e rode `scripts/new-patch.sh NNNN-nome arquivo…`. Detalhes em `AGENTS.md`.
 
