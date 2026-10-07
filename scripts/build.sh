@@ -9,9 +9,13 @@
 #   5. copia patches/code/*.patch para .work/vscodium/patches/user/ (hook oficial do VSCodium p/ downstream)
 #   6. roda get_repo.sh + build.sh do VSCodium com as variáveis de branding exportadas
 #
-# Uso: scripts/build.sh [--skip-source] [--prepare-only]
+# Uso: scripts/build.sh [--skip-source] [--prepare-only] [--no-deb]
 #   --skip-source   reusa o vscode/ já clonado
 #   --prepare-only  para depois de clone + patches + branding + npm ci (sem compilar); usado pelo scripts/dev.sh
+#   --no-deb        só a pasta VSCode-linux-<arch> (sem gerar o .deb)
+#
+# A extensão ../arara-ai (ARARA_AI_DIR) é compilada e entra como extensão built-in.
+# No Linux o resultado vai para dist/: arara-code_<versão>_<arch>.deb e .tar.gz
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -19,11 +23,14 @@ UPSTREAM="${ROOT}/upstream/vscodium"
 WORK="${ROOT}/.work/vscodium"
 SKIP_SOURCE="no"
 PREPARE_ONLY="no"
+BUILD_DEB="yes"
+ARARA_AI_DIR="${ARARA_AI_DIR:-$( cd "${ROOT}/.." && pwd )/arara-ai}"
 
 for arg in "$@"; do
   case "${arg}" in
     --skip-source) SKIP_SOURCE="yes" ;;
     --prepare-only) PREPARE_ONLY="yes" ;;
+    --no-deb) BUILD_DEB="no" ;;
     *) echo "opção desconhecida: ${arg}" >&2; exit 1 ;;
   esac
 done
@@ -46,6 +53,9 @@ done
 
 # --- 3. ícones
 "${ROOT}/scripts/build-icons.sh" "${WORK}/src/stable"
+
+# --- 3b. textos do Linux (menu de programas, .deb): sobrescrevem os do VSCodium
+cp "${ROOT}"/branding/linux/{code.desktop,code-url-handler.desktop,code.appdata.xml} "${WORK}/src/stable/resources/linux/"
 
 # --- 4. product.json (o prepare_vscode.sh faz `vscode/product.json * ../product.json`)
 jq -s '.[0] * .[1]' "${WORK}/product.json" "${ROOT}/branding/product.overlay.json" > "${WORK}/product.json.tmp"
@@ -105,6 +115,23 @@ else
   rm -rf VSCode-*
 fi
 
+# --- 7. extensão arara-ai embutida (built-in): o gulp empacota tudo em vscode/extensions/*
+embed_arara_ai() {
+  [[ -f "${ARARA_AI_DIR}/package.json" ]] || { echo "! ${ARARA_AI_DIR} não encontrado; build sem a extensão de IA" >&2; return 0; }
+  echo "» Compilando arara-ai…"
+  ( cd "${ARARA_AI_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build )
+  local dest="${WORK}/vscode/extensions/arara-ai"
+  rm -rf "${dest}"
+  mkdir -p "${dest}"
+  # mesmo conjunto do .vscodeignore: só o que roda (sem src/, testes, node_modules)
+  cp "${ARARA_AI_DIR}/package.json" "${dest}/"
+  [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"
+  [[ -f "${ARARA_AI_DIR}/.vscodeignore" ]] && cp "${ARARA_AI_DIR}/.vscodeignore" "${dest}/"
+  mkdir -p "${dest}/dist"
+  cp "${ARARA_AI_DIR}/dist/extension.js" "${dest}/dist/"
+  cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
+}
+
 if [[ "${PREPARE_ONLY}" == "yes" ]]; then
   # o mesmo que o build.sh do VSCodium faz antes de chamar o gulp
   . version.sh
@@ -114,7 +141,43 @@ if [[ "${PREPARE_ONLY}" == "yes" ]]; then
   exit 0
 fi
 
-. build.sh
+if [[ "${OS_NAME}" == "linux" ]]; then
+  # Mesmo fluxo do build.sh do VSCodium (Linux, sem CI), em etapas, para a
+  # extensão e os textos do .deb entrarem depois do prepare_vscode.sh.
+  . version.sh
+  . prepare_vscode.sh
+  embed_arara_ai
+  cp "${ROOT}/branding/linux/control.template" vscode/resources/linux/debian/control.template
+  (
+    cd vscode
+    export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
+    export VSCODE_PUBLISH_COUNTER=1
+    npm run gulp vscode-min-prepack
+    rm -f .build/extensions/ms-vscode.js-debug/src/win32-app-container-tokens.*.node
+    npm run copy-policy-dto --prefix build
+    node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc linux
+    npm run gulp "vscode-linux-${VSCODE_ARCH}-min-packing"
+  )
+  find "VSCode-linux-${VSCODE_ARCH}" -print0 | xargs -0 touch -c
+else
+  # macOS/Windows: fluxo do VSCodium sem mudanças (extensão embutida ainda só no Linux)
+  . build.sh
+fi
 
-echo
-echo "pronto: ${WORK}/VSCode-${OS_NAME}-${VSCODE_ARCH}"
+if [[ "${OS_NAME}" == "linux" ]]; then
+  OUT="${ROOT}/dist"
+  mkdir -p "${OUT}"
+  tar czf "${OUT}/arara-code-linux-${VSCODE_ARCH}-${RELEASE_VERSION}.tar.gz" -C "${WORK}/VSCode-linux-${VSCODE_ARCH}" .
+  if [[ "${BUILD_DEB}" == "yes" ]]; then
+    ( cd "${WORK}/vscode" \
+      && npm run gulp "vscode-linux-${VSCODE_ARCH}-prepare-deb" \
+      && npm run gulp "vscode-linux-${VSCODE_ARCH}-build-deb" )
+    cp "${WORK}"/vscode/.build/linux/deb/*/deb/*.deb "${OUT}/"
+  fi
+  echo
+  echo "pronto:"
+  ls -lh "${OUT}"
+else
+  echo
+  echo "pronto: ${WORK}/VSCode-${OS_NAME}-${VSCODE_ARCH}"
+fi
