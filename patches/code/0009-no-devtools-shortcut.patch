@@ -1,0 +1,73 @@
+Arara Code: no Developer Tools shortcut; command only when running from source.
+
+- developerActions.ts: Toggle Developer Tools has no keybinding (Ctrl+Shift+I is
+  Format Document on Linux) and only appears/runs with isDevelopment.
+- workbench.ts: the early dev listener no longer toggles devtools on
+  Ctrl+Shift+I / F12 (reload stays).
+
+Why a patch: keybindings and menu registration are hard-coded in the workbench.
+Touches: src/vs/workbench/electron-browser/actions/developerActions.ts
+         src/vs/code/electron-browser/workbench/workbench.ts
+
+--- a/src/vs/workbench/electron-browser/actions/developerActions.ts
++++ b/src/vs/workbench/electron-browser/actions/developerActions.ts
+@@ -10,9 +10,7 @@
+ import { Categories } from '../../../platform/action/common/actionCommonCategories.js';
+ import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
+ import { IWorkbenchEnvironmentService } from '../../services/environment/common/environmentService.js';
+-import { KeybindingWeight } from '../../../platform/keybinding/common/keybindingsRegistry.js';
+ import { IsDevelopmentContext } from '../../../platform/contextkey/common/contextkeys.js';
+-import { KeyCode, KeyMod } from '../../../base/common/keyCodes.js';
+ import { INativeWorkbenchEnvironmentService } from '../../services/environment/electron-browser/environmentService.js';
+ import { URI } from '../../../base/common/uri.js';
+ import { getActiveWindow } from '../../../base/browser/dom.js';
+@@ -27,18 +25,19 @@
+ 			id: 'workbench.action.toggleDevTools',
+ 			title: localize2('toggleDevTools', 'Toggle Developer Tools'),
+ 			category: Categories.Developer,
++			// Arara Code: sem atalho (Ctrl+Shift+I é "Formatar documento" no Linux) e só
++			// rodando do código-fonte; no release o comando não aparece em lugar nenhum
+ 			f1: true,
+-			keybinding: {
+-				weight: KeybindingWeight.WorkbenchContrib + 50,
+-				when: IsDevelopmentContext,
+-				primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyI,
+-				mac: { primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyI }
+-			},
+-			menu: {
++			precondition: IsDevelopmentContext,
++			menu: [{
+ 				id: MenuId.MenubarHelpMenu,
+ 				group: '5_tools',
+-				order: 1
+-			}
++				order: 1,
++				when: IsDevelopmentContext
++			}, {
++				id: MenuId.CommandPalette,
++				when: IsDevelopmentContext
++			}]
+ 		});
+ 	}
+ 
+--- a/src/vs/code/electron-browser/workbench/workbench.ts
++++ b/src/vs/code/electron-browser/workbench/workbench.ts
+@@ -471,16 +471,12 @@
+ 				].join('');
+ 			};
+ 
+-		// Devtools & reload support
+-		const TOGGLE_DEV_TOOLS_KB = (safeProcess.platform === 'darwin' ? 'meta-alt-73' : 'ctrl-shift-73'); // mac: Cmd-Alt-I, rest: Ctrl-Shift-I
+-		const TOGGLE_DEV_TOOLS_KB_ALT = '123'; // F12
++		// Arara Code: sem atalho de devtools (Ctrl+Shift+I / F12); só o reload de dev
+ 		const RELOAD_KB = (safeProcess.platform === 'darwin' ? 'meta-82' : 'ctrl-82'); // mac: Cmd-R, rest: Ctrl-R
+ 
+ 		let listener: ((e: KeyboardEvent) => void) | undefined = function (e) {
+ 			const key = extractKey(e);
+-			if (key === TOGGLE_DEV_TOOLS_KB || key === TOGGLE_DEV_TOOLS_KB_ALT) {
+-				ipcRenderer.send('vscode:toggleDevTools');
+-			} else if (key === RELOAD_KB && !disallowReloadKeybinding) {
++			if (key === RELOAD_KB && !disallowReloadKeybinding) {
+ 				ipcRenderer.send('vscode:reloadWindow');
+ 			}
+ 		};
