@@ -1,0 +1,28 @@
+Arara Code: dev mode keeps the normal color theme.
+
+- workbenchThemeService.ts: upstream switches to the color theme of the
+  extension under development (--extensionDevelopmentPath) on every start and
+  writes it to the user settings. scripts/dev.sh always loads arara-ai, which
+  contributes 'Arara Dark 2027', so dev mode never opened with the product
+  default (Dark 2026). The color theme now comes from settings/default like
+  in release builds.
+
+Why a patch: hard-coded in the theme service; no setting controls it.
+Touches: src/vs/workbench/services/themes/browser/workbenchThemeService.ts
+
+--- a/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
++++ b/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
+@@ -201,11 +201,8 @@
+ 		const extDevLoc = extDevLocs && extDevLocs.length === 1 ? extDevLocs[0] : undefined; // in dev mode, switch to a theme provided by the extension under dev.
+ 
+ 		const initializeColorTheme = async () => {
+-			const devThemes = this.colorThemeRegistry.findThemeByExtensionLocation(extDevLoc);
+-			if (devThemes.length) {
+-				const matchedColorTheme = devThemes.find(theme => theme.type === this.currentColorTheme.type);
+-				return this.setColorTheme(matchedColorTheme ? matchedColorTheme.id : devThemes[0].id, undefined);
+-			}
++			// Arara Code: o upstream troca para o tema da extensão em desenvolvimento. No dev.sh essa
++			// extensão é a arara-ai, que traz o Arara Dark 2027; aqui o modo dev abre no tema normal.
+ 			let theme = this.colorThemeRegistry.findThemeBySettingsId(this.settings.colorTheme, undefined);
+ 			if (!theme) {
+ 				// If the current theme is not available, first make sure setting sync is complete
