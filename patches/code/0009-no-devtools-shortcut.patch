@@ -1,7 +1,8 @@
 Arara Code: no Developer Tools shortcut; command only when running from source.
 
 - developerActions.ts: Toggle Developer Tools has no keybinding (Ctrl+Shift+I is
-  Format Document on Linux) and only appears/runs with isDevelopment.
+  Format Document on Linux) and only appears/runs with isDevelopment; in a
+  built release run() returns without opening (executeCommand skips precondition).
 - workbench.ts: the early dev listener no longer toggles devtools on
   Ctrl+Shift+I / F12 (reload stays).
 
@@ -21,7 +22,7 @@ Touches: src/vs/workbench/electron-browser/actions/developerActions.ts
  import { INativeWorkbenchEnvironmentService } from '../../services/environment/electron-browser/environmentService.js';
  import { URI } from '../../../base/common/uri.js';
  import { getActiveWindow } from '../../../base/browser/dom.js';
-@@ -27,18 +25,19 @@
+@@ -27,22 +25,27 @@
  			id: 'workbench.action.toggleDevTools',
  			title: localize2('toggleDevTools', 'Toggle Developer Tools'),
  			category: Categories.Developer,
@@ -50,6 +51,14 @@ Touches: src/vs/workbench/electron-browser/actions/developerActions.ts
  		});
  	}
  
+ 	async run(accessor: ServicesAccessor): Promise<void> {
++		// Arara Code: precondition não vale para executeCommand (extensões); no release não abre nunca
++		if (accessor.get(IWorkbenchEnvironmentService).isBuilt) {
++			return;
++		}
+ 		const nativeHostService = accessor.get(INativeHostService);
+ 
+ 		return nativeHostService.toggleDevTools({ targetWindowId: getActiveWindow().vscodeWindowId });
 --- a/src/vs/code/electron-browser/workbench/workbench.ts
 +++ b/src/vs/code/electron-browser/workbench/workbench.ts
 @@ -471,16 +471,12 @@

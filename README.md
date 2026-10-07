@@ -3,6 +3,40 @@
 IDE baseada em Code-OSS, construída em cima dos scripts do [VSCodium](https://github.com/VSCodium/vscodium).
 Este repo não contém código do VS Code: só o VSCodium como submódulo (tag fixa), patches, branding e scripts.
 
+## Instalar
+
+Linux (Ubuntu/Debian, x64). Baixe o `.deb` da [última release](https://github.com/arara-ide/arara-ide/releases/latest) e rode:
+
+```bash
+sudo apt install ./arara-code_*_amd64.deb
+```
+
+Pronto: o Arara Code aparece no menu de aplicativos. No terminal, abra com `arara-code`.
+
+Para entrar na conta e usar a IA, o backend precisa estar no ar (nesta fase de teste: `localhost:7010`, ver abaixo).
+
+### Atualizar
+
+Baixe o `.deb` novo e rode o mesmo comando. Suas configurações e conversas ficam.
+
+### Desinstalar
+
+```bash
+arara-code-uninstall          # remove o programa, mantém suas configurações
+arara-code-uninstall --all    # remove tudo, inclusive configurações e conversas
+```
+
+Ou: `sudo apt remove arara-code`.
+
+### Sem instalar (.tar.gz)
+
+```bash
+mkdir -p ~/arara-code && tar -xzf arara-code-linux-x64-*.tar.gz -C ~/arara-code
+~/arara-code/bin/arara-code
+```
+
+Para remover, rode `~/arara-code/bin/arara-code-uninstall`.
+
 ## Rodar local rapidinho (modo dev)
 
 Pastas lado a lado em `~/Documents/gabs/`: `arara-code`, `arara-ai`, `ac-services`, `ac-web`.
@@ -50,17 +84,21 @@ Para criar/alterar um patch: edite em `.work/vscodium/vscode`, teste com `script
 
 ```bash
 git submodule update --init
-scripts/build.sh                 # ~15 min, ~10 GB em .work/, pico ~13 GB de RAM
+scripts/build.sh                 # ~25 min, ~10 GB em .work/, gera dist/*.deb e dist/*.tar.gz
 scripts/build.sh --skip-source   # rebuild reusando o vscode/ já clonado
 scripts/prepare.sh               # só clone + patches + branding + npm ci (o que o dev.sh usa)
 ```
 
 Saída: `.work/vscodium/VSCode-linux-x64/bin/arara-code`.
 
-Para não travar a máquina, limite a memória:
+Para não travar a máquina, limite a memória a 12 GB. Rode como unidade do systemd, assim o build não morre se o terminal fechar:
 
 ```bash
-systemd-run --user --scope -p MemoryHigh=12G -p MemoryMax=13G nice -n 10 scripts/build.sh --skip-source
+systemd-run --user --unit=arara-build --collect -p MemoryHigh=11G -p MemoryMax=12G -p MemorySwapMax=0 \
+  -p Nice=10 --working-directory="$PWD" -E HOME="$HOME" -E PATH="$PATH" \
+  bash -c 'scripts/build.sh --skip-source > /tmp/arara-build.log 2>&1'
 ```
+
+Saída em `dist/`: `.deb` e `.tar.gz`. Publicar uma versão: `ac-docs/agents/release/AGENTS.md`.
 
 Requisitos: os mesmos do VSCodium (`upstream/vscodium/docs/howto-build.md`) + `rsync`, `rsvg-convert`, ImageMagick.

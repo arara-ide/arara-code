@@ -159,6 +159,17 @@ if [[ "${OS_NAME}" == "linux" ]]; then
     npm run gulp "vscode-linux-${VSCODE_ARCH}-min-packing"
   )
   find "VSCode-linux-${VSCODE_ARCH}" -print0 | xargs -0 touch -c
+  # desinstalador junto do programa (bin/arara-code-uninstall; no .deb vira /usr/bin/arara-code-uninstall)
+  install -m 755 "${ROOT}/branding/linux/uninstall.sh" "VSCode-linux-${VSCODE_ARCH}/bin/arara-code-uninstall"
+  for t in postinst prerm; do
+    f="vscode/resources/linux/debian/${t}.template"
+    grep -q arara-code-uninstall "${f}" && continue
+    if [[ "${t}" == "postinst" ]]; then
+      sed -i '0,/^ln -s .*$/s||&\nln -sf /usr/share/@@NAME@@/bin/@@NAME@@-uninstall /usr/bin/@@NAME@@-uninstall|' "${f}"
+    else
+      printf '\nrm -f /usr/bin/@@NAME@@-uninstall\n' >> "${f}"
+    fi
+  done
 else
   # macOS/Windows: fluxo do VSCodium sem mudanças (extensão embutida ainda só no Linux)
   . build.sh
@@ -169,6 +180,12 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   mkdir -p "${OUT}"
   tar czf "${OUT}/arara-code-linux-${VSCODE_ARCH}-${RELEASE_VERSION}.tar.gz" -C "${WORK}/VSCode-linux-${VSCODE_ARCH}" .
   if [[ "${BUILD_DEB}" == "yes" ]]; then
+    # O dpkg-shlibdeps.pl do Chromium não funciona com o dpkg ≥ 1.23 (Ubuntu 26.04+).
+    # Nesse caso usa a lista de dependências que o próprio VS Code mantém (dep-lists.ts).
+    if ! perl -e 'use Dpkg; exit(($Dpkg::PROGVERSION =~ /^1\.(2[3-9]|[3-9]\d)/) ? 0 : 1)' 2>/dev/null; then :; else
+      sed -i 's|\tconst dpkgShlibdepsResult = spawnSync(.perl., cmd, { cwd: chromiumSysroot });|\tconst dpkgShlibdepsResult = { status: 0, stdout: Buffer.from(""), stderr: "" }; // Arara: dpkg novo, usa dep-lists.ts|' "${WORK}/vscode/build/linux/debian/calculate-deps.ts"
+      sed -i 's|\tconst sortedDependencies: string\[\] = Array.from(mergedDependencies)|\tif (packageType === "deb" \&\& !mergedDependencies.size) { return [...debianGeneratedDeps[arch as DebianArchString]]; }\n\tconst sortedDependencies: string[] = Array.from(mergedDependencies)|' "${WORK}/vscode/build/linux/dependencies-generator.ts"
+    fi
     ( cd "${WORK}/vscode" \
       && npm run gulp "vscode-linux-${VSCODE_ARCH}-prepare-deb" \
       && npm run gulp "vscode-linux-${VSCODE_ARCH}-build-deb" )
