@@ -37,9 +37,22 @@ fi
 
 cd "${VSCODE}"
 
-# 2. transpile rápido (esbuild, sem typecheck)
+# 2. prepara a fonte dos ícones antes do transpile copiar os assets para out/.
+# O fluxo rápido pula o preLaunch/build-fast, que normalmente faz esta etapa.
+echo "» Preparando ícones do workbench…"
+npm run --silent gulp copy-codicons >/dev/null
+if [[ ! -s src/vs/base/browser/ui/codicons/codicon/codicon.ttf ]]; then
+  echo "! Fonte codicon.ttf ausente. Reinstale as dependências do workbench com npm ci." >&2
+  exit 1
+fi
+
+# 2a. transpile rápido (esbuild, sem typecheck)
 echo "» Transpilando o workbench…"
 npm run --silent transpile-client >/dev/null
+if [[ ! -s out/vs/base/browser/ui/codicons/codicon/codicon.ttf ]]; then
+  echo "! O transpile não copiou codicon.ttf para out/. O workbench não será aberto com ícones quebrados." >&2
+  exit 1
+fi
 
 # 2b. extensões built-in (git, emmet, temas…): só na primeira vez (~10 s)
 if [[ ! -f extensions/git/out/main.js ]]; then
