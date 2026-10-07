@@ -62,6 +62,7 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +		'explorer.compactFolders': false,
 +
 +		// scm / git (extensão built-in)
++		'scm.repositories.sortOrder': 'name',
 +		'scm.repositories.selectionMode': 'single',
 +		'git.autofetch': true,
 +		'git.confirmSync': false,
