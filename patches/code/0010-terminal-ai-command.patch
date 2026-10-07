@@ -1,21 +1,27 @@
-Arara Code: botão "AI" (ícone + rótulo) na barra inline do painel de terminal.
+Arara Code: botão de comando de terminal com IA + estado "preenchendo" do terminal.
 
-- terminalMenus.ts: adiciona uma ação no MenuId.ViewTitle do terminal (grupo
-  navigation, order 4, mesmo gate shouldShowViewInlineActions dos botões
-  split/kill), apontando para o comando arara.terminal.command da extensão
-  arara-ai. Fica entre split/matar e o botão de novo terminal.
-- terminalView.ts: createActionViewItem renderiza essa ação com ícone + rótulo
-  "AI" (os demais botões inline da barra são só ícone).
+- terminalMenus.ts: adiciona uma ação (ícone sparkle, comando
+  arara.terminal.command da extensão arara-ai) no MenuId.ViewTitle do terminal
+  (grupo navigation, order 4, mesmo gate shouldShowViewInlineActions dos botões
+  split/kill). Fica inline na barra do painel, entre split/matar e o botão de
+  novo terminal. Só ícone, como os vizinhos.
+- terminalView.ts + terminal.css: enquanto a context key arara.terminalStreaming
+  está ligada (a extensão liga enquanto a IA preenche o terminal via stream),
+  a tela do terminal escurece com um brilho animado. A execução fica travada
+  nesse período porque a extensão engole o Enter por keybinding
+  (arara.terminal.streamingNoop com when terminalFocus && arara.terminalStreaming);
+  o escurecimento é só o sinal visual disso.
 
-Se a extensão de IA não estiver carregada, o comando não resolve e o VS Code
-simplesmente não mostra a ação.
+Se a extensão de IA não estiver carregada, o comando não resolve (ação some) e a
+context key nunca liga (sem efeito visual).
 
 Why a patch: a barra inline do painel de terminal (MenuId.ViewTitle do
-TERMINAL_VIEW_ID, renderizada pelo ViewPane) é UI do core; o `menus` de extensão
-não contribui ações inline ali, só no menu de contexto das abas
-(terminal/title/context), que foi onde a ação aparecia antes.
+TERMINAL_VIEW_ID) e o escurecimento/brilho da tela do terminal são UI do core;
+o `menus` de extensão não contribui ações inline ali (só no menu de contexto das
+abas) e não há API para alterar a aparência do terminal.
 Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
-         src/vs/workbench/contrib/terminal/browser/terminalView.ts
+         src/vs/workbench/contrib/terminal/browser/terminalView.ts,
+         src/vs/workbench/contrib/terminal/browser/media/terminal.css
 
 --- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
@@ -28,7 +34,7 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
 +				item: {
 +					command: {
 +						id: 'arara.terminal.command',
-+						title: localize('arara.terminal.command', "AI"),
++						title: localize('arara.terminal.command', "Comando no terminal com IA"),
 +						icon: Codicon.sparkle
 +					},
 +					group: 'navigation',
@@ -42,16 +48,67 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
  					command: {
 --- a/src/vs/workbench/contrib/terminal/browser/terminalView.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
-@@ -249,6 +249,12 @@
+@@ -197,6 +197,17 @@
+ 		domStylesheetsJs.createStyleSheet(this._parentDomElement);
+ 		this._instantiationService.createInstance(TerminalThemeIconStyle, this._parentDomElement);
  
- 	override createActionViewItem(action: Action, options: IBaseActionViewItemOptions): IActionViewItem | undefined {
- 		switch (action.id) {
-+			case 'arara.terminal.command': {
-+				// Arara Code: mostra ícone + "AI" (os demais botões inline são só ícone)
-+				const item = new ActionViewItem(action, action, { ...options, icon: true, label: true, keybinding: this._getKeybindingLabel(action) });
-+				this._actionDisposables.set(action.id, item);
-+				return item;
-+			}
- 			case TerminalCommandId.Split: {
- 				// Split needs to be special cased to force splitting within the panel, not the editor
- 				const that = this;
++		// Arara Code: enquanto a IA preenche o terminal (context key arara.terminalStreaming),
++		// escurece com um brilho e trava a execução (o Enter é engolido por keybinding da extensão)
++		const araraStreamingKey = 'arara.terminalStreaming';
++		const updateAraraStreaming = () => {
++			this._parentDomElement?.classList.toggle('arara-streaming', !!this._contextKeyService.getContextKeyValue(araraStreamingKey));
++		};
++		this._register(this._contextKeyService.onDidChangeContext(e => {
++			if (e.affectsSome(new Set([araraStreamingKey]))) { updateAraraStreaming(); }
++		}));
++		updateAraraStreaming();
++
+ 		if (!this.shouldShowWelcome()) {
+ 			this._createTabsView();
+ 		}
+--- a/src/vs/workbench/contrib/terminal/browser/media/terminal.css
++++ b/src/vs/workbench/contrib/terminal/browser/media/terminal.css
+@@ -620,3 +620,43 @@
+ .monaco-workbench .xterm.terminal.hide {
+ 	visibility: hidden;
+ }
++
++/* Arara Code: terminal sendo preenchido pela IA (context key arara.terminalStreaming).
++   Escurece a tela do terminal e passa um brilho; a execução fica travada (o Enter é
++   engolido por keybinding da extensão enquanto esta classe está presente). */
++.monaco-workbench .pane-body.integrated-terminal.arara-streaming .terminal-outer-container {
++	position: relative;
++}
++
++.monaco-workbench .pane-body.integrated-terminal.arara-streaming .xterm .xterm-screen {
++	opacity: 0.55;
++	transition: opacity 120ms ease;
++}
++
++.monaco-workbench .pane-body.integrated-terminal.arara-streaming .terminal-outer-container::after {
++	content: "";
++	position: absolute;
++	inset: 0;
++	pointer-events: none;
++	z-index: 10;
++	background: linear-gradient(
++		100deg,
++		transparent 30%,
++		var(--vscode-terminal-foreground, rgba(255, 255, 255, 0.12)) 50%,
++		transparent 70%
++	);
++	opacity: 0.12;
++	background-size: 300% 100%;
++	animation: arara-terminal-shine 1.4s linear infinite;
++}
++
++@keyframes arara-terminal-shine {
++	from { background-position: 180% 0; }
++	to { background-position: -80% 0; }
++}
++
++@media (prefers-reduced-motion: reduce) {
++	.monaco-workbench .pane-body.integrated-terminal.arara-streaming .terminal-outer-container::after {
++		animation: none;
++	}
++}
