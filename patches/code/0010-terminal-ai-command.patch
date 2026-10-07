@@ -1,0 +1,57 @@
+Arara Code: botão "AI" (ícone + rótulo) na barra inline do painel de terminal.
+
+- terminalMenus.ts: adiciona uma ação no MenuId.ViewTitle do terminal (grupo
+  navigation, order 4, mesmo gate shouldShowViewInlineActions dos botões
+  split/kill), apontando para o comando arara.terminal.command da extensão
+  arara-ai. Fica entre split/matar e o botão de novo terminal.
+- terminalView.ts: createActionViewItem renderiza essa ação com ícone + rótulo
+  "AI" (os demais botões inline da barra são só ícone).
+
+Se a extensão de IA não estiver carregada, o comando não resolve e o VS Code
+simplesmente não mostra a ação.
+
+Why a patch: a barra inline do painel de terminal (MenuId.ViewTitle do
+TERMINAL_VIEW_ID, renderizada pelo ViewPane) é UI do core; o `menus` de extensão
+não contribui ações inline ali, só no menu de contexto das abas
+(terminal/title/context), que foi onde a ação aparecia antes.
+Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
+         src/vs/workbench/contrib/terminal/browser/terminalView.ts
+
+--- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+@@ -498,6 +498,20 @@
+ 				}
+ 			},
+ 			{
++				// Arara Code: comando de terminal com IA, entre o botão de split/matar e o de novo terminal
++				id: MenuId.ViewTitle,
++				item: {
++					command: {
++						id: 'arara.terminal.command',
++						title: localize('arara.terminal.command', "AI"),
++						icon: Codicon.sparkle
++					},
++					group: 'navigation',
++					order: 4,
++					when: TerminalContextKeys.shouldShowViewInlineActions
++				}
++			},
++			{
+ 				id: MenuId.ViewTitle,
+ 				item: {
+ 					command: {
+--- a/src/vs/workbench/contrib/terminal/browser/terminalView.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
+@@ -249,6 +249,12 @@
+ 
+ 	override createActionViewItem(action: Action, options: IBaseActionViewItemOptions): IActionViewItem | undefined {
+ 		switch (action.id) {
++			case 'arara.terminal.command': {
++				// Arara Code: mostra ícone + "AI" (os demais botões inline são só ícone)
++				const item = new ActionViewItem(action, action, { ...options, icon: true, label: true, keybinding: this._getKeybindingLabel(action) });
++				this._actionDisposables.set(action.id, item);
++				return item;
++			}
+ 			case TerminalCommandId.Split: {
+ 				// Split needs to be special cased to force splitting within the panel, not the editor
+ 				const that = this;
