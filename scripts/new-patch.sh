@@ -46,7 +46,7 @@ for f in "${FILES[@]}"; do INCLUDES+=(--include="${f}"); done
 
 # variáveis de branding que o VSCodium substitui nos patches (!!APP_NAME!! etc.)
 APP_NAME="Arara Code"; BINARY_NAME="arara-code"; ORG_NAME="Arara"; GLOBAL_DIRNAME="arara-code"
-TUNNEL_APP_NAME="arara-code-tunnel"; GH_REPO_PATH="arara-ide/arara-ide"; ASSETS_REPOSITORY="arara-ide/arara-ide"
+TUNNEL_APP_NAME="arara-code-tunnel"; GH_REPO_PATH="arara-ide/arara-code"; ASSETS_REPOSITORY="arara-ide/arara-code"
 APP_NAME_LC="arara code"; RELEASE_VERSION="$( sed -n 's/^RELEASE_VERSION="\(.*\)"/\1/p' "${WORK}/dev/build.env" 2>/dev/null || true )"
 
 for p in "${PATCHES[@]}"; do

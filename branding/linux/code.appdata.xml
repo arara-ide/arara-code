@@ -4,7 +4,7 @@
 	<metadata_license>@@LICENSE@@</metadata_license>
 	<project_license>@@LICENSE@@</project_license>
 	<name>@@NAME_LONG@@</name>
-	<url type="homepage">https://github.com/arara-ide/arara-ide</url>
+	<url type="homepage">https://github.com/arara-ide/arara-code</url>
 	<summary>Editor de código com IA</summary>
 	<description>
 		<p>Arara Code é um editor baseado no Code-OSS com chat, agente e autocomplete de IA.</p>

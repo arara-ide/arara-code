@@ -28,7 +28,7 @@
     "arm64": { "clsid": "6A531DED-205E-4CAD-B652-474623F77FA2" }
   },
   "updateUrl": "",
-  "downloadUrl": "https://github.com/arara-ide/arara-ide/releases",
-  "licenseUrl": "https://github.com/arara-ide/arara-ide/blob/main/LICENSE",
-  "reportIssueUrl": "https://github.com/arara-ide/arara-ide/issues/new"
+  "downloadUrl": "https://github.com/arara-ide/arara-code/releases",
+  "licenseUrl": "https://github.com/arara-ide/arara-code/blob/main/LICENSE",
+  "reportIssueUrl": "https://github.com/arara-ide/arara-code/issues/new"
 }

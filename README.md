@@ -5,7 +5,7 @@ Este repo não contém código do VS Code: só o VSCodium como submódulo (tag f
 
 ## Instalar
 
-Linux (Ubuntu/Debian, x64). Baixe o `.deb` da [última release](https://github.com/arara-ide/arara-ide/releases/latest) e rode:
+Linux (Ubuntu/Debian, x64). Baixe o `.deb` da [última release](https://github.com/arara-ide/arara-code/releases/latest) e rode:
 
 ```bash
 sudo apt install ./arara-code_*_amd64.deb
