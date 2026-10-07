@@ -75,12 +75,7 @@ if [[ -f "${EXT_DIR}/package.json" ]]; then
   fi
   echo "» Buildando arara-ai…"
   ( cd "${EXT_DIR}" && npm run --silent build >/dev/null )
-  # Ao abrir com --extensionDevelopmentPath, o VS Code nao salva o historico de projetos recentes.
-  # Entao instalamos a extensao no perfil pra valer e rodamos como se fosse producao.
-  EXT_ARGS=()
-  rm -rf "${PROFILE}/extensions/arara.arara-ai-0.0.0"
-  mkdir -p "${PROFILE}/extensions/arara.arara-ai-0.0.0"
-  cp -r "${EXT_DIR}/"package.json "${EXT_DIR}/"media "${EXT_DIR}/"dist "${PROFILE}/extensions/arara.arara-ai-0.0.0/"
+  EXT_ARGS=("--extensionDevelopmentPath=${EXT_DIR}")
 else
   echo "! ${EXT_DIR} não encontrado; abrindo sem a extensão arara-ai." >&2
 fi

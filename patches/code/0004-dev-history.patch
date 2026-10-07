@@ -1,0 +1,11 @@
+--- a/src/vs/platform/windows/electron-main/windowsMainService.ts
++++ b/src/vs/platform/windows/electron-main/windowsMainService.ts
+@@ -475,7 +475,7 @@
+ 		// Also do not add paths when files are opened for diffing or merging, only if opened individually
+ 		const isDiff = filesToOpen && filesToOpen.filesToDiff.length > 0;
+ 		const isMerge = filesToOpen && filesToOpen.filesToMerge.length > 0;
+-		if (!usedWindows.some(window => window.isExtensionDevelopmentHost) && !isDiff && !isMerge && !openConfig.noRecentEntry) {
++		if (!isDiff && !isMerge && !openConfig.noRecentEntry) {
+ 			const recents: IRecent[] = [];
+ 			for (const pathToOpen of pathsToOpen) {
+ 				if (isWorkspacePathToOpen(pathToOpen) && !pathToOpen.transient /* never add transient workspaces to history */) {
