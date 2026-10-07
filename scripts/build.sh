@@ -109,6 +109,9 @@ if [[ "${SKIP_SOURCE}" == "no" ]]; then
 else
   [[ -d vscode ]] || { echo "--skip-source sem vscode/ existente" >&2; exit 1; }
   . dev/build.env
+  # número novo a cada build (mesma fórmula do get_repo.sh: hora do ano), senão o apt não atualiza
+  RELEASE_VERSION="${MS_TAG}$( printf "%04d" $(( $(date +%-j) * 24 + $(date +%-H) )) )"
+  { echo "MS_TAG=\"${MS_TAG}\""; echo "MS_COMMIT=\"${MS_COMMIT}\""; echo "RELEASE_VERSION=\"${RELEASE_VERSION}\""; } > dev/build.env
   export MS_TAG MS_COMMIT RELEASE_VERSION
   # volta o vscode/ ao estado limpo da tag antes de reaplicar os patches
   ( cd vscode && git add -A && git reset -q --hard HEAD && git clean -fdq -e node_modules && rm -rf .build out* )

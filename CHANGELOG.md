@@ -4,6 +4,27 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06736] - 2026-10-07
+
+Versão de teste, só para Linux (x64).
+
+### Novidades
+- Autocomplete: clicar em "Autocomplete" na barra de status abre um menu para habilitar, desabilitar ou orientar as sugestões.
+- Autocomplete: "Orientar sugestões" recebe em poucas palavras o que você está construindo. Vale por 30 min, só naquele projeto. 10 min depois de abrir o projeto, uma notificação lembra dessa opção.
+- Chat: a IA sabe a linha onde você está e as últimas 10 abas abertas.
+- Chat: aparece "Thinking..." quando a IA fica um tempo sem responder.
+
+### Melhorias
+- Chat: o que o Codex faz pelo terminal aparece como "Ler arquivo", "Buscar no projeto" ou "Editando arquivo…".
+- Chat: as ações do Antigravity aparecem em português.
+- Chat: comandos de terminal mostram um ícone em vez do título.
+- Chat: enquanto uma ação roda, o rótulo mostra o que ela está fazendo ("Lendo arquivo…").
+
+### Correções
+- Chat: colar texto no campo de mensagem funciona sempre.
+- Chat: no Codex, as ações da segunda mensagem em diante não se misturam mais com as anteriores.
+- DevTools não abre na versão instalada, nem quando uma extensão pede.
+
 ## [1.135.06709] - 2026-10-07
 
 Versão de teste, só para Linux (x64). Baseada no VS Code 1.135.
