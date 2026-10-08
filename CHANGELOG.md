@@ -4,6 +4,17 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+### Novidades
+- Terminal: botão com ícone de IA na barra do terminal (entre dividir e novo terminal). Descreva o que você quer e a Arara escreve o comando e cola no terminal, sem executar — você revisa e aperta Enter. Precisa estar conectado.
+- Terminal: o campo de pedido guarda um histórico dos últimos pedidos, para reaproveitar.
+- Terminal: a IA usa como contexto as últimas linhas do terminal, o diretório atual e os arquivos e pastas de onde você está, e pode olhar outras pastas para montar o comando certo.
+- Autocomplete: opção para desligar o aviso que convida a orientar as sugestões.
+
+### Melhorias
+- Secondary Side Bar: o botão de fechar (X) aparece sempre ao lado do maximizar, mesmo com a barra de atividades no topo.
+- Terminal: enquanto a Arara escreve o comando, o terminal escurece e fica travado para execução até terminar.
+- Login: a mensagem "conectado como…" some sozinha depois de alguns segundos, em vez de ficar na tela.
+
 ## [1.135.06736] - 2026-10-07
 
 Versão de teste, só para Linux (x64).
