@@ -1,0 +1,46 @@
+Arara Code: estrelinha de IA à esquerda dos itens de IA nos menus de contexto.
+
+Itens de menu cujo comando tem ícone $(sparkle) (ex.: "Adicionar ao chat" do
+arara-ai no Explorer e no editor) mostram o codicon sparkle no espaço do check,
+à esquerda do texto. Os outros itens não mudam: o check continua igual e
+aparece só quando o item está marcado.
+
+Why a patch: o menu custom do Code-OSS ignora o ícone dos comandos em menus de
+contexto, e nenhuma API de extensão desenha ícones nesses menus. O menu nativo
+(macOS, window.menuStyle = native) continua mostrando só o texto.
+Touches: src/vs/base/browser/ui/menu/menu.ts
+
+--- a/src/vs/base/browser/ui/menu/menu.ts
++++ b/src/vs/base/browser/ui/menu/menu.ts
+@@ -551,7 +551,12 @@
+ 			}
+ 		}
+ 
+-		this.check = append(this.item, $('span.menu-item-check' + ThemeIcon.asCSSSelector(Codicon.menuSelection)));
++		// Arara Code: ações de IA (ícone sparkle) mostram a estrelinha no espaço do check, à esquerda
++		const aiIcon = !!this._action.class?.split(' ').includes(`codicon-${Codicon.sparkle.id}`);
++		if (aiIcon) {
++			this.item.classList.add('arara-ai-item');
++		}
++		this.check = append(this.item, $('span.menu-item-check' + ThemeIcon.asCSSSelector(aiIcon ? Codicon.sparkle : Codicon.menuSelection)));
+ 		this.check.setAttribute('role', 'none');
+ 
+ 		this.label = append(this.item, $('span.action-label'));
+@@ -1041,6 +1046,7 @@
+ 
+ ${formatRule(Codicon.menuSelection)}
+ ${formatRule(Codicon.menuSubmenu)}
++${formatRule(Codicon.sparkle)}
+ 
+ .monaco-menu .monaco-action-bar {
+ 	text-align: right;
+@@ -1240,7 +1246,8 @@
+ 	height: 100%;
+ }
+ 
+-.monaco-menu .monaco-action-bar.vertical .action-menu-item.checked .menu-item-check {
++.monaco-menu .monaco-action-bar.vertical .action-menu-item.checked .menu-item-check,
++.monaco-menu .monaco-action-bar.vertical .action-menu-item.arara-ai-item .menu-item-check {
+ 	visibility: visible;
+ 	display: flex;
+ 	align-items: center;
