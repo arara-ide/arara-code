@@ -5,6 +5,10 @@ Arara Code: botão de comando de terminal com IA + estado "preenchendo" do termi
   (grupo navigation, order 4, mesmo gate shouldShowViewInlineActions dos botões
   split/kill). Fica inline na barra do painel, entre split/matar e o botão de
   novo terminal. Só ícone, como os vizinhos.
+- terminalTabsList.ts: o mesmo comando (sparkle) nas ações inline de cada linha
+  da lista de terminais (aparece com 2+ terminais), entre split e lixeira. Ativa
+  o terminal da linha antes de rodar, para o comando ir para ele. Só aparece se
+  o comando estiver registrado.
 - terminalView.ts + terminal.css: enquanto a context key arara.terminalStreaming
   está ligada (a extensão liga enquanto a IA preenche o terminal via stream),
   a tela do terminal escurece com um brilho animado. A execução fica travada
@@ -17,9 +21,11 @@ context key nunca liga (sem efeito visual).
 
 Why a patch: a barra inline do painel de terminal (MenuId.ViewTitle do
 TERMINAL_VIEW_ID) e o escurecimento/brilho da tela do terminal são UI do core;
-o `menus` de extensão não contribui ações inline ali (só no menu de contexto das
-abas) e não há API para alterar a aparência do terminal.
+o `menus` de extensão não contribui ações inline ali nem nas linhas da lista de
+terminais (só no menu de contexto das abas) e não há API para alterar a
+aparência do terminal.
 Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
+         src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts,
          src/vs/workbench/contrib/terminal/browser/terminalView.ts,
          src/vs/workbench/contrib/terminal/browser/media/terminal.css
 
@@ -34,7 +40,7 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
 +				item: {
 +					command: {
 +						id: 'arara.terminal.command',
-+						title: localize('arara.terminal.command', "Comando no terminal com IA"),
++						title: localize('arara.terminal.command', "Comando com IA"),
 +						icon: Codicon.sparkle
 +					},
 +					group: 'navigation',
@@ -46,6 +52,32 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
  				id: MenuId.ViewTitle,
  				item: {
  					command: {
+--- a/src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts
+@@ -52,7 +52,7 @@
+ import { TerminalContextActionRunner } from './terminalContextMenu.js';
+ import type { IHoverAction } from '../../../../base/browser/ui/hover/hover.js';
+ import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
+-import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
+ import { TerminalStorageKeys } from '../common/terminalStorageKeys.js';
+ import { isObject } from '../../../../base/common/types.js';
+@@ -531,6 +531,14 @@
+ 				});
+ 			})),
+ 		];
++		// Arara Code: comando de terminal com IA entre o split e a lixeira, no terminal desta linha
++		// (só se a extensão arara-ai registrou o comando)
++		if (CommandsRegistry.getCommand('arara.terminal.command')) {
++			actions.push(template.elementDisposables.add(new Action('arara.terminal.command', localize('arara.terminal.command', "Comando com IA"), ThemeIcon.asClassName(Codicon.sparkle), true, async () => {
++				this._terminalService.setActiveInstance(instance);
++				await this._commandService.executeCommand('arara.terminal.command');
++			})));
++		}
+ 		if (instance.shellLaunchConfig.tabActions) {
+ 			for (const action of instance.shellLaunchConfig.tabActions) {
+ 				actions.push(template.elementDisposables.add(new Action(action.id, action.label, action.icon ? ThemeIcon.asClassName(action.icon) : undefined, true, async () => {
 --- a/src/vs/workbench/contrib/terminal/browser/terminalView.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
 @@ -197,6 +197,17 @@
