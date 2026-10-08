@@ -4,6 +4,19 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06755] - 2026-10-08
+
+Versão de teste, só para Linux (x64).
+
+### Novidades
+- Chat: botão direito em um ou vários arquivos no Explorer → "Adicionar ao chat" coloca os arquivos como referência no chat, igual ao Ctrl+L.
+- Chat: botão direito no editor → "Adicionar seleção ao chat" menciona as linhas selecionadas (sem seleção, "Adicionar ao chat" coloca o arquivo).
+- Menus: itens de IA mostram uma estrelinha à esquerda.
+
+## [1.135.06753] - 2026-10-08
+
+Versão de teste, só para Linux (x64).
+
 ### Novidades
 - Terminal: botão com ícone de IA na barra do terminal (entre dividir e novo terminal). Descreva o que você quer e a Arara escreve o comando e cola no terminal, sem executar — você revisa e aperta Enter. Precisa estar conectado.
 - Terminal: o campo de pedido guarda um histórico dos últimos pedidos, para reaproveitar.
