@@ -4,9 +4,23 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06780] - 2026-10-09
+
+Versão de teste, só para Linux (x64).
+
 ### Novidades
 - Atualização: quando sai versão nova, aparece o botão "Atualizar" no topo da janela, que abre a página de download.
 - Atualização: instalou o `.deb` novo com a IDE aberta? Ela percebe e reinicia sozinha em 10 s, sem perder arquivos não salvos. Dá para adiar.
+- Codex, Claude Code, Antigravity e Kiro: no topo do painel, ao lado do nome, quanto você já gastou do limite da conta (janela de 5h, ou a que a sua conta tiver; no Kiro, os créditos usados do total). O mesmo aparece com uma barra no seletor de modelos.
+- Kiro: o seletor de modelos mostra o custo de cada modelo em créditos (1x, 2x, 0.5x…).
+- Antigravity: modelos com raciocínio aparecem marcados como "Thinking" no seletor.
+- Chat: dá para editar uma mensagem na fila (lápis ao lado do X). Ela continua na mesma posição.
+- Chat: "Compactar conversa" no topo do painel resume as mensagens antigas e mantém as 5 últimas, na mesma conversa. Funciona na Arara, Codex, Claude Code, Antigravity e Kiro.
+
+### Melhorias
+- Codex, Claude Code, Antigravity e Kiro: nomes de modelo mais legíveis no seletor (ex.: "Claude Opus 5.5" em vez de "claude-opus-5.5").
+- Chat: a conversa não desce mais sozinha enquanto você lê mensagens anteriores durante uma resposta.
+- Chat: botões da fila de mensagens maiores e mais fáceis de clicar.
 
 ## [1.135.06777] - 2026-10-09
 
