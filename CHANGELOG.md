@@ -4,6 +4,18 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06782] - 2026-10-09
+
+Versão de teste, só para Linux (x64).
+
+### Novidades
+- Git History: extensão `donjayamanne.githistory` vem embutida na IDE por padrão para consultar histórico de commits, arquivos e linhas.
+- Chat: botão de desfazer (ícone ao lado da mensagem do usuário) permite restaurar o projeto para o estado exato antes do pedido.
+- Chat: mensagens antigas são carregadas sob demanda ao chegar no topo do painel ("Carregar mais mensagens").
+
+### Melhorias
+- Chat: botão "Compactar conversa" agora pode ser usado a partir de 3 mensagens, resumindo as antigas e mantendo as 2 mais recentes no contexto.
+
 ## [1.135.06780] - 2026-10-09
 
 Versão de teste, só para Linux (x64).
