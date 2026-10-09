@@ -17,7 +17,7 @@ Para entrar na conta e usar a IA, o backend precisa estar no ar (nesta fase de t
 
 ### Atualizar
 
-Baixe o `.deb` novo e rode o mesmo comando. Suas configurações e conversas ficam.
+Quando sai versão nova, aparece o botão **Atualizar** no topo da janela. Ele abre a página da release: baixe o `.deb` novo e rode o mesmo comando. Pode fazer com a IDE aberta: ela percebe o pacote novo e reinicia sozinha em 10 s (dá para adiar). Suas configurações, conversas e arquivos não salvos ficam.
 
 ### Desinstalar
 
@@ -77,6 +77,7 @@ Na IDE, clique em **Arara: entrar** na barra de status (ou `Ctrl+Shift+P` → *A
 | `0001-no-welcome-page` | Sem página Welcome: `workbench.startupEditor` = `none`, walkthroughs não abrem ao instalar extensão |
 | `0002-start-screen-shortcuts` | Editor vazio vira tela inicial com atalhos clicáveis (abrir pasta, recentes, clonar, comandos, terminal, chat Arara, entrar, tema, atalhos…) |
 | `0003-default-settings-keybindings` | Configurações e atalhos padrão do produto (só nativos). Lista em `src/vs/workbench/common/arara.defaults.ts`. Atalhos só em Windows/Linux |
+| `0015-ide-update` | Botão "Atualizar" no topo (ao lado do Customize Layout) quando há versão nova, e reinício sozinho quando o `.deb` novo é instalado com a IDE aberta |
 
 Para criar/alterar um patch: edite em `.work/vscodium/vscode`, teste com `scripts/dev.sh` e rode `scripts/new-patch.sh NNNN-nome arquivo…`. Detalhes em `AGENTS.md`.
 

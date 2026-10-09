@@ -4,6 +4,10 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+### Novidades
+- Atualização: quando sai versão nova, aparece o botão "Atualizar" no topo da janela, que abre a página de download.
+- Atualização: instalou o `.deb` novo com a IDE aberta? Ela percebe e reinicia sozinha em 10 s, sem perder arquivos não salvos. Dá para adiar.
+
 ## [1.135.06777] - 2026-10-09
 
 Versão de teste, só para Linux (x64).
