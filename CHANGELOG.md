@@ -22,6 +22,9 @@ Versão de teste, só para Linux (x64).
 - Chat: a conversa não desce mais sozinha enquanto você lê mensagens anteriores durante uma resposta.
 - Chat: botões da fila de mensagens maiores e mais fáceis de clicar.
 
+### Correções
+- Atualização: o botão "Atualizar" não aparece mais quando você já está na versão mais nova.
+
 ## [1.135.06777] - 2026-10-09
 
 Versão de teste, só para Linux (x64).

@@ -6,6 +6,14 @@ Este arquivo vai na raiz do repo `arara-code`. Leia também o AGENTS.md geral.
 
 Scripts que transformam o VSCodium (submódulo em `upstream/vscodium`, tag fixa) no Arara Code. **Não há código de IA aqui.** Estrutura e fluxo em `ac-docs/docs/03-organizacao-git.md` (workspace de planejamento).
 
+## Propriedade intelectual: o mínimo possível aqui
+
+Este repo é **open source**: todo patch fica público. Quanto menos lógica na IDE e mais no `arara-ai` (fechado), melhor.
+
+- Antes de criar ou crescer um patch, prove que a API de extensão (inclusive proposed) não resolve.
+- Quando o patch for inevitável, ele só abre o ponto de extensão: um item de menu, uma context key, um gancho que chama um comando `arara.*`. Regras de negócio, heurísticas, textos de produto, parsers de CLIs e tudo que faz a IA funcionar ficam na extensão. Exemplo: no `0015-ide-update` o patch só desenha o botão e reinicia; quem decide se há versão nova e para onde o botão leva é a `arara-ai`.
+- Nunca colocar no patch nomes de modelos, prompts, URLs internas ou detalhes do `ac-services`.
+
 ## O que você pode mexer
 
 - `patches/code/*.patch` — mudanças no Code-OSS.
