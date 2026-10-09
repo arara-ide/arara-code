@@ -1,0 +1,13 @@
+Arara Code: remove o recuo esquerdo do título dos painéis.
+
+Why a patch: o title-label pertence ao workbench, fora da webview; a API de
+extensão não permite alterar o CSS desse elemento.
+Touches: src/vs/workbench/browser/media/part.css
+
+--- a/src/vs/workbench/browser/media/part.css
++++ b/src/vs/workbench/browser/media/part.css
+@@ -50,3 +50,3 @@
+ .monaco-workbench .part > .title > .title-label {
+-	padding-left: 12px;
++	padding-left: 0;
+ }
