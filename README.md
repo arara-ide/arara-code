@@ -13,6 +13,8 @@ sudo apt install ./arara-code_*_amd64.deb
 
 Pronto: o Arara Code aparece no menu de aplicativos. No terminal, abra com `arara-code`.
 
+A **Git History** (`donjayamanne.githistory`) vem embutida, com histórico de commits, arquivos e linhas. Para consultar uma linha, use **Git: View Line History**. O build e o modo dev baixam o VSIX do Open VSX, com versão e SHA256 fixados em `extensions.lock.json`.
+
 Para entrar na conta e usar a IA, o backend precisa estar no ar (nesta fase de teste: `localhost:7010`, ver abaixo).
 
 ### Atualizar
@@ -102,4 +104,4 @@ systemd-run --user --unit=arara-build --collect -p MemoryHigh=11G -p MemoryMax=1
 
 Saída em `dist/`: `.deb` e `.tar.gz`. Publicar uma versão: `ac-docs/agents/release/AGENTS.md`.
 
-Requisitos: os mesmos do VSCodium (`upstream/vscodium/docs/howto-build.md`) + `rsync`, `rsvg-convert`, ImageMagick.
+Requisitos: os mesmos do VSCodium (`upstream/vscodium/docs/howto-build.md`) + `rsync`, `rsvg-convert`, ImageMagick, `curl`, `jq` e `unzip`.

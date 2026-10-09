@@ -37,6 +37,9 @@ fi
 
 cd "${VSCODE}"
 
+# Extensões padrão também no perfil de desenvolvimento (preLaunch é pulado).
+bash "${ROOT}/scripts/default-extensions.sh" "${VSCODE}"
+
 # 2. prepara a fonte dos ícones antes do transpile copiar os assets para out/.
 # O fluxo rápido pula o preLaunch/build-fast, que normalmente faz esta etapa.
 echo "» Preparando ícones do workbench…"

@@ -61,6 +61,10 @@ cp "${ROOT}"/branding/linux/{code.desktop,code-url-handler.desktop,code.appdata.
 jq -s '.[0] * .[1]' "${WORK}/product.json" "${ROOT}/branding/product.overlay.json" > "${WORK}/product.json.tmp"
 mv "${WORK}/product.json.tmp" "${WORK}/product.json"
 
+# Executado depois do preparo em todas as plataformas, antes do gulp empacotar.
+# A cópia de trabalho é recriada acima; o submódulo permanece intacto.
+printf '\nbash "%s/scripts/default-extensions.sh" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
+
 # --- 5. patches no Code-OSS
 mkdir -p "${WORK}/patches/user"
 for p in "${ROOT}"/patches/code/*.patch; do
