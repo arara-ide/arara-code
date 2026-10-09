@@ -4,6 +4,10 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06777] - 2026-10-09
+
+Versão de teste, só para Linux (x64).
+
 ### Novidades
 - Kiro: quarto assistente no painel direito, ao lado de Codex, Claude Code e Antigravity, usando o Kiro CLI (`kiro-cli`) instalado e logado na máquina. Mesma interface de chat: mensagens em tempo real, cartões de ferramentas (ler, editar, buscar, comandos), histórico de conversas, continuar a conversa, parar, escolher o modelo (com o custo em créditos), Ctrl+L e transferir conversa entre assistentes.
 - Kiro: permissões "Acesso total", "Pedir aprovação no chat" (cada comando/edição aparece com Aceitar/Recusar) e "Somente leitura".
