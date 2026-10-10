@@ -4,6 +4,18 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06790] - 2026-10-09
+
+Versão de teste, só para Linux (x64).
+
+### Novidades
+- ChatGPT: integração com assistente ChatGPT via automação web / extensão de navegador.
+- Terminal: atalhos `Ctrl+Shift+'` e `Ctrl+Shift+`` configurados para criar um novo terminal.
+
+### Melhorias
+- Interface: ajuste de espaçamento e alinhamento no título da janela.
+- Chat: aprimoramentos na edição e restauração de mensagens no fluxo do chat.
+
 ## [1.135.06782] - 2026-10-09
 
 Versão de teste, só para Linux (x64).
