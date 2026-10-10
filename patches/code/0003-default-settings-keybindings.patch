@@ -19,7 +19,7 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 
 --- /dev/null
 +++ b/src/vs/workbench/common/arara.defaults.ts
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,122 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Arara Code: configurações e atalhos padrão do produto.
 + *  Licensed under the MIT License.
@@ -95,6 +95,10 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +const inlineChatWhen = 'editorFocus && inlineChatHasEditsAgent && inlineChatPossible && !editorReadonly && !editorSimpleInput || editorFocus && inlineChatHasProvider && inlineChatPossible && !editorReadonly && !editorSimpleInput';
 +
 +export const araraDefaultKeybindings: AraraKeybinding[] = [
++	// terminal: ambos os atalhos criam um novo terminal
++	{ key: 'ctrl+shift+`', command: 'workbench.action.terminal.new', when: 'terminalProcessSupported || terminalHasBeenCreated' },
++	{ key: "ctrl+shift+'", command: 'workbench.action.terminal.new', when: 'terminalProcessSupported || terminalHasBeenCreated' },
++
 +	// terminal: ctrl+c / ctrl+v copiam e colam (ctrl+c sem seleção continua mandando SIGINT)
 +	{ key: 'ctrl+c', command: 'workbench.action.terminal.copySelection', when: terminalCopyWhen },
 +	{ key: 'ctrl+shift+c', command: '-workbench.action.terminal.copySelection', when: terminalCopyWhen },
