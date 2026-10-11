@@ -4,7 +4,7 @@
 # Fluxo (ver ac-docs/docs/03-organizacao-git.md):
 #   1. copia upstream/vscodium (submódulo, tag fixa) para .work/vscodium  — o submódulo nunca é alterado
 #   2. aplica patches/vscodium/*.patch nos scripts do VSCodium
-#   3. gera ícones do Arara por cima de .work/vscodium/src/stable
+#   3. copia assets de branding e ícones pré-gerados para .work/vscodium/src/stable
 #   4. faz merge de branding/product.overlay.json no product.json do VSCodium
 #   5. copia patches/code/*.patch para .work/vscodium/patches/user/ (hook oficial do VSCodium p/ downstream)
 #   6. roda get_repo.sh + build.sh do VSCodium com as variáveis de branding exportadas
@@ -51,11 +51,12 @@ for p in "${ROOT}"/patches/vscodium/*.patch; do
   patch -d "${WORK}" -p1 --forward --no-backup-if-mismatch < "${p}"
 done
 
-# --- 3. ícones
-"${ROOT}/scripts/build-icons.sh" "${WORK}/src/stable"
-
-# --- 3b. textos do Linux (menu de programas, .deb): sobrescrevem os do VSCodium
-cp "${ROOT}"/branding/linux/{code.desktop,code-url-handler.desktop,code.appdata.xml} "${WORK}/src/stable/resources/linux/"
+# --- 3. branding e ícones pré-gerados (sem dependência de ferramentas de imagem no build)
+if [[ ! -d "${ROOT}/branding/src-stable" ]]; then
+  echo "» Gerando assets de branding pela primeira vez..."
+  "${ROOT}/scripts/build-icons.sh" "${ROOT}/branding/src-stable"
+fi
+cp -rp "${ROOT}/branding/src-stable/"* "${WORK}/src/stable/"
 
 # --- 4. product.json (o prepare_vscode.sh faz `vscode/product.json * ../product.json`)
 jq -s '.[0] * .[1]' "${WORK}/product.json" "${ROOT}/branding/product.overlay.json" > "${WORK}/product.json.tmp"
