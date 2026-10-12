@@ -35,6 +35,13 @@ for arg in "$@"; do
   esac
 done
 
+# Release builds default to production; ac-docs/scripts/environment.sh selects a local override.
+ARARA_ENVIRONMENT="production"
+if [[ -f "${ROOT}/.arara-environment" ]]; then
+  ARARA_ENVIRONMENT="$(cat "${ROOT}/.arara-environment")"
+fi
+node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}"
+
 [[ -f "${UPSTREAM}/build.sh" ]] || git -C "${ROOT}" submodule update --init
 
 # --- 1. cópia de trabalho (preserva vscode/ quando --skip-source)
@@ -133,6 +140,7 @@ embed_arara_ai() {
   mkdir -p "${dest}"
   # mesmo conjunto do .vscodeignore: só o que roda (sem src/, testes, node_modules)
   cp "${ARARA_AI_DIR}/package.json" "${dest}/"
+  node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
   [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"
   [[ -f "${ARARA_AI_DIR}/.vscodeignore" ]] && cp "${ARARA_AI_DIR}/.vscodeignore" "${dest}/"
   mkdir -p "${dest}/dist"
