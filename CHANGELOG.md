@@ -4,6 +4,16 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06855] - 2026-10-12
+
+Versão de teste, só para Linux (x64).
+
+### Novidades
+- WhatsApp / Controle Remoto: integração e controle remoto do assistente via arara-zap (WebSocket direto) com reconexão resiliente.
+
+### Melhorias
+- Telemetria de Uso: aprimoramentos no rastreamento de consumo e exibição no chat da extensão.
+
 ## [1.135.06851] - 2026-10-12
 
 Versão de teste, só para Linux (x64).
