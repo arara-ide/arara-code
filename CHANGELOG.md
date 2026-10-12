@@ -4,6 +4,17 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06848] - 2026-10-12
+
+Versão de teste, só para Linux (x64).
+
+### Novidades
+- Branding: ícones e assets de identidade visual atualizados em todas as plataformas.
+- Rede e Endpoints: configuração nativa de endpoint de produção da Arara na versão instalada.
+
+### Melhorias
+- Agente: suporte a pesquisa na web nativa diretamente pelo servidor.
+
 ## [1.135.06790] - 2026-10-09
 
 Versão de teste, só para Linux (x64).
