@@ -4,6 +4,16 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06851] - 2026-10-12
+
+Versão de teste, só para Linux (x64).
+
+### Novidades
+- WhatsApp / Controle Remoto: integração e controle remoto do assistente via Evolution API.
+
+### Melhorias
+- Controle Remoto: reconexão automática resiliente e tratamento aprimorado de cancelamento de requisições.
+
 ## [1.135.06848] - 2026-10-12
 
 Versão de teste, só para Linux (x64).
