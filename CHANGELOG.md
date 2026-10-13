@@ -4,6 +4,9 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+### Novidades
+- MCPs: busca de servidores no catálogo e opções de login e gerenciamento por assistente.
+
 ## [1.135.06878] - 2026-10-13
 
 ### Novidades
