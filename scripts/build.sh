@@ -46,9 +46,19 @@ node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}"
 
 # --- 1. cópia de trabalho (preserva vscode/ quando --skip-source)
 mkdir -p "${WORK}"
-rsync -a --delete \
-  --exclude '/vscode/' --exclude '/VSCode-*/' --exclude '/vscode-reh*/' --exclude '/dev/build.env' \
-  "${UPSTREAM}/" "${WORK}/"
+if command -v rsync >/dev/null 2>&1; then
+  rsync -a --delete \
+    --exclude '/vscode/' --exclude '/VSCode-*/' --exclude '/vscode-reh*/' --exclude '/dev/build.env' \
+    "${UPSTREAM}/" "${WORK}/"
+else
+  # Windows (Git Bash) não tem rsync: mesma cópia com find + tar.
+  mkdir -p "${WORK}/dev"
+  [[ -f "${WORK}/dev/build.env" ]] && cp "${WORK}/dev/build.env" "${WORK}/.build.env.keep"
+  find "${WORK}" -mindepth 1 -maxdepth 1 ! -name vscode ! -name 'VSCode-*' ! -name 'vscode-reh*' -exec rm -rf {} +
+  ( cd "${UPSTREAM}" && tar cf - --exclude=./vscode --exclude='./VSCode-*' --exclude='./vscode-reh*' . ) | tar xf - -C "${WORK}"
+  mkdir -p "${WORK}/dev"
+  [[ -f "${WORK}/.build.env.keep" ]] && mv "${WORK}/.build.env.keep" "${WORK}/dev/build.env"
+fi
 rm -f "${WORK}/.git"   # o .git do submódulo é só um ponteiro; não queremos git no work dir
 
 # --- 2. patches nos scripts do VSCodium
@@ -186,8 +196,33 @@ if [[ "${OS_NAME}" == "linux" ]]; then
       printf '\nrm -f /usr/bin/@@NAME@@-uninstall\n' >> "${f}"
     fi
   done
+elif [[ "${OS_NAME}" == "windows" ]]; then
+  # Mesmo fluxo do build.sh do VSCodium (Windows, CI_BUILD=no), em etapas, para a
+  # extensão entrar depois do prepare_vscode.sh. Sem CLI nem REH (não usamos).
+  . version.sh
+  . prepare_vscode.sh
+  embed_arara_ai
+  (
+    cd vscode
+    export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
+    export VSCODE_PUBLISH_COUNTER=1
+    npm run gulp vscode-min-prepack
+    . ../build/windows/rtf/make.sh
+    npm run copy-policy-dto --prefix build
+    node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc win32
+    npm run gulp "vscode-win32-${VSCODE_ARCH}-min-packing"
+  )
+  # zip + instaladores (sistema e usuário). APP_NAME sem espaço só para o nome dos arquivos.
+  (
+    export SHOULD_BUILD_CLI="no" SHOULD_BUILD_REH="no" SHOULD_BUILD_REH_WEB="no"
+    export SHOULD_BUILD_MSI="no" SHOULD_BUILD_MSI_NOUP="no"
+    APP_NAME="AraraCode" ./prepare_assets.sh
+  )
+  OUT="${ROOT}/dist"
+  mkdir -p "${OUT}"
+  cp assets/* "${OUT}/"
 else
-  # macOS/Windows: fluxo do VSCodium sem mudanças (extensão embutida ainda só no Linux)
+  # macOS: fluxo do VSCodium sem mudanças (extensão embutida ainda só no Linux)
   . build.sh
 fi
 

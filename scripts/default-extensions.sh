@@ -32,7 +32,11 @@ while IFS= read -r entry; do
   dest="${VSCODE}/.build/builtInExtensions/${name}"
   if [[ ! -f "${dest}/package.json" ]] || [[ "$(jq -r '.version' "${dest}/package.json")" != "${version}" ]]; then
     temp="$(mktemp -d "${CACHE}/extract.XXXXXX")"
-    unzip -q "${vsix}" 'extension/*' -d "${temp}"
+    if command -v unzip >/dev/null 2>&1; then
+      unzip -q "${vsix}" 'extension/*' -d "${temp}"
+    else
+      7z x -y -bd -o"${temp}" "${vsix}" 'extension/*' >/dev/null
+    fi
     jq -e --arg name "${name}" --arg version "${version}" \
       '(.publisher + "." + .name) == $name and .version == $version' \
       "${temp}/extension/package.json" >/dev/null
