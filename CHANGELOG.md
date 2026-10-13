@@ -4,6 +4,21 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+### Novidades
+- CLIs: instalação pelo terminal integrado e ajuda de login nos painéis Codex, Claude Code, Antigravity e Kiro.
+- Chat: perguntas do assistente aparecem em cartões e podem ser respondidas enquanto ele trabalha.
+- Primeiro acesso: escolha idioma, tema e modo de uso antes de começar.
+- Configurações: importe preferências e atalhos de outras IDEs na primeira abertura.
+- Terminal: escolha o assistente pelo seletor do modo otimizado.
+
+### Melhorias
+- Chat: todos os assistentes recebem o arquivo ativo, a linha do cursor e o contexto das abas abertas.
+- WhatsApp: respostas, progresso e perguntas ficam mais claros, com suporte à troca de projeto em outra janela.
+
+### Correções
+- Login: falhas temporárias de conexão preservam a sessão e tentam recuperar o acesso.
+- Controle remoto: conexões abandonadas deixam de bloquear o WhatsApp e a atualização da IDE.
+
 ## [1.135.06874] - 2026-10-13
 
 ## [1.135.06867] - 2026-10-13
