@@ -1,0 +1,228 @@
+Arara Code: generic extension-owned blocking webview modal.
+
+Why a patch: the public/proposed webview API has no blocking modal, CannotClose
+capability, lifecycle veto or command admission hook. Reuse the native modal
+editor and its existing focus/layout machinery instead of intercepting DOM keys
+or reopening a closed tab. The extension supplies arara.modal.viewType and an
+exact arara.modal.allowedCommands list; clearing the viewType releases the gate.
+CannotClose prevents editor/modal dismissal. Native window close/load is vetoed
+while active; reload remains possible for language changes and recovery.
+No setup steps, provider names, business decisions or process execution here.
+Touches: command service, webview editor input/service, native modal part/CSS.
+
+--- a/src/vs/workbench/services/commands/common/commandService.ts
++++ b/src/vs/workbench/services/commands/common/commandService.ts
+@@ -8,6 +8,7 @@
+ import { Disposable } from '../../../../base/common/lifecycle.js';
+ import Severity from '../../../../base/common/severity.js';
+ import { CommandsRegistry, ICommandEvent, ICommandService } from '../../../../platform/commands/common/commands.js';
++import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
+ import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
+@@ -34,6 +35,7 @@
+ 		@IExtensionService private readonly _extensionService: IExtensionService,
+ 		@ILogService private readonly _logService: ILogService,
+ 		@IConfigurationService private readonly _configurationService: IConfigurationService,
++		@IContextKeyService private readonly _contextKeyService: IContextKeyService,
+ 		@IDialogService private readonly _dialogService: IDialogService
+ 	) {
+ 		super();
+@@ -63,6 +65,12 @@
+ 	}
+ 
+ 	async executeCommand<T>(id: string, ...args: unknown[]): Promise<T> {
++		// Blocking extension-owned modal: commands are admitted centrally, so native
++		// menus, custom shortcuts and webview-forwarded keybindings share the gate.
++		if (this._contextKeyService.getContextKeyValue('arara.modal.viewType') && id !== 'setContext') {
++			const allowed = this._contextKeyService.getContextKeyValue<readonly string[]>('arara.modal.allowedCommands');
++			if (!allowed?.includes(id)) { return undefined as T; }
++		}
+ 		this._logService.trace('CommandService#executeCommand', id);
+ 
+ 		const activationEvent = `onCommand:${id}`;
+--- a/src/vs/workbench/contrib/webviewPanel/browser/webviewEditorInput.ts
++++ b/src/vs/workbench/contrib/webviewPanel/browser/webviewEditorInput.ts
+@@ -24,6 +24,8 @@
+ 
+ export class WebviewInput extends EditorInput {
+ 
++	public blocking = false;
++
+ 	public static typeId = 'workbench.editors.webviewInput';
+ 
+ 	public override get typeId(): string {
+@@ -35,7 +37,7 @@
+ 	}
+ 
+ 	public override get capabilities(): EditorInputCapabilities {
+-		return EditorInputCapabilities.Readonly | EditorInputCapabilities.Singleton | EditorInputCapabilities.CanDropIntoEditor;
++		return EditorInputCapabilities.Readonly | EditorInputCapabilities.Singleton | (this.blocking ? EditorInputCapabilities.CannotClose : EditorInputCapabilities.CanDropIntoEditor);
+ 	}
+ 
+ 	private readonly _resourceId = generateUuid();
+--- a/src/vs/workbench/contrib/webviewPanel/browser/webviewWorkbenchService.ts
++++ b/src/vs/workbench/contrib/webviewPanel/browser/webviewWorkbenchService.ts
+@@ -10,6 +10,8 @@
+ import { Emitter, Event } from '../../../../base/common/event.js';
+ import { Iterable } from '../../../../base/common/iterator.js';
+ import { combinedDisposable, Disposable, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
++import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
++import { ILifecycleService, ShutdownReason } from '../../../services/lifecycle/common/lifecycle.js';
+ import { EditorActivation } from '../../../../platform/editor/common/editor.js';
+ import { createDecorator, IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+@@ -17,7 +19,7 @@
+ import { DiffEditorInput } from '../../../common/editor/diffEditorInput.js';
+ import { EditorInput } from '../../../common/editor/editorInput.js';
+ import { IEditorGroup, IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
+-import { ACTIVE_GROUP_TYPE, IEditorService, SIDE_GROUP_TYPE } from '../../../services/editor/common/editorService.js';
++import { ACTIVE_GROUP_TYPE, IEditorService, SIDE_GROUP_TYPE, MODAL_GROUP } from '../../../services/editor/common/editorService.js';
+ import { IOverlayWebview, IWebviewService, WebviewInitInfo } from '../../webview/browser/webview.js';
+ import { CONTEXT_ACTIVE_WEBVIEW_PANEL_ID } from './webviewEditor.js';
+ import { WebviewIconPath, WebviewInput, WebviewInputInitInfo } from './webviewEditorInput.js';
+@@ -212,6 +214,8 @@
+ 		@IEditorService private readonly _editorService: IEditorService,
+ 		@IInstantiationService private readonly _instantiationService: IInstantiationService,
+ 		@IWebviewService private readonly _webviewService: IWebviewService,
++		@IContextKeyService private readonly _contextKeyService: IContextKeyService,
++		@ILifecycleService private readonly _lifecycleService: ILifecycleService,
+ 	) {
+ 		super();
+ 
+@@ -280,13 +284,24 @@
+ 	): WebviewInput {
+ 		const webview = this._webviewService.createWebviewOverlay(webviewInitInfo);
+ 		const webviewInput = this._instantiationService.createInstance(WebviewInput, { viewType, name: title, providedId: webviewInitInfo.providedViewType, iconPath }, webview);
++		const blocking = this._contextKeyService.getContextKeyValue('arara.modal.viewType') === webviewInitInfo.providedViewType && !!webviewInitInfo.providedViewType;
++		webviewInput.blocking = blocking;
++		if (blocking) {
++			const veto = this._lifecycleService.onBeforeShutdown(event => {
++				if (this._contextKeyService.getContextKeyValue('arara.modal.viewType') === webviewInput.providerId && event.reason !== ShutdownReason.RELOAD) {
++					event.veto(true, 'arara.modal');
++				}
++			});
++			webviewInput.onWillDispose(() => veto.dispose());
++		}
+ 		this._editorService.openEditor(webviewInput, {
++			modal: blocking ? { maximized: true } : undefined,
+ 			pinned: true,
+ 			preserveFocus: showOptions.preserveFocus,
+ 			// preserve pre 1.38 behaviour to not make group active when preserveFocus: true
+ 			// but make sure to restore the editor to fix https://github.com/microsoft/vscode/issues/79633
+ 			activation: showOptions.preserveFocus ? EditorActivation.RESTORE : undefined
+-		}, showOptions.group);
++		}, blocking ? MODAL_GROUP : showOptions.group);
+ 		return webviewInput;
+ 	}
+ 
+--- a/src/vs/workbench/browser/parts/editor/modalEditorPart.ts
++++ b/src/vs/workbench/browser/parts/editor/modalEditorPart.ts
+@@ -31,7 +31,7 @@
+ import { GroupDirection, GroupsOrder, IModalEditorPart, GroupActivationReason } from '../../../services/editor/common/editorGroupsService.js';
+ import { IEditorService, USE_MODAL_EDITOR_SETTING, UseModalEditorMode } from '../../../services/editor/common/editorService.js';
+ import { EditorPartModalContext, EditorPartModalMaximizedContext, EditorPartModalNavigationContext, EditorPartModalSidebarContext, EditorPartModalSidebarVisibleContext } from '../../../common/contextkeys.js';
+-import { EditorResourceAccessor, IEditorCommandsContext, SideBySideEditor, Verbosity } from '../../../common/editor.js';
++import { EditorInputCapabilities, EditorResourceAccessor, IEditorCommandsContext, SideBySideEditor, Verbosity } from '../../../common/editor.js';
+ import { EditorInput } from '../../../common/editor/editorInput.js';
+ import { ResourceLabel } from '../../labels.js';
+ import { IHostService } from '../../../services/host/browser/host.js';
+@@ -362,6 +362,7 @@
+ 		let trackedEditor: EditorInput | undefined;
+ 		const updateLabel = () => {
+ 			const activeEditor = editorPart.activeGroup.activeEditor;
++			modalElement.classList.toggle('blocking-modal', !!activeEditor?.hasCapability(EditorInputCapabilities.CannotClose));
+ 			if (activeEditor) {
+ 				const { labelFormat } = editorPart.partOptions;
+ 
+@@ -1082,6 +1083,7 @@
+ 	}
+ 
+ 	async close(options?: { mergeAllEditorsToMainPart?: boolean }): Promise<boolean> {
++		if (this.groups.some(group => group.editors.some(editor => editor.hasCapability(EditorInputCapabilities.CannotClose)))) { return false; }
+ 
+ 		// Merge all editors to main part (editors stay open, no confirmation needed)
+ 		if (options?.mergeAllEditorsToMainPart) {
+--- a/src/vs/workbench/browser/parts/editor/media/modalEditorPart.css
++++ b/src/vs/workbench/browser/parts/editor/media/modalEditorPart.css
+@@ -206,3 +206,7 @@
+ .monaco-modal-editor-block.compact-header .modal-editor-title .monaco-icon-label > .monaco-icon-label-iconpath {
+ 	display: none;
+ }
++
++/* A blocking editor owns navigation until its extension releases it. */
++.monaco-modal-editor-block.blocking-modal { background: var(--vscode-editor-background); }
++.monaco-modal-editor-block.blocking-modal .modal-editor-header { visibility: hidden; pointer-events: none; }
+--- a/src/vs/workbench/services/commands/test/common/commandService.test.ts
++++ b/src/vs/workbench/services/commands/test/common/commandService.test.ts
+@@ -3,6 +3,7 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ import assert from 'assert';
++import { MockContextKeyService } from '../../../../../platform/keybinding/test/common/mockKeybindingService.js';
+ import { DisposableStore } from '../../../../../base/common/lifecycle.js';
+ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
+ import { CommandsRegistry } from '../../../../../platform/commands/common/commands.js';
+@@ -45,7 +46,7 @@
+ 				lastEvent = activationEvent;
+ 				return super.activateByEvent(activationEvent);
+ 			}
+-		}, new NullLogService(), nullConfigService, new TestDialogService()));
++		}, new NullLogService(), nullConfigService, new MockContextKeyService(), new TestDialogService()));
+ 
+ 		return service.executeCommand('foo').then(() => {
+ 			assert.ok(lastEvent, 'onCommand:foo');
+@@ -65,7 +66,7 @@
+ 			}
+ 		};
+ 
+-		const service = store.add(new CommandService(new InstantiationService(), extensionService, new NullLogService(), nullConfigService, new TestDialogService()));
++		const service = store.add(new CommandService(new InstantiationService(), extensionService, new NullLogService(), nullConfigService, new MockContextKeyService(), new TestDialogService()));
+ 
+ 		await extensionService.whenInstalledExtensionsRegistered();
+ 
+@@ -83,7 +84,7 @@
+ 			override whenInstalledExtensionsRegistered() {
+ 				return new Promise<boolean>(_resolve => { /*ignore*/ });
+ 			}
+-		}, new NullLogService(), nullConfigService, new TestDialogService()));
++		}, new NullLogService(), nullConfigService, new MockContextKeyService(), new TestDialogService()));
+ 
+ 		service.executeCommand('bar');
+ 		assert.strictEqual(callCounter, 1);
+@@ -100,7 +101,7 @@
+ 			override whenInstalledExtensionsRegistered() {
+ 				return whenInstalledExtensionsRegistered;
+ 			}
+-		}, new NullLogService(), nullConfigService, new TestDialogService()));
++		}, new NullLogService(), nullConfigService, new MockContextKeyService(), new TestDialogService()));
+ 
+ 		const r = service.executeCommand('bar');
+ 		assert.strictEqual(callCounter, 0);
+@@ -140,7 +141,7 @@
+ 				return Promise.resolve();
+ 			}
+ 
+-		}, new NullLogService(), nullConfigService, new TestDialogService()));
++		}, new NullLogService(), nullConfigService, new MockContextKeyService(), new TestDialogService()));
+ 
+ 		return service.executeCommand('farboo').then(() => {
+ 			assert.strictEqual(callCounter, 1);
+@@ -181,7 +182,7 @@
+ 				return Promise.resolve();
+ 			}
+ 
+-		}, new NullLogService(), nullConfigService, new TestDialogService()));
++		}, new NullLogService(), nullConfigService, new MockContextKeyService(), new TestDialogService()));
+ 
+ 		return service.executeCommand('farboo2').then(() => {
+ 			assert.deepStrictEqual(actualOrder, expectedOrder);
+@@ -202,7 +203,7 @@
+ 				return true;
+ 			}
+ 		};
+-		const service = store.add(new CommandService(new InstantiationService(), extensionService, new NullLogService(), nullConfigService, new TestDialogService()));
++		const service = store.add(new CommandService(new InstantiationService(), extensionService, new NullLogService(), nullConfigService, new MockContextKeyService(), new TestDialogService()));
+ 
+ 		await extensionService.whenInstalledExtensionsRegistered();
+ 

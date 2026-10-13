@@ -252,7 +252,6 @@ jobs:
           retention-days: 14
 
   macos:
-    # Gratuito em repo público. Intel (14 GB) deve caber; arm64 (7 GB) é tentativa e pode falhar por memória.
     needs: version
     continue-on-error: true
     runs-on: ${{ matrix.runner }}
@@ -266,7 +265,7 @@ jobs:
             heap: '12288'
           - runner: macos-14
             arch: arm64
-            heap: '6144'
+            heap: '12288'
     env:
       RELEASE_VERSION: ${{ needs.version.outputs.release }}
     steps:
