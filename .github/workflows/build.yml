@@ -100,10 +100,20 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="$(jq -r '.tag' upstream/vscodium/upstream/stable.json)"
-          patch="$(printf '%04d' $(( $(date +%-j) * 24 + $(date +%-H) )))"
-          echo "release=${tag}${patch}" >> "$GITHUB_OUTPUT"
+          base_patch=$(( $(date +%-j) * 24 + $(date +%-H) ))
+          patch="$(printf '%04d' $base_patch)"
+          release="${tag}${patch}"
+          while git ls-remote --exit-code --tags origin "refs/tags/${release}" >/dev/null 2>&1 || gh release view "${release}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; do
+            echo "Versão ${release} já existe. Incrementando patch automaticamente..."
+            base_patch=$(( base_patch + 1 ))
+            patch="$(printf '%04d' $base_patch)"
+            release="${tag}${patch}"
+          done
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
 
   linux:
     needs: version
@@ -321,8 +331,19 @@ jobs:
       V: ${{ needs.version.outputs.release }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+
+      - name: Atualizar CHANGELOG e commitar se necessário
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          hoje="$(date +%Y-%m-%d)"
+          if grep -q "## \[Não lançado\]" CHANGELOG.md && ! grep -q "## \[${V}\]" CHANGELOG.md; then
+            echo "Registrando versão ${V} no CHANGELOG.md..."
+            sed -i "s/## \[Não lançado\]/## [Não lançado]\n\n## [${V}] - ${hoje}/" CHANGELOG.md
+            git add CHANGELOG.md
+            git commit -m "chore: bump changelog to ${V} [skip ci]" || true
+            git push origin HEAD:main || true
+          fi
 
       - uses: actions/download-artifact@v4
         with:
