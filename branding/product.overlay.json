@@ -35,5 +35,11 @@
     "arara.arara-ai": [
       "quickPickSortByLabel"
     ]
+  },
+  "startupWebview": {
+    "extensionId": "arara.arara-ai",
+    "viewType": "arara.setup",
+    "completedKey": "arara.setup.v1.completed",
+    "title": "Bem-vindo ao Arara Code"
   }
 }

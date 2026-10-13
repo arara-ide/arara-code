@@ -28,13 +28,27 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  		@IDialogService private readonly _dialogService: IDialogService
  	) {
  		super();
+@@ -41,11 +43,11 @@
+ 		this._starActivation = null;
+ 		this._commandFilters = this._configurationService.getValue('commands.filters') ?? { 'workbench.action.terminal.newLocal': 'off' };
+ 
+-		this._configurationService.onDidChangeConfiguration(async (event) => {
++		this._register(this._configurationService.onDidChangeConfiguration(async (event) => {
+ 			if (event.affectsConfiguration('commands.filters')) {
+ 				this._commandFilters = this._configurationService.getValue('commands.filters') ?? { 'workbench.action.terminal.newLocal': 'off' };
+ 			}
+-		})
++		}));
+ 	}
+ 
+ 	private _activateStar(): Promise<void> {
 @@ -63,6 +65,12 @@
  	}
  
  	async executeCommand<T>(id: string, ...args: unknown[]): Promise<T> {
 +		// Blocking extension-owned modal: commands are admitted centrally, so native
 +		// menus, custom shortcuts and webview-forwarded keybindings share the gate.
-+		if (this._contextKeyService.getContextKeyValue('arara.modal.viewType') && id !== 'setContext') {
++		if (this._contextKeyService.getContextKeyValue('arara.modal.viewType') && id !== 'setContext' && id !== '_setContext') {
 +			const allowed = this._contextKeyService.getContextKeyValue<readonly string[]>('arara.modal.allowedCommands');
 +			if (!allowed?.includes(id)) { return undefined as T; }
 +		}
@@ -63,16 +77,15 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  	private readonly _resourceId = generateUuid();
 --- a/src/vs/workbench/contrib/webviewPanel/browser/webviewWorkbenchService.ts
 +++ b/src/vs/workbench/contrib/webviewPanel/browser/webviewWorkbenchService.ts
-@@ -10,6 +10,8 @@
+@@ -10,6 +10,7 @@
  import { Emitter, Event } from '../../../../base/common/event.js';
  import { Iterable } from '../../../../base/common/iterator.js';
  import { combinedDisposable, Disposable, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 +import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
-+import { ILifecycleService, ShutdownReason } from '../../../services/lifecycle/common/lifecycle.js';
  import { EditorActivation } from '../../../../platform/editor/common/editor.js';
  import { createDecorator, IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
-@@ -17,7 +19,7 @@
+@@ -17,7 +18,7 @@
  import { DiffEditorInput } from '../../../common/editor/diffEditorInput.js';
  import { EditorInput } from '../../../common/editor/editorInput.js';
  import { IEditorGroup, IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
@@ -81,29 +94,21 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  import { IOverlayWebview, IWebviewService, WebviewInitInfo } from '../../webview/browser/webview.js';
  import { CONTEXT_ACTIVE_WEBVIEW_PANEL_ID } from './webviewEditor.js';
  import { WebviewIconPath, WebviewInput, WebviewInputInitInfo } from './webviewEditorInput.js';
-@@ -212,6 +214,8 @@
+@@ -212,6 +213,7 @@
  		@IEditorService private readonly _editorService: IEditorService,
  		@IInstantiationService private readonly _instantiationService: IInstantiationService,
  		@IWebviewService private readonly _webviewService: IWebviewService,
 +		@IContextKeyService private readonly _contextKeyService: IContextKeyService,
-+		@ILifecycleService private readonly _lifecycleService: ILifecycleService,
  	) {
  		super();
  
-@@ -280,13 +284,24 @@
+@@ -280,13 +282,17 @@
  	): WebviewInput {
  		const webview = this._webviewService.createWebviewOverlay(webviewInitInfo);
  		const webviewInput = this._instantiationService.createInstance(WebviewInput, { viewType, name: title, providedId: webviewInitInfo.providedViewType, iconPath }, webview);
 +		const blocking = this._contextKeyService.getContextKeyValue('arara.modal.viewType') === webviewInitInfo.providedViewType && !!webviewInitInfo.providedViewType;
 +		webviewInput.blocking = blocking;
-+		if (blocking) {
-+			const veto = this._lifecycleService.onBeforeShutdown(event => {
-+				if (this._contextKeyService.getContextKeyValue('arara.modal.viewType') === webviewInput.providerId && event.reason !== ShutdownReason.RELOAD) {
-+					event.veto(true, 'arara.modal');
-+				}
-+			});
-+			webviewInput.onWillDispose(() => veto.dispose());
-+		}
++		if (blocking) { webview.container.classList.add('blocking-webview-content'); }
  		this._editorService.openEditor(webviewInput, {
 +			modal: blocking ? { maximized: true } : undefined,
  			pinned: true,
@@ -163,7 +168,41 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  import { DisposableStore } from '../../../../../base/common/lifecycle.js';
  import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
  import { CommandsRegistry } from '../../../../../platform/commands/common/commands.js';
-@@ -45,7 +46,7 @@
+@@ -19,7 +20,7 @@
+ suite('CommandService', function () {
+ 
+ 	const store = ensureNoDisposablesAreLeakedInTestSuite();
+-	const testDisposables = ensureNoDisposablesAreLeakedInTestSuite();
++	const testDisposables = store;
+ 	let nullConfigService: ConfigurationService
+ 
+ 	setup(function () {
+@@ -36,6 +37,24 @@
+ 		store.add(CommandsRegistry.registerCommand('foo', function () { }));
+ 	});
+ 
++	test('blocking modal admits only declared commands and restores normal dispatch', async () => {
++		const context = new MockContextKeyService();
++		const modal = context.createKey<string>('arara.modal.viewType', 'test.modal');
++		context.createKey('arara.modal.allowedCommands', ['modal.allowed']);
++		const executed: string[] = [];
++		store.add(CommandsRegistry.registerCommand('modal.allowed', () => executed.push('allowed')));
++		store.add(CommandsRegistry.registerCommand('modal.blocked', () => executed.push('blocked')));
++		const service = store.add(new CommandService(new InstantiationService(), new NullExtensionService(), new NullLogService(), nullConfigService, context, new TestDialogService()));
++		await service.executeCommand('modal.blocked');
++		await service.executeCommand('unknown.during.modal');
++		await service.executeCommand('modal.allowed');
++		assert.deepStrictEqual(executed, ['allowed']);
++		store.add(CommandsRegistry.registerCommand('_setContext', () => modal.set('')));
++		await service.executeCommand('_setContext');
++		await service.executeCommand('modal.blocked');
++		assert.deepStrictEqual(executed, ['allowed', 'blocked']);
++	});
++
+ 	test('activateOnCommand', () => {
+ 
+ 		let lastEvent: string;
+@@ -45,7 +64,7 @@
  				lastEvent = activationEvent;
  				return super.activateByEvent(activationEvent);
  			}
@@ -172,7 +211,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  
  		return service.executeCommand('foo').then(() => {
  			assert.ok(lastEvent, 'onCommand:foo');
-@@ -65,7 +66,7 @@
+@@ -65,7 +84,7 @@
  			}
  		};
  
@@ -181,7 +220,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  
  		await extensionService.whenInstalledExtensionsRegistered();
  
-@@ -83,7 +84,7 @@
+@@ -83,7 +102,7 @@
  			override whenInstalledExtensionsRegistered() {
  				return new Promise<boolean>(_resolve => { /*ignore*/ });
  			}
@@ -190,7 +229,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  
  		service.executeCommand('bar');
  		assert.strictEqual(callCounter, 1);
-@@ -100,7 +101,7 @@
+@@ -100,7 +119,7 @@
  			override whenInstalledExtensionsRegistered() {
  				return whenInstalledExtensionsRegistered;
  			}
@@ -199,7 +238,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  
  		const r = service.executeCommand('bar');
  		assert.strictEqual(callCounter, 0);
-@@ -140,7 +141,7 @@
+@@ -140,7 +159,7 @@
  				return Promise.resolve();
  			}
  
@@ -208,7 +247,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  
  		return service.executeCommand('farboo').then(() => {
  			assert.strictEqual(callCounter, 1);
-@@ -181,7 +182,7 @@
+@@ -181,7 +200,7 @@
  				return Promise.resolve();
  			}
  
@@ -217,7 +256,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  
  		return service.executeCommand('farboo2').then(() => {
  			assert.deepStrictEqual(actualOrder, expectedOrder);
-@@ -202,7 +203,7 @@
+@@ -202,7 +221,7 @@
  				return true;
  			}
  		};
