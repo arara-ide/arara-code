@@ -93,7 +93,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_AI_REPO }}
-          token: ${{ secrets.ENVS_REPO_PAT }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-ai
           persist-credentials: false
 
@@ -161,7 +161,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_AI_REPO }}
-          token: ${{ secrets.ARARA_AI_TOKEN }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-ai
           persist-credentials: false
 
