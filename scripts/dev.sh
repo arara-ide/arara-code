@@ -37,6 +37,9 @@ fi
 
 cd "${VSCODE}"
 
+# Atualiza a fonte preparada quando os patches do projeto mudarem.
+bash "${ROOT}/scripts/sync-dev-patches.sh"
+
 # Extensões padrão também no perfil de desenvolvimento (preLaunch é pulado).
 bash "${ROOT}/scripts/default-extensions.sh" "${VSCODE}"
 
@@ -78,6 +81,11 @@ if [[ -f "${EXT_DIR}/package.json" ]]; then
   fi
   echo "» Buildando arara-ai…"
   ( cd "${EXT_DIR}" && npm run --silent build >/dev/null )
+  # Mantenha também a extensão embutida do dev atualizada: recursos/hooks podem
+  # ser resolvidos por essa cópia em janelas abertas sem extensionDevelopmentPath.
+  mkdir -p "${VSCODE}/extensions/arara-ai"
+  cp "${EXT_DIR}/package.json" "${VSCODE}/extensions/arara-ai/"
+  cp -R "${EXT_DIR}/dist" "${EXT_DIR}/media" "${EXT_DIR}/themes" "${VSCODE}/extensions/arara-ai/"
   EXT_ARGS=("--extensionDevelopmentPath=${EXT_DIR}")
 else
   echo "! ${EXT_DIR} não encontrado; abrindo sem a extensão arara-ai." >&2
