@@ -34,6 +34,8 @@ concurrency:
 
 env:
   ARARA_AI_REPO: arara-ide/arara-ai
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   # PR: prova que clone + patches + branding + npm ci funcionam nas 3 plataformas (sem compilar, sem secrets).
@@ -160,6 +162,8 @@ jobs:
         env:
           ARARA_AI_DIR: ${{ github.workspace }}/arara-ai
           MAX_OLD_SPACE_SIZE: '8192'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: scripts/build.sh
 
       - name: Conferir versão e gerar hashes
@@ -223,6 +227,8 @@ jobs:
           ARARA_AI_DIR_NAME: arara-ai
           MAX_OLD_SPACE_SIZE: '8192'
           CI_BUILD: 'no'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export ARARA_AI_DIR="$(pwd)/arara-ai"
           scripts/build.sh
@@ -297,6 +303,8 @@ jobs:
       - name: Build
         env:
           MAX_OLD_SPACE_SIZE: ${{ matrix.heap }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export ARARA_AI_DIR="$(pwd)/arara-ai"
           scripts/build.sh

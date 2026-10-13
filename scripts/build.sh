@@ -98,6 +98,8 @@ export GLOBAL_DIRNAME="arara-code"
 export TUNNEL_APP_NAME="arara-code-tunnel"
 export GH_REPO_PATH="arara-ide/arara-code"
 export ASSETS_REPOSITORY="arara-ide/arara-code"
+export GITHUB_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 
 export SHOULD_BUILD="yes"
 export SHOULD_BUILD_REH="${SHOULD_BUILD_REH:-no}"
