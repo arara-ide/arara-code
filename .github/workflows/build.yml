@@ -194,10 +194,78 @@ jobs:
           path: dist/
           retention-days: 14
 
+  macos:
+    # Gratuito em repo público. Intel (14 GB) deve caber; arm64 (7 GB) é tentativa e pode falhar por memória.
+    needs: version
+    continue-on-error: true
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x64
+            heap: '12288'
+          - runner: macos-14
+            arch: arm64
+            heap: '6144'
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Checkout arara-ai
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_AI_REPO }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-ai
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: upstream/vscodium/.nvmrc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # O patch do macOS (BSD) não aceita as opções usadas no build.sh; usa o GNU patch como `patch`.
+      - name: Dependências
+        run: |
+          brew install gpatch jq
+          mkdir -p "$HOME/gnubin"
+          ln -sf "$(brew --prefix gpatch)/bin/gpatch" "$HOME/gnubin/patch"
+          echo "$HOME/gnubin" >> "$GITHUB_PATH"
+          vm_stat | head -3; sysctl hw.memsize
+
+      - name: Build
+        env:
+          MAX_OLD_SPACE_SIZE: ${{ matrix.heap }}
+        run: |
+          export ARARA_AI_DIR="$(pwd)/arara-ai"
+          scripts/build.sh
+
+      - name: Conferir versão
+        run: |
+          . .work/vscodium/dev/build.env
+          [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/
+          retention-days: 14
+
   release:
-    # Publica mesmo que o Windows falhe (Linux é a plataforma estável); o Windows entra quando passar.
+    # Publica mesmo que Windows/macOS falhem (Linux é a plataforma estável); eles entram quando passarem.
     if: ${{ !cancelled() && needs.linux.result == 'success' && github.event_name != 'pull_request' }}
-    needs: [version, linux, windows]
+    needs: [version, linux, windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -246,6 +314,14 @@ jobs:
               echo "### Windows (teste)"
               echo "Baixe \`AraraCodeUserSetup-x64-${V}.exe\` (só para o seu usuário) ou \`AraraCodeSetup-x64-${V}.exe\` (todos os usuários) e execute."
               echo "Também há o \`.zip\`, sem instalar. O instalador ainda não é assinado: o Windows pode avisar."
+            fi
+            if ls dist/*darwin*.zip >/dev/null 2>&1; then
+              echo
+              echo "### macOS (teste)"
+              echo "Baixe o \`AraraCode-darwin-arm64-${V}.zip\` (Apple Silicon) ou \`AraraCode-darwin-x64-${V}.zip\` (Intel), descompacte e arraste o app para Aplicativos."
+              echo "O app não é notarizado. Na primeira vez, rode no Terminal:"
+              echo
+              echo "    xattr -cr \"/Applications/Arara Code.app\""
             fi
           } > release-notes.md
 

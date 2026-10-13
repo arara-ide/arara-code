@@ -222,8 +222,30 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
   mkdir -p "${OUT}"
   cp assets/* "${OUT}/"
 else
-  # macOS: fluxo do VSCodium sem mudanças (extensão embutida ainda só no Linux)
-  . build.sh
+  # macOS: mesmo fluxo do build.sh do VSCodium, em etapas, para a extensão entrar
+  # depois do prepare_vscode.sh. Sem CLI nem REH. Sem conta Apple Developer: assinatura
+  # ad-hoc (o usuário libera na primeira abertura), sem notarização nem dmg.
+  . version.sh
+  . prepare_vscode.sh
+  embed_arara_ai
+  (
+    cd vscode
+    export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
+    export VSCODE_PUBLISH_COUNTER=1
+    npm run gulp vscode-min-prepack
+    rm -f .build/extensions/ms-vscode.js-debug/src/win32-app-container-tokens.*.node
+    npm run copy-policy-dto --prefix build
+    node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc darwin
+    npm run gulp "vscode-darwin-${VSCODE_ARCH}-min-packing"
+  )
+  find "VSCode-darwin-${VSCODE_ARCH}" -print0 | xargs -0 touch -c
+  APP=""
+  for APP in "VSCode-darwin-${VSCODE_ARCH}"/*.app; do break; done
+  [[ -d "${APP}" ]] || { echo "! .app não encontrado em VSCode-darwin-${VSCODE_ARCH}" >&2; exit 1; }
+  codesign --force --deep --sign - "${APP}"
+  OUT="${ROOT}/dist"
+  mkdir -p "${OUT}"
+  ditto -c -k --sequesterRsrc --keepParent "${APP}" "${OUT}/AraraCode-darwin-${VSCODE_ARCH}-${RELEASE_VERSION}.zip"
 fi
 
 if [[ "${OS_NAME}" == "linux" ]]; then
