@@ -4,6 +4,8 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06878] - 2026-10-13
+
 ### Novidades
 - CLIs: instalação pelo terminal integrado e ajuda de login nos painéis Codex, Claude Code, Antigravity e Kiro.
 - Chat: perguntas do assistente aparecem em cartões e podem ser respondidas enquanto ele trabalha.
