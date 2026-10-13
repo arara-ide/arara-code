@@ -209,7 +209,7 @@ Touches: src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts,
 -		const box = append(this.shortcuts, $('.watermark-box'));
 +		if (!CommandsRegistry.getCommand('arara.startScreen')) { return; }
 +		const sections = await this.commandService.executeCommand<StartSection[]>('arara.startScreen');
-+		if (version !== this.renderVersion || this._store.isDisposed) { return; }
++		if (!sections || version !== this.renderVersion || this._store.isDisposed) { return; }
 +
 +		const root = append(this.shortcuts, $('.arara-start-box'));
 +		const title = append(root, $('h1.arara-start-title'));
