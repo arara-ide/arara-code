@@ -36,12 +36,23 @@ env:
   ARARA_AI_REPO: arara-ide/arara-ai
 
 jobs:
-  # PR: só prova que clone + patches + branding + npm ci funcionam (sem compilar, sem secrets).
+  # PR: prova que clone + patches + branding + npm ci funcionam nas 3 plataformas (sem compilar, sem secrets).
   verify:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2022, macos-14]
+    defaults:
+      run:
+        shell: bash
     steps:
+      - name: Caminhos longos (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -51,10 +62,28 @@ jobs:
         with:
           node-version-file: upstream/vscodium/.nvmrc
 
-      - name: Dependências do sistema
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dependências do sistema (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends jq rsync libkrb5-dev libx11-dev libxkbfile-dev libsecret-1-dev
+
+      - name: Dependências do sistema (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install gpatch jq
+          mkdir -p "$HOME/gnubin"
+          ln -sf "$(brew --prefix gpatch)/bin/gpatch" "$HOME/gnubin/patch"
+          echo "$HOME/gnubin" >> "$GITHUB_PATH"
+
+      - name: Sintaxe dos scripts
+        run: |
+          for f in scripts/*.sh; do bash -n "$f"; done
+          node --check scripts/apply-environment.cjs
 
       - name: Preparar (patches aplicam do zero)
         run: scripts/prepare.sh
@@ -133,6 +162,12 @@ jobs:
         run: |
           dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|bin/arara-code-uninstall"
 
+      - name: Testar o binário (abre e traz o arara-ai)
+        run: |
+          d=.work/vscodium/VSCode-linux-x64
+          timeout 120 "$d/bin/arara-code" --version
+          test -f "$d/resources/app/extensions/arara-ai/package.json"
+
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -187,6 +222,12 @@ jobs:
           . .work/vscodium/dev/build.env
           [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
           ls -lh dist
+
+      - name: Testar o binário (abre e traz o arara-ai)
+        run: |
+          d=.work/vscodium/VSCode-win32-x64
+          timeout 120 "$d/bin/arara-code" --version
+          test -f "$d/resources/app/extensions/arara-ai/package.json"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -255,6 +296,13 @@ jobs:
           . .work/vscodium/dev/build.env
           [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
           ls -lh dist
+
+      - name: Testar o binário (abre e traz o arara-ai)
+        run: |
+          for app in .work/vscodium/VSCode-darwin-${{ matrix.arch }}/*.app; do break; done
+          "$app/Contents/Resources/app/bin/arara-code" --version
+          test -f "$app/Contents/Resources/app/extensions/arara-ai/package.json"
+          codesign --verify --deep "$app"
 
       - uses: actions/upload-artifact@v4
         with:
