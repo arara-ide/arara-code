@@ -38,7 +38,7 @@ Este repo é **open source**: todo patch fica público. Quanto menos lógica na 
 ## Comandos
 
 ```bash
-scripts/dev.sh                       # modo dev: abre a IDE com ../arara-ai em ~7 s (use isto no dia a dia)
+scripts/dev.sh --no-sandbox          # modo dev: abre a IDE com ../arara-ai em ~7 s (use isto no dia a dia)
 scripts/prepare.sh                   # clone + patches + branding + npm ci, sem compilar
 scripts/build.sh                     # build de release (~15 min, ~10 GB, pico ~13 GB de RAM)
 scripts/build.sh --skip-source       # reusa vscode/ existente
