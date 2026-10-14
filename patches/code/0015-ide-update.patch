@@ -79,7 +79,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +const POLL_MS = 30_000;
 +const COUNTDOWN_S = 10;
 +/** Context keys de "IA gerando" (arara-ai: chat e CLIs). */
-+const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running'];
++const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running', 'arara.opencode.running'];
 +
 +const notInAuxWindow = IsAuxiliaryWindowContext.negate();
 +
@@ -317,7 +317,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +const POLL_MS = 30_000;
 +const COUNTDOWN_S = 10;
 +/** Context keys de "IA gerando" (arara-ai: chat e CLIs). */
-+const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running'];
++const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running', 'arara.opencode.running'];
 +
 +const notInAuxWindow = IsAuxiliaryWindowContext.negate();
 +

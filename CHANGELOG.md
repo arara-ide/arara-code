@@ -4,6 +4,11 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+### Novidades
+- OpenCode: quinto assistente no painel direito, usando o OpenCode CLI (`opencode`, V2) instalado na máquina. Mesma interface dos outros: mensagens em tempo real, cartões de ferramentas, histórico, continuar a conversa, parar, modelo e nível de pensamento, imagens anexadas, perguntas do assistente, "A propósito", compactar, transferir conversa, Ctrl+L, terminal do modo otimizado e WhatsApp.
+- OpenCode: permissões "Acesso total", "Pedir aprovação no chat" e "Somente leitura", sem alterar a configuração do OpenCode.
+- OpenCode: consumo de cada pedido em tokens e no custo informado pelo provedor; MCPs da Arara (incluindo o chrome-devtools) sincronizados no OpenCode.
+
 ## [1.135.06904] - 2026-10-14
 
 ## [1.135.06890] - 2026-10-14

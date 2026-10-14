@@ -19,7 +19,7 @@ Referências de abordagem: [aviso do Baileys](https://github.com/WhiskeySockets/
 
 ### Independência, marcas e ausência de endosso
 
-Este é um projeto independente. Referências a Codex, ChatGPT, OpenAI, Claude, Anthropic, Antigravity, Google, Kiro, Amazon e AWS identificam produtos e possíveis formas de interoperabilidade. Não significam afiliação, parceria, representação, certificação, patrocínio, aprovação ou autorização dessas empresas. Nomes, marcas, interfaces, modelos e outros ativos de terceiros pertencem aos respectivos titulares; a licença deste repositório não concede direitos sobre eles.
+Este é um projeto independente. Referências a Codex, ChatGPT, OpenAI, Claude, Anthropic, Antigravity, Google, Kiro, Amazon, AWS e OpenCode identificam produtos e possíveis formas de interoperabilidade. Não significam afiliação, parceria, representação, certificação, patrocínio, aprovação ou autorização dessas empresas. Nomes, marcas, interfaces, modelos e outros ativos de terceiros pertencem aos respectivos titulares; a licença deste repositório não concede direitos sobre eles.
 
 ### Autorização de acesso e termos das plataformas
 
@@ -61,6 +61,7 @@ Consulte os documentos vigentes e aqueles aceitos pela sua conta, inclusive even
 - Anthropic/Claude: [termos de consumidor](https://www.anthropic.com/legal/consumer-terms) e [termos comerciais](https://www.anthropic.com/legal/commercial-terms).
 - Google/Antigravity: [termos adicionais do Antigravity](https://antigravity.google/terms) e [termos do Google](https://policies.google.com/terms).
 - Kiro/AWS: [documentos indicados no download do Kiro](https://kiro.dev/downloads/), [AWS Customer Agreement](https://aws.amazon.com/agreement/) e [Service Terms](https://aws.amazon.com/service-terms/).
+- OpenCode: [termos de serviço](https://opencode.ai/legal/terms-of-service) e [política de privacidade](https://opencode.ai/legal/privacy-policy). Provedores conectados pelo OpenCode (OpenAI, Anthropic etc.) seguem os próprios termos.
 
 ## Instalar
 
