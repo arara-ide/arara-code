@@ -74,6 +74,8 @@ if [[ ! -d "${ROOT}/branding/src-stable" ]]; then
   "${ROOT}/scripts/build-icons.sh" "${ROOT}/branding/src-stable"
 fi
 cp -rp "${ROOT}/branding/src-stable/"* "${WORK}/src/stable/"
+# Banner e diálogo do instalador MSI (WiX) ficam fora de src/stable no VSCodium.
+cp -p "${ROOT}/branding/msi/stable/"*.bmp "${WORK}/build/windows/msi/resources/stable/"
 
 # --- 4. product.json (o prepare_vscode.sh faz `vscode/product.json * ../product.json`)
 jq -s '.[0] * .[1]' "${WORK}/product.json" "${ROOT}/branding/product.overlay.json" > "${WORK}/product.json.tmp"

@@ -15,14 +15,16 @@ TMP="$( mktemp -d )"
 trap 'rm -rf "${TMP}"' EXIT
 
 # Renderiza SVG em PNG com fidelidade de cores (gradientes e máscaras).
-# Tenta python3 com librsvg/cairo primeiro; caso indisponível, tenta rsvg-convert real.
+# rsvg-convert real primeiro (alguns ambientes têm um shim que achata cores); depois
+# python3 com librsvg/cairo, que exige o binding gi-cairo e falha sem ele.
 render_png() {
   local in_svg="$1"
   local size="$2"
   local out_png="$3"
 
-  if python3 -c "import gi; gi.require_version('Rsvg', '2.0'); from gi.repository import Rsvg; import cairo" 2>/dev/null; then
-    python3 -c "
+  if command -v rsvg-convert >/dev/null && ! grep -q "shim: rsvg-convert" "$(command -v rsvg-convert)" 2>/dev/null; then
+    rsvg-convert -w "${size}" -h "${size}" "${in_svg}" -o "${out_png}"
+  elif python3 -c "
 import gi
 gi.require_version('Rsvg', '2.0')
 from gi.repository import Rsvg
@@ -34,11 +36,10 @@ ctx = cairo.Context(surface)
 ctx.scale(${size} / 512.0, ${size} / 512.0)
 handle.render_cairo(ctx)
 surface.write_to_png('${out_png}')
-"
-  elif command -v rsvg-convert >/dev/null && ! grep -q "shim: rsvg-convert" "$(command -v rsvg-convert)" 2>/dev/null; then
-    rsvg-convert -w "${size}" -h "${size}" "${in_svg}" -o "${out_png}"
+" 2>/dev/null; then
+    :
   else
-    echo "erro: renderizador de SVG seguro não encontrado. Instale librsvg2-bin ou python3-gi." >&2
+    echo "erro: renderizador de SVG seguro não encontrado. Instale librsvg2-bin ou python3-gi-cairo." >&2
     exit 1
   fi
 }
@@ -66,14 +67,53 @@ convert -size 70x70 canvas:transparent "${TMP}/45.png" -gravity center -composit
 render_png "${ICON}" 64 "${TMP}/64.png"
 convert -size 150x150 canvas:transparent "${TMP}/64.png" -gravity NorthWest -geometry +44+25 -composite PNG32:"${DEST}/resources/win32/code_150x150.png"
 
+# Imagens do assistente de instalação (Inno Setup: WizardImageFile/WizardSmallImageFile)
+# e do MSI (WiX). Mesmas dimensões e posições do icons/build_icons.sh do VSCodium; sem
+# isto o instalador mostra o logo do VSCodium. BMP3 24 bits: formato aceito por Inno e WiX.
+bmp() { # $1 destino, $2 tamanho da tela, $3 lado do logo, $4 gravidade (center ou +x+y)
+  render_png "${ICON}" "$3" "${TMP}/logo.png"
+  if [[ "$4" == center ]]; then
+    convert -size "$2" xc:white "${TMP}/logo.png" -gravity center -composite -alpha remove -type TrueColor BMP3:"$1"
+  else
+    convert -size "$2" xc:white "${TMP}/logo.png" -gravity NorthWest -geometry "$4" -composite -alpha remove -type TrueColor BMP3:"$1"
+  fi
+}
+W="${DEST}/resources/win32"
+bmp "${W}/inno-big-100.bmp" 164x314 126 center
+bmp "${W}/inno-big-125.bmp" 192x386 147 center
+bmp "${W}/inno-big-150.bmp" 246x459 190 center
+bmp "${W}/inno-big-175.bmp" 273x556 211 center
+bmp "${W}/inno-big-200.bmp" 328x604 255 center
+bmp "${W}/inno-big-225.bmp" 355x700 273 center
+bmp "${W}/inno-big-250.bmp" 410x797 317 center
+bmp "${W}/inno-small-100.bmp" 55x55 44 center
+bmp "${W}/inno-small-125.bmp" 64x68 52 center
+bmp "${W}/inno-small-150.bmp" 83x80 63 center
+bmp "${W}/inno-small-175.bmp" 92x97 76 center
+bmp "${W}/inno-small-200.bmp" 110x106 86 center
+bmp "${W}/inno-small-225.bmp" 119x123 103 center
+bmp "${W}/inno-small-250.bmp" 138x140 116 center
+MSI="${ROOT}/branding/msi/stable"
+mkdir -p "${MSI}"
+bmp "${MSI}/wix-banner.bmp" 493x58 50 +438+6
+bmp "${MSI}/wix-dialog.bmp" 493x312 120 +22+152
+
 # --- macOS
+# .icns montado direto (PNG embutido por tipo: ic07 128 … ic10 1024, ic11–ic14 @2x),
+# para não depender do png2icns, que não existe na maioria das máquinas.
 mkdir -p "${DEST}/resources/darwin"
-if command -v png2icns >/dev/null; then
-  for s in 1024 512 256 128; do render_png "${ICON}" "${s}" "${TMP}/m${s}.png"; done
-  png2icns "${DEST}/resources/darwin/code.icns" "${TMP}"/m{1024,512,256,128}.png
-elif [[ ! -f "${DEST}/resources/darwin/code.icns" && -f "${ROOT}/upstream/vscodium/src/stable/resources/darwin/code.icns" ]]; then
-  cp "${ROOT}/upstream/vscodium/src/stable/resources/darwin/code.icns" "${DEST}/resources/darwin/code.icns"
-fi
+for s in 16 32 64 128 256 512 1024; do render_png "${ICON}" "${s}" "${TMP}/m${s}.png"; done
+python3 - "${TMP}" "${DEST}/resources/darwin/code.icns" <<'PY'
+import struct, sys
+src, out = sys.argv[1], sys.argv[2]
+types = [('ic07', 128), ('ic08', 256), ('ic09', 512), ('ic10', 1024),
+         ('ic11', 32), ('ic12', 64), ('ic13', 256), ('ic14', 512)]
+body = b''
+for kind, size in types:
+    data = open(f'{src}/m{size}.png', 'rb').read()
+    body += kind.encode() + struct.pack('>I', len(data) + 8) + data
+open(out, 'wb').write(b'icns' + struct.pack('>I', len(body) + 8) + body)
+PY
 
 # --- workbench: ícone da barra de título/about e marca d'água do editor vazio
 mkdir -p "${DEST}/src/vs/workbench/browser/media" "${DEST}/src/vs/workbench/browser/parts/editor/media"
