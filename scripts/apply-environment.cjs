@@ -29,6 +29,7 @@ try {
         property.description = 'URL do servidor da Arara. Uma URL definida pelo usuário substitui o padrão do build.';
       }
     }
+    manifest.araraEnvironment = environment;
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
   }
   console.log(`Environment: ${environment}\nWeb: ${urls.web}\nAPI: ${urls.api}`);

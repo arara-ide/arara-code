@@ -10,6 +10,7 @@
 # Uso:
 #   scripts/dev.sh                 # abre a IDE
 #   scripts/dev.sh ~/meu-projeto   # abre a IDE nessa pasta
+#   scripts/dev.sh --production    # desenvolvimento com APIs de produção
 #   scripts/dev.sh --reset         # apaga o perfil de dev antes de abrir
 #
 # Variáveis: ARARA_AI_DIR (padrão ../arara-ai), ARARA_DEV_PROFILE.
@@ -18,15 +19,34 @@ set -euo pipefail
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 VSCODE="${ROOT}/.work/vscodium/vscode"
 EXT_DIR="${ARARA_AI_DIR:-$( cd "${ROOT}/.." && pwd )/arara-ai}"
-PROFILE="${ARARA_DEV_PROFILE:-${ROOT}/.work/dev-profile}"
+DEV_ENVIRONMENT="local"
+ENVIRONMENT_SELECTED=""
+RESET_PROFILE=false
 
 ARGS=()
 for arg in "$@"; do
   case "${arg}" in
-    --reset) rm -rf "${PROFILE}" ;;
+    --production|--local)
+      selected="${arg#--}"
+      if [[ -n "${ENVIRONMENT_SELECTED}" && "${ENVIRONMENT_SELECTED}" != "${selected}" ]]; then
+        echo '! Use apenas um ambiente: --production ou --local.' >&2
+        exit 1
+      fi
+      DEV_ENVIRONMENT="${selected}"
+      ENVIRONMENT_SELECTED="${selected}"
+      ;;
+    --reset) RESET_PROFILE=true ;;
     *) ARGS+=("${arg}") ;;
   esac
 done
+
+PROFILE_DEFAULT="${ROOT}/.work/dev-profile"
+if [[ "${DEV_ENVIRONMENT}" == production ]]; then
+  PROFILE_DEFAULT="${ROOT}/.work/dev-profile-production"
+fi
+PROFILE="${ARARA_DEV_PROFILE:-${PROFILE_DEFAULT}}"
+if [[ "${RESET_PROFILE}" == true ]]; then rm -rf "${PROFILE}"; fi
+node "${ROOT}/scripts/apply-environment.cjs" "${DEV_ENVIRONMENT}"
 
 # 1. código do VS Code preparado (uma vez só)
 if [[ ! -d "${VSCODE}/node_modules" ]]; then
@@ -86,14 +106,24 @@ if [[ -f "${EXT_DIR}/package.json" ]]; then
   mkdir -p "${VSCODE}/extensions/arara-ai"
   cp "${EXT_DIR}/package.json" "${VSCODE}/extensions/arara-ai/"
   cp -R "${EXT_DIR}/dist" "${EXT_DIR}/media" "${EXT_DIR}/themes" "${VSCODE}/extensions/arara-ai/"
-  EXT_ARGS=("--extensionDevelopmentPath=${EXT_DIR}")
+  node "${ROOT}/scripts/apply-environment.cjs" "${DEV_ENVIRONMENT}" "${VSCODE}/extensions/arara-ai/package.json"
+  DEV_EXT_DIR="${EXT_DIR}"
+  if [[ "${DEV_ENVIRONMENT}" == production ]]; then
+    # O manifesto do checkout continua local. A cópia tem padrões de produção.
+    DEV_EXT_DIR="${ROOT}/.work/dev-extensions/production/arara-ai"
+    mkdir -p "${DEV_EXT_DIR}"
+    cp "${EXT_DIR}/package.json" "${DEV_EXT_DIR}/"
+    cp -R "${EXT_DIR}/dist" "${EXT_DIR}/media" "${EXT_DIR}/themes" "${DEV_EXT_DIR}/"
+    node "${ROOT}/scripts/apply-environment.cjs" production "${DEV_EXT_DIR}/package.json"
+  fi
+  EXT_ARGS=("--extensionDevelopmentPath=${DEV_EXT_DIR}")
 else
   echo "! ${EXT_DIR} não encontrado; abrindo sem a extensão arara-ai." >&2
 fi
 
 mkdir -p "${PROFILE}/data" "${PROFILE}/extensions"
 
-echo "» Abrindo Arara Code (dev)…"
+echo "» Abrindo Arara Code (dev, ${DEV_ENVIRONMENT}) — perfil: ${PROFILE}"
 # VSCODE_SKIP_PRELAUNCH: pula o preLaunch (que faria npm ci/compile completo se algo faltasse)
 VSCODE_SKIP_PRELAUNCH=1 exec ./scripts/code.sh \
   --user-data-dir "${PROFILE}/data" \
