@@ -4,6 +4,8 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+## [1.135.06929] - 2026-10-15
+
 ## [1.135.06923] - 2026-10-15
 
 ## [1.135.06907] - 2026-10-14
