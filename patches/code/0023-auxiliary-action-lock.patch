@@ -1,0 +1,192 @@
+Arara Code: extension-owned auxiliary selector action and visibility lock.
+
+Why a patch: stable/proposed extension APIs cannot place a separate action beside
+secondary sidebar selectors or prevent native commands, view reveal and maximize
+from reopening that workbench part. The extension provides the command, label,
+title and codicon through arara.ui.auxiliaryAction{Command,Label,Title,Icon};
+arara.ui.auxiliaryBarLocked closes and gates the part until released. All product
+state, text and coordination remain in the extension. No process, path or network
+operations are introduced. Context keys are window-local and not persisted.
+Touches: src/vs/workbench/browser/layout.ts src/vs/workbench/browser/parts/paneCompositePart.ts src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
+
+--- a/src/vs/workbench/browser/layout.ts
++++ b/src/vs/workbench/browser/layout.ts
+@@ -50,6 +50,7 @@
+ import { ITelemetryService } from '../../platform/telemetry/common/telemetry.js';
+ import { IAuxiliaryWindowService } from '../services/auxiliaryWindow/browser/auxiliaryWindowService.js';
+ import { CodeWindow, mainWindow } from '../../base/browser/window.js';
++import { IContextKeyService } from '../../platform/contextkey/common/contextkey.js';
+ import { localize } from '../../nls.js';
+ 
+ //#region Layout Implementation
+@@ -302,6 +303,7 @@
+ 	private titleService!: ITitleService;
+ 	private viewDescriptorService!: IViewDescriptorService;
+ 	private contextService!: IWorkspaceContextService;
++	private araraContextKeyService!: IContextKeyService;
+ 	private notificationService!: INotificationService;
+ 	private themeService!: IThemeService;
+ 	private statusBarService!: IStatusbarService;
+@@ -324,6 +326,7 @@
+ 	protected initLayout(accessor: ServicesAccessor): void {
+ 
+ 		// Services
++		this.araraContextKeyService = accessor.get(IContextKeyService);
+ 		this.environmentService = accessor.get(IBrowserWorkbenchEnvironmentService);
+ 		this.configurationService = accessor.get(IConfigurationService);
+ 		this.hostService = accessor.get(IHostService);
+@@ -354,6 +357,12 @@
+ 	}
+ 
+ 	private registerLayoutListeners(): void {
++		this._register(this.araraContextKeyService.onDidChangeContext(e => {
++			if (e.affectsSome(new Set(['arara.ui.auxiliaryBarLocked'])) && this.araraContextKeyService.getContextKeyValue('arara.ui.auxiliaryBarLocked') && this.workbenchGrid) {
++				this.setAuxiliaryBarHidden(true);
++			}
++		}));
++
+ 
+ 		// Restore editor if hidden and an editor is to show
+ 		const showEditorIfHidden = (explicitUserAction?: boolean) => {
+@@ -2170,6 +2179,7 @@
+ 	}
+ 
+ 	setAuxiliaryBarMaximized(maximized: boolean): boolean {
++		if (maximized && this.araraContextKeyService.getContextKeyValue('arara.ui.auxiliaryBarLocked')) { return false; }
+ 		if (
+ 			this.inMaximizedAuxiliaryBarTransition ||		// prevent re-entrance
+ 			(maximized === this.isAuxiliaryBarMaximized())	// return early if state is already present
+@@ -2281,6 +2291,7 @@
+ 	}
+ 
+ 	private setAuxiliaryBarHidden(hidden: boolean, skipLayout?: boolean): void {
++		if (!hidden && this.araraContextKeyService.getContextKeyValue('arara.ui.auxiliaryBarLocked')) { return; }
+ 		if (hidden && this.setAuxiliaryBarMaximized(false) && !this.isVisible(Parts.AUXILIARYBAR_PART)) {
+ 			return; // return: leaving maximised auxiliary bar made this part hidden
+ 		}
+--- a/src/vs/workbench/browser/parts/paneCompositePart.ts
++++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
+@@ -516,6 +516,7 @@
+ 	}
+ 
+ 	private async doOpenPaneComposite(id: string, focus?: boolean): Promise<PaneComposite | undefined> {
++		if (this.partId === Parts.AUXILIARYBAR_PART && this.contextKeyService.getContextKeyValue('arara.ui.auxiliaryBarLocked')) { return undefined; }
+ 		if (this.blockOpening) {
+ 			// Workaround against a potential race condition when calling
+ 			// `setPartHidden` we may end up in `openPaneComposite` again.
+@@ -681,13 +682,15 @@
+ 		};
+ 	}
+ 
+-	private layoutCompositeBar(): void {
++	protected getAdditionalCompositeBarWidth(): number { return 0; }
++
++	protected layoutCompositeBar(): void {
+ 		this.pendingCompositeBarLayout.clear();
+ 
+ 		if (this.contentDimension && this.dimension && this.paneCompositeBar.value) {
+ 			const padding = this.compositeBarPosition === CompositeBarPosition.TITLE ? 16 : 8;
+ 			const borderWidth = this.partId === Parts.PANEL_PART ? 0 : 1;
+-			let availableWidth = this.contentDimension.width - padding - borderWidth;
++			let availableWidth = this.contentDimension.width - padding - borderWidth - this.getAdditionalCompositeBarWidth();
+ 			availableWidth = Math.max(AbstractPaneCompositePart.MIN_COMPOSITE_BAR_WIDTH, availableWidth - this.getToolbarWidth());
+ 			this.paneCompositeBar.value.layout(availableWidth, this.dimension.height);
+ 		}
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import './media/auxiliaryBarPart.css';
++import { addDisposableListener } from '../../../../base/browser/dom.js';
+ import { localize } from '../../../../nls.js';
+ import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
+@@ -84,7 +85,7 @@
+ 	private readonly visibleViewContainersTracker: VisibleViewContainersTracker;
+ 
+ 	constructor(
+-		@INotificationService notificationService: INotificationService,
++		@INotificationService private readonly actionNotificationService: INotificationService,
+ 		@IStorageService storageService: IStorageService,
+ 		@IContextMenuService contextMenuService: IContextMenuService,
+ 		@IWorkbenchLayoutService layoutService: IWorkbenchLayoutService,
+@@ -116,7 +117,7 @@
+ 			ViewContainerLocation.AuxiliaryBar,
+ 			Extensions.Auxiliary,
+ 			MenuId.AuxiliaryBarTitle,
+-			notificationService,
++			actionNotificationService,
+ 			storageService,
+ 			contextMenuService,
+ 			layoutService,
+@@ -156,6 +157,55 @@
+ 		}));
+ 	}
+ 
++	private auxiliaryActionButton: HTMLButtonElement | undefined;
++
++	protected override updateCompositeBar(updateCompositeBarOption: boolean = false): void {
++		super.updateCompositeBar(updateCompositeBarOption);
++		const container = this.getContainer();
++		const area = container?.querySelector<HTMLElement>('.header-or-footer.has-composite-bar') ?? container?.querySelector<HTMLElement>(':scope > .title');
++		if (!area) { return; }
++		if (!this.auxiliaryActionButton) {
++			const button = this.auxiliaryActionButton = area.ownerDocument.createElement('button');
++			button.className = 'arara-auxiliary-action';
++			button.type = 'button';
++			const update = () => {
++				const command = this.contextKeyService.getContextKeyValue<string>('arara.ui.auxiliaryActionCommand');
++				const label = this.contextKeyService.getContextKeyValue<string>('arara.ui.auxiliaryActionLabel') ?? '';
++				const icon = this.contextKeyService.getContextKeyValue<string>('arara.ui.auxiliaryActionIcon') ?? '';
++				button.hidden = !command;
++				button.title = this.contextKeyService.getContextKeyValue<string>('arara.ui.auxiliaryActionTitle') ?? label;
++				button.setAttribute('aria-label', button.title);
++				button.replaceChildren();
++				if (/^[a-z0-9-]+$/.test(icon)) {
++					const glyph = area.ownerDocument.createElement('span');
++					glyph.className = `codicon codicon-${icon}`;
++					glyph.setAttribute('aria-hidden', 'true');
++					button.append(glyph);
++				}
++				button.append(area.ownerDocument.createTextNode(label));
++				this.layoutCompositeBar();
++			};
++			this._register(this.contextKeyService.onDidChangeContext(e => {
++				if (e.affectsSome(new Set(['arara.ui.auxiliaryActionCommand', 'arara.ui.auxiliaryActionLabel', 'arara.ui.auxiliaryActionTitle', 'arara.ui.auxiliaryActionIcon']))) { update(); }
++			}));
++			this._register(addDisposableListener(button, 'click', async () => {
++				const command = this.contextKeyService.getContextKeyValue<string>('arara.ui.auxiliaryActionCommand');
++				if (!command) { return; }
++				button.disabled = true;
++				try { await this.commandService.executeCommand(command); }
++				catch (error) { this.actionNotificationService.error(error); }
++				finally { button.disabled = false; }
++			}));
++			update();
++		}
++		area.append(this.auxiliaryActionButton);
++		this.layoutCompositeBar();
++	}
++
++	protected override getAdditionalCompositeBarWidth(): number {
++		return this.auxiliaryActionButton && !this.auxiliaryActionButton.hidden ? this.auxiliaryActionButton.offsetWidth + 8 : 0;
++	}
++
+ 	private onDidChangeAutoHideViewContainers(e: { before: number; after: number }): void {
+ 		// Only update if auto-hide is enabled and composite bar would show
+ 		const autoHide = this.configurationService.getValue<boolean>(LayoutSettings.ACTIVITY_BAR_AUTO_HIDE);
+--- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
++++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
+@@ -111,3 +111,11 @@
+ .monaco-workbench .auxiliarybar.pane-composite-part > .title.has-composite-bar > .title-actions .monaco-action-bar .action-item {
+ 	max-width: 150px;
+ }
++
++/* Extension-owned trailing action, independent of the view selectors. */
++.monaco-workbench .part.auxiliarybar > .header-or-footer.has-composite-bar,
++.monaco-workbench .part.auxiliarybar > .title { display: flex; align-items: center; justify-content: space-between; }
++.monaco-workbench .part.auxiliarybar .arara-auxiliary-action { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex: 0 0 auto; margin-left: auto; margin-right: 4px; max-width: 112px; height: 26px; padding: 0 6px; overflow: hidden; white-space: nowrap; color: var(--vscode-icon-foreground); background: transparent; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
++.monaco-workbench .part.auxiliarybar .arara-auxiliary-action[hidden] { display: none; }
++.monaco-workbench .part.auxiliarybar .arara-auxiliary-action:hover { background: var(--vscode-toolbar-hoverBackground); }
++.monaco-workbench .part.auxiliarybar .arara-auxiliary-action:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
