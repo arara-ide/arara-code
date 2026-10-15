@@ -1,7 +1,8 @@
 Arara Code: gancho genérico de lançador no cabeçalho do Secondary Side Bar.
 
 Mostra um botão com ícone + texto na linha das plataformas (composite bar no header),
-no header acima do título da plataforma, com justify-content:space-between. O texto vem
+no header acima do título da plataforma, com justify-content:space-between (botão primário,
+centralizado na altura do header). O texto vem
 da context key `arara.ui.auxLauncher` (vazio = oculto) e o clique executa o comando
 `arara.ui.auxLauncher.run`. A extensão (arara-ai) decide rótulo, quando mostrar e o que
 abrir (hoje: Orquestra). O core só define `arara.ui.auxLauncherAvailable` para a
@@ -79,31 +80,34 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  		return {
 --- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
-@@ -111,3 +111,30 @@
+@@ -111,3 +111,33 @@
  .monaco-workbench .auxiliarybar.pane-composite-part > .title.has-composite-bar > .title-actions .monaco-action-bar .action-item {
  	max-width: 150px;
  }
 +
-+/* Arara Code: lançador da extensão, à direita das plataformas e antes das ações do painel */
++/* Arara Code: lançador da extensão (botão primário), à direita das plataformas e antes das ações do painel */
 +.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher {
 +	margin-left: auto;
++	margin-right: 6px;
++	align-self: center;
 +	display: inline-flex;
 +	align-items: center;
 +	gap: 4px;
 +	height: 22px;
 +	padding: 0 8px;
-+	border: 0;
++	border: 1px solid var(--vscode-button-border, transparent);
 +	border-radius: 4px;
-+	background: transparent;
-+	color: var(--vscode-foreground);
++	background: var(--vscode-button-background);
++	color: var(--vscode-button-foreground);
 +	font: inherit;
 +	font-size: 12px;
 +	cursor: pointer;
 +	white-space: nowrap;
 +	flex-shrink: 0;
 +}
-+.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:hover { background: var(--vscode-toolbar-hoverBackground); }
-+.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher .codicon { color: inherit; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:hover { background: var(--vscode-button-hoverBackground); }
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
 +.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher[hidden] { display: none; }
 +
 +
