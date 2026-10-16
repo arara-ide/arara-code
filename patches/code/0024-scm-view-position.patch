@@ -1,0 +1,21 @@
+Arara Code: TODO o que este patch faz.
+
+Why a patch: TODO por que não dá pela API de extensão.
+Touches: src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+
+--- a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
++++ b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+@@ -62,6 +62,13 @@
+ 	alwaysUseContainerInfo: true,
+ 	order: 2,
+ 	hideIfEmpty: true,
++	// Arara: extension views can pick their slot with `"group": "position@N"` (Changes = 1, Graph = 2)
++	viewOrderDelegate: {
++		getOrder: (group?: string) => {
++			const match = group ? /^position@(\d+(?:\.\d+)?)$/.exec(group) : null;
++			return match ? Number(match[1]) : undefined;
++		}
++	},
+ }, ViewContainerLocation.Sidebar, { doNotRegisterOpenCommand: true });
+ 
+ const viewsRegistry = Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry);
