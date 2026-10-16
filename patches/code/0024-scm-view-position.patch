@@ -1,6 +1,9 @@
-Arara Code: TODO o que este patch faz.
+Arara Code: let extension views choose their position in the Source Control container.
 
-Why a patch: TODO por que não dá pela API de extensão.
+Why a patch: extension views contributed to `scm` get no order and always land below
+Graph. The container gains a viewOrderDelegate that reads `"group": "position@N"`
+(Changes = 1, Graph = 2) so an extension view can sit between them. No product
+logic, view ids or texts live in this public patch.
 Touches: src/vs/workbench/contrib/scm/browser/scm.contribution.ts
 
 --- a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
