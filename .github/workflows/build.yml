@@ -86,6 +86,7 @@ jobs:
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
           node --check scripts/apply-environment.cjs
+          node scripts/tests/embed-arara-ai.cjs
 
       - name: Preparar (patches aplicam do zero)
         run: scripts/prepare.sh
@@ -181,6 +182,8 @@ jobs:
           d=.work/vscodium/VSCode-linux-x64
           timeout 120 "$d/bin/arara-code" --version
           test -f "$d/resources/app/extensions/arara-ai/package.json"
+          test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -244,6 +247,8 @@ jobs:
           d=.work/vscodium/VSCode-win32-x64
           timeout 120 "$d/bin/arara-code" --version
           test -f "$d/resources/app/extensions/arara-ai/package.json"
+          test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -319,6 +324,8 @@ jobs:
           for app in .work/vscodium/VSCode-darwin-${{ matrix.arch }}/*.app; do break; done
           "$app/Contents/Resources/app/bin/arara-code" --version
           test -f "$app/Contents/Resources/app/extensions/arara-ai/package.json"
+          test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/extension.js"
+          test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/orquestra/webview.js"
           codesign --verify --deep "$app"
 
       - uses: actions/upload-artifact@v4

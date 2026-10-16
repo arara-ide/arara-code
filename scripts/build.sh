@@ -157,8 +157,9 @@ embed_arara_ai() {
   node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
   [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"
   [[ -f "${ARARA_AI_DIR}/.vscodeignore" ]] && cp "${ARARA_AI_DIR}/.vscodeignore" "${dest}/"
-  mkdir -p "${dest}/dist"
+  mkdir -p "${dest}/dist/orquestra"
   cp "${ARARA_AI_DIR}/dist/extension.js" "${dest}/dist/"
+  cp "${ARARA_AI_DIR}/dist/orquestra/webview.js" "${dest}/dist/orquestra/"
   cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
 }
 
