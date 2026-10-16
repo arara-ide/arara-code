@@ -29,9 +29,20 @@ git switch -c feature/nome-da-tarefa
 
 Trabalho individual pode ser commitado diretamente em `development`. Use Conventional Commits e PRs para promover código a `main`. Após uma promoção ou hotfix, incorpore `main` em `development` por merge, preservando o histórico; não use force push nem mova tags publicadas.
 
-Releases e CI de produto executam somente em `main`. A exceção é o workflow de segurança: analisa PRs destinados a `main` e `development`, além da linha de base em `main`. Push isolado em `development` não publica releases. A `main` é protegida por PR obrigatório e verificações de segurança.
+CI de produto executa em `main` e `development`. Releases, tags de distribuição e publicação no registro Docker continuam exclusivas da `main`. Em `development`, os pacotes são disponibilizados somente como **Artifacts do GitHub Actions**, com SHA-256 e retenção de 14 dias; não são releases nem pré-releases e não entram nas consultas dos atualizadores. O workflow de segurança continua analisando PRs destinados a `main` e `development`, além da linha de base em `main`. A `main` é protegida por PR obrigatório e verificações de segurança.
 
-Este repositório é público. Mantenha somente patches, branding e infraestrutura de build aqui. O checkout local pode usar `development` dos componentes irmãos; o CI de distribuição seleciona explicitamente `main` da extensão privada. Branches de desenvolvimento são validadas localmente; as Actions de validação e distribuição só executam em `main`.
+Este repositório é público. Mantenha somente patches, branding e infraestrutura de build aqui. O CI seleciona explicitamente a mesma branch da extensão privada: `development` para testes e `main` para distribuição estável.
+
+## Builds de development
+
+Pushes em `development` executam testes e build. A execução manual também aceita essa branch; o botão **Run workflow** depende da definição com `workflow_dispatch` estar na branch padrão do GitHub. Na aba **Actions**, selecione uma execução bem-sucedida de `development` e baixe o pacote na seção **Artifacts**. É necessário estar conectado ao GitHub e ter acesso de leitura ao repositório. Os arquivos expiram após 14 dias; execute novamente o workflow se precisar de outro pacote. Não há publicação em GitHub Releases, criação de tags ou atualização automática para esses builds.
+
+Os artifacts `arara-code-development-linux` e `arara-code-development-windows` contêm os instaladores/pacotes e `SHA256SUMS`. O build embute `arara-ai` da branch `development`; builds da `main` continuam usando `arara-ai/main`. macOS permanece pausado.
+
+```sh
+gh run list -R arara-ide/arara-code --workflow build.yml --branch development --status success
+gh run download <RUN_ID> -R arara-ide/arara-code -n arara-code-development-linux -D ./build-development
+```
 
 ## Conclusão de tarefas e autoria
 
