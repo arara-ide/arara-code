@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
     paths:
       - 'patches/**'
       - 'scripts/**'
@@ -34,7 +34,7 @@ env:
 
 jobs:
   verify:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
   # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
   version:
     needs: verify
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.v.outputs.release }}
@@ -76,7 +76,7 @@ jobs:
           echo "release=${release}" >> "$GITHUB_OUTPUT"
 
   linux:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -93,7 +93,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_AI_REPO }}
-          ref: main
+          ref: ${{ github.ref_name }}
           token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-ai
           persist-credentials: false
@@ -144,14 +144,19 @@ jobs:
           test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
 
+      - name: Hashes do build de development
+        if: github.ref == 'refs/heads/development'
+        run: (cd dist && sha256sum ./* > SHA256SUMS)
+
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: ${{ github.ref_name == 'development' && 'arara-code-development-linux' || 'linux' }}
           path: dist/
           retention-days: 14
+          if-no-files-found: error
 
   windows:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     needs: version
     runs-on: windows-2022
     timeout-minutes: 240
@@ -173,7 +178,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_AI_REPO }}
-          ref: main
+          ref: ${{ github.ref_name }}
           token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-ai
           persist-credentials: false
@@ -211,11 +216,16 @@ jobs:
           test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
 
+      - name: Hashes do build de development
+        if: github.ref == 'refs/heads/development'
+        run: (cd dist && sha256sum ./* > SHA256SUMS)
+
       - uses: actions/upload-artifact@v4
         with:
-          name: windows
+          name: ${{ github.ref_name == 'development' && 'arara-code-development-windows' || 'windows' }}
           path: dist/
           retention-days: 14
+          if-no-files-found: error
 
   # macOS PAUSADO: builds desativados temporariamente.
   # Para reativar: descomente o job abaixo (remova o "# " do início das linhas)
