@@ -63,3 +63,10 @@ Por orientação explícita do usuário em 16/10/2026, este repositório segue a
 - `hotfix/*`: sai de `main` e deve ser incorporada em `main` e `development`.
 - Não publicar a partir de branches de desenvolvimento, apagar branches históricas sem verificar seus commits ou reescrever o histórico.
 - Commit e push continuam dependendo de autorização do usuário. Esta política não altera os fluxos dos repositórios `ac-*`.
+
+## Encerramento e autoria
+
+- Ao concluir trabalho em uma branch temporária, valide, mescle na branch de destino e confirme o merge no remoto. Uma tarefa não está concluída com a feature isolada; se o merge estiver pendente, informe isso ao usuário.
+- Após confirmar o merge, remova a branch temporária local e remota, usando `git branch -d` localmente, e atualize as referências com `git fetch --prune`. Preserve branches permanentes, de ambiente e qualquer branch com trabalho ainda não integrado. Mantenha a exclusão automática após merge habilitada no GitHub.
+- Nunca atribua autoria ou coautoria a IA em commits ou PRs: sem trailers `Co-authored-by` para assistentes/modelos/serviços e sem assinaturas de IA. Preserve autores humanos, licenças e avisos legítimos; não reescreva histórico publicado para aplicar essa regra.
+- GitHub Actions somente em `main`, inclusive jobs de workflows manuais/reutilizáveis. Sem gatilhos em PRs, tags ou branches de desenvolvimento. Valide localmente antes do merge.

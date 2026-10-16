@@ -2,19 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main, development, 'release/**', 'hotfix/**']
-    paths:
-      - 'patches/**'
-      - 'scripts/**'
-      - 'branding/**'
-      - 'upstream/**'
-      - 'extensions.lock.json'
-      - 'CHANGELOG.md'
-      - '.github/workflows/**'
-      - 'README.md'
-      - 'AGENTS.md'
-  pull_request:
-    branches: [main, development, 'release/**', 'hotfix/**']
+    branches: [main]
     paths:
       - 'patches/**'
       - 'scripts/**'
@@ -45,62 +33,24 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # PR e branches de desenvolvimento: prova que clone + patches + branding + npm ci funcionam nas 3 plataformas (sem compilar, sem secrets).
   verify:
-    if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-2022, macos-14]
-    defaults:
-      run:
-        shell: bash
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
     steps:
-      - name: Caminhos longos (Windows)
-        if: runner.os == 'Windows'
-        run: git config --system core.longpaths true
-
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          persist-credentials: false
-
       - uses: actions/setup-node@v4
         with:
-          node-version-file: upstream/vscodium/.nvmrc
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Dependências do sistema (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends jq rsync libkrb5-dev libx11-dev libxkbfile-dev libsecret-1-dev
-
-      - name: Dependências do sistema (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install gpatch jq
-          mkdir -p "$HOME/gnubin"
-          ln -sf "$(brew --prefix gpatch)/bin/gpatch" "$HOME/gnubin/patch"
-          echo "$HOME/gnubin" >> "$GITHUB_PATH"
-
-      - name: Sintaxe dos scripts
+          node-version: '22'
+      - name: Validar scripts e empacotamento
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
           node --check scripts/apply-environment.cjs
           node scripts/tests/embed-arara-ai.cjs
 
-      - name: Preparar (patches aplicam do zero)
-        run: scripts/prepare.sh
-
   # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
   version:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: verify
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.v.outputs.release }}
@@ -126,6 +76,7 @@ jobs:
           echo "release=${release}" >> "$GITHUB_OUTPUT"
 
   linux:
+    if: github.ref == 'refs/heads/main'
     needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -200,6 +151,7 @@ jobs:
           retention-days: 14
 
   windows:
+    if: github.ref == 'refs/heads/main'
     needs: version
     runs-on: windows-2022
     timeout-minutes: 240
@@ -266,6 +218,7 @@ jobs:
           retention-days: 14
 
   macos:
+    if: github.ref == 'refs/heads/main'
     needs: version
     continue-on-error: true
     runs-on: ${{ matrix.runner }}
@@ -346,7 +299,7 @@ jobs:
 
   release:
     # Publica mesmo que Windows/macOS falhem (Linux é a plataforma estável); eles entram quando passarem.
-    if: ${{ !cancelled() && needs.linux.result == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    if: ${{ !cancelled() && needs.linux.result == 'success' && github.ref == 'refs/heads/main' }}
     needs: [version, linux, windows, macos]
     runs-on: ubuntu-latest
     permissions:
