@@ -3,6 +3,36 @@
 IDE baseada em Code-OSS, construída em cima dos scripts do [VSCodium](https://github.com/VSCodium/vscodium).
 Este repo não contém código do VS Code: só o VSCodium como submódulo (tag fixa), patches, branding e scripts.
 
+## Branches e contribuição
+
+A branch estável e padrão é `main`, seguindo a nomenclatura atual do GitHub. O trabalho diário fica em `development`; este é o checkout recomendado no notebook. Branches representam etapas do código, e não ambientes de execução.
+
+| Branch | Origem | Uso e destino |
+|---|---|---|
+| `main` | — | Código aprovado para distribuição; recebe PRs de `development`, `release/*` ou `hotfix/*`. |
+| `development` | `main` | Integração contínua e trabalho diário; recebe funcionalidades e correções. |
+| `feature/<assunto>` | `development` | Funcionalidade isolada; PR para `development`. |
+| `fix/<assunto>` | `development` | Correção comum; PR para `development`. |
+| `release/<versao>` | `development` | Preparação opcional de versão; PR para `main`, seguido de sincronização com `development`. |
+| `hotfix/<assunto>` | `main` | Correção urgente de uma versão distribuída; PR para `main` e incorporação também em `development`. |
+
+Somente `main` e `development` são permanentes. Crie as demais quando houver trabalho concreto e remova-as após integrar seus commits. Branches anteriores à adoção deste fluxo são históricas: confira os commits antes de integrar ou excluir.
+
+Para trabalhar no notebook:
+
+```sh
+git switch development
+git pull --ff-only origin development
+# Opcional, para isolar uma tarefa:
+git switch -c feature/nome-da-tarefa
+```
+
+Trabalho individual pode ser commitado diretamente em `development`. Use Conventional Commits e PRs para promover código a `main`. Após uma promoção ou hotfix, incorpore `main` em `development` por merge, preservando o histórico; não use force push nem mova tags publicadas.
+
+O CI valida pushes em `development`, `release/*` e `hotfix/*`, além dos PRs. Essas branches não publicam releases. Publicações continuam no fluxo de `main`, conforme a seção de releases deste repositório. As convenções de PR são regras de contribuição; não pressupõem proteção de branch configurada no GitHub.
+
+Este repositório é público. Mantenha somente patches, branding e infraestrutura de build aqui. O checkout local pode usar `development` dos componentes irmãos; o CI de distribuição seleciona explicitamente `main` da extensão privada. Em branches de desenvolvimento, o CI prepara e verifica os patches nas três plataformas, sem compilar nem publicar a IDE completa.
+
 ## Integração não oficial e responsabilidade pelo uso
 
 O Arara Zap e a integração WhatsApp do Arara Code são projetos independentes, sem afiliação, associação, autorização, patrocínio ou endosso do WhatsApp ou da Meta. A conexão via Baileys usa o WhatsApp Web; não é a API oficial WhatsApp Business Platform. WhatsApp, Meta e demais marcas pertencem aos respectivos titulares.

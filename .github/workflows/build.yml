@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, development, 'release/**', 'hotfix/**']
     paths:
       - 'patches/**'
       - 'scripts/**'
@@ -10,14 +10,21 @@ on:
       - 'upstream/**'
       - 'extensions.lock.json'
       - 'CHANGELOG.md'
-      - '.github/workflows/build.yml'
+      - '.github/workflows/**'
+      - 'README.md'
+      - 'AGENTS.md'
   pull_request:
-    branches: [main]
+    branches: [main, development, 'release/**', 'hotfix/**']
     paths:
       - 'patches/**'
       - 'scripts/**'
       - 'branding/**'
       - 'upstream/**'
+      - 'extensions.lock.json'
+      - 'CHANGELOG.md'
+      - '.github/workflows/**'
+      - 'README.md'
+      - 'AGENTS.md'
   workflow_dispatch:
     inputs:
       prerelease:
@@ -38,9 +45,9 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # PR: prova que clone + patches + branding + npm ci funcionam nas 3 plataformas (sem compilar, sem secrets).
+  # PR e branches de desenvolvimento: prova que clone + patches + branding + npm ci funcionam nas 3 plataformas (sem compilar, sem secrets).
   verify:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -93,7 +100,7 @@ jobs:
 
   # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
   version:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.v.outputs.release }}
@@ -135,6 +142,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_AI_REPO }}
+          ref: main
           token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-ai
           persist-credentials: false
@@ -213,6 +221,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_AI_REPO }}
+          ref: main
           token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-ai
           persist-credentials: false
@@ -283,6 +292,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_AI_REPO }}
+          ref: main
           token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-ai
           persist-credentials: false
@@ -336,7 +346,7 @@ jobs:
 
   release:
     # Publica mesmo que Windows/macOS falhem (Linux é a plataforma estável); eles entram quando passarem.
-    if: ${{ !cancelled() && needs.linux.result == 'success' && github.event_name != 'pull_request' }}
+    if: ${{ !cancelled() && needs.linux.result == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     needs: [version, linux, windows, macos]
     runs-on: ubuntu-latest
     permissions:
