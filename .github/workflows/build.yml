@@ -309,19 +309,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Atualizar CHANGELOG e commitar se necessário
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          hoje="$(date +%Y-%m-%d)"
-          if grep -q "## \[Não lançado\]" CHANGELOG.md && ! grep -q "## \[${V}\]" CHANGELOG.md; then
-            echo "Registrando versão ${V} no CHANGELOG.md..."
-            sed -i "s/## \[Não lançado\]/## [Não lançado]\n\n## [${V}] - ${hoje}/" CHANGELOG.md
-            git add CHANGELOG.md
-            git commit -m "chore: bump changelog to ${V} [skip ci]" || true
-            git push origin HEAD:main || true
-          fi
-
       - uses: actions/download-artifact@v4
         with:
           path: dist
