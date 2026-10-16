@@ -217,90 +217,94 @@ jobs:
           path: dist/
           retention-days: 14
 
-  macos:
-    if: github.ref == 'refs/heads/main'
-    needs: version
-    continue-on-error: true
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 360
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15-intel
-            arch: x64
-            heap: '12288'
-          - runner: macos-14
-            arch: arm64
-            heap: '12288'
-    env:
-      RELEASE_VERSION: ${{ needs.version.outputs.release }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          persist-credentials: false
-
-      - name: Checkout arara-ai
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.ARARA_AI_REPO }}
-          ref: main
-          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
-          path: arara-ai
-          persist-credentials: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: upstream/vscodium/.nvmrc
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      # O patch do macOS (BSD) não aceita as opções usadas no build.sh; usa o GNU patch como `patch`.
-      - name: Dependências
-        run: |
-          brew install gpatch jq
-          mkdir -p "$HOME/gnubin"
-          ln -sf "$(brew --prefix gpatch)/bin/gpatch" "$HOME/gnubin/patch"
-          echo "$HOME/gnubin" >> "$GITHUB_PATH"
-          vm_stat | head -3; sysctl hw.memsize
-
-      - name: Build
-        env:
-          MAX_OLD_SPACE_SIZE: ${{ matrix.heap }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          export ARARA_AI_DIR="$(pwd)/arara-ai"
-          scripts/build.sh
-
-      - name: Conferir versão
-        run: |
-          . .work/vscodium/dev/build.env
-          [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
-          ls -lh dist
-
-      - name: Testar o binário (abre e traz o arara-ai)
-        run: |
-          for app in .work/vscodium/VSCode-darwin-${{ matrix.arch }}/*.app; do break; done
-          "$app/Contents/Resources/app/bin/arara-code" --version
-          test -f "$app/Contents/Resources/app/extensions/arara-ai/package.json"
-          test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/extension.js"
-          test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/orquestra/webview.js"
-          codesign --verify --deep "$app"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ matrix.arch }}
-          path: dist/
-          retention-days: 14
+  # macOS PAUSADO: builds desativados temporariamente.
+  # Para reativar: descomente o job abaixo (remova o "# " do início das linhas)
+  # e troque o `needs` do job release pela linha comentada que inclui macos.
+  # macos:
+  #   if: github.ref == 'refs/heads/main'
+  #   needs: version
+  #   continue-on-error: true
+  #   runs-on: ${{ matrix.runner }}
+  #   timeout-minutes: 360
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - runner: macos-15-intel
+  #           arch: x64
+  #           heap: '12288'
+  #         - runner: macos-14
+  #           arch: arm64
+  #           heap: '12288'
+  #   env:
+  #     RELEASE_VERSION: ${{ needs.version.outputs.release }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
+  #         persist-credentials: false
+  #
+  #     - name: Checkout arara-ai
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ env.ARARA_AI_REPO }}
+  #         ref: main
+  #         token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+  #         path: arara-ai
+  #         persist-credentials: false
+  #
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version-file: upstream/vscodium/.nvmrc
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
+  #
+  #     # O patch do macOS (BSD) não aceita as opções usadas no build.sh; usa o GNU patch como `patch`.
+  #     - name: Dependências
+  #       run: |
+  #         brew install gpatch jq
+  #         mkdir -p "$HOME/gnubin"
+  #         ln -sf "$(brew --prefix gpatch)/bin/gpatch" "$HOME/gnubin/patch"
+  #         echo "$HOME/gnubin" >> "$GITHUB_PATH"
+  #         vm_stat | head -3; sysctl hw.memsize
+  #
+  #     - name: Build
+  #       env:
+  #         MAX_OLD_SPACE_SIZE: ${{ matrix.heap }}
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         export ARARA_AI_DIR="$(pwd)/arara-ai"
+  #         scripts/build.sh
+  #
+  #     - name: Conferir versão
+  #       run: |
+  #         . .work/vscodium/dev/build.env
+  #         [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
+  #         ls -lh dist
+  #
+  #     - name: Testar o binário (abre e traz o arara-ai)
+  #       run: |
+  #         for app in .work/vscodium/VSCode-darwin-${{ matrix.arch }}/*.app; do break; done
+  #         "$app/Contents/Resources/app/bin/arara-code" --version
+  #         test -f "$app/Contents/Resources/app/extensions/arara-ai/package.json"
+  #         test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/extension.js"
+  #         test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+  #         codesign --verify --deep "$app"
+  #
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: macos-${{ matrix.arch }}
+  #         path: dist/
+  #         retention-days: 14
 
   release:
     # Publica mesmo que Windows/macOS falhem (Linux é a plataforma estável); eles entram quando passarem.
     if: ${{ !cancelled() && needs.linux.result == 'success' && github.ref == 'refs/heads/main' }}
-    needs: [version, linux, windows, macos]
+    # needs: [version, linux, windows, macos]  # <- use esta ao reativar o macOS
+    needs: [version, linux, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -357,6 +361,15 @@ jobs:
               echo "    xattr -cr \"/Applications/Arara Code.app\""
             fi
           } > release-notes.md
+
+      - name: Conferir workflows da main
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          if ! git diff --quiet "${GITHUB_SHA}" FETCH_HEAD -- .github/workflows; then
+            echo "::error::A main mudou arquivos em .github/workflows depois deste build começar; o GITHUB_TOKEN não pode criar a tag ${V} em ${GITHUB_SHA}. Rode o workflow de novo (workflow_dispatch) na main atual."
+            git diff --stat "${GITHUB_SHA}" FETCH_HEAD -- .github/workflows
+            exit 1
+          fi
 
       - name: Publicar release
         env:
