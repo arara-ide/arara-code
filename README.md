@@ -29,7 +29,7 @@ git switch -c feature/nome-da-tarefa
 
 Trabalho individual pode ser commitado diretamente em `development`. Use Conventional Commits e PRs para promover código a `main`. Após uma promoção ou hotfix, incorpore `main` em `development` por merge, preservando o histórico; não use force push nem mova tags publicadas.
 
-As GitHub Actions executam somente em `main`, para validar e distribuir releases. Não há gatilhos de Actions em `development`, branches temporárias, PRs ou tags. Faça a validação local antes do merge; execuções manuais também têm os jobs restritos a `main`. As convenções de PR são regras de contribuição; não pressupõem proteção de branch configurada no GitHub.
+Releases e CI de produto executam somente em `main`. A exceção é o workflow de segurança: analisa PRs destinados a `main` e `development`, além da linha de base em `main`. Push isolado em `development` não publica releases. A `main` é protegida por PR obrigatório e verificações de segurança.
 
 Este repositório é público. Mantenha somente patches, branding e infraestrutura de build aqui. O checkout local pode usar `development` dos componentes irmãos; o CI de distribuição seleciona explicitamente `main` da extensão privada. Branches de desenvolvimento são validadas localmente; as Actions de validação e distribuição só executam em `main`.
 
@@ -211,8 +211,12 @@ Requisitos: os mesmos do VSCodium (`upstream/vscodium/docs/howto-build.md`) + `r
 
 A `main` exige pull request, resolução das conversas de revisão e preservação do histórico (sem force push). A proteção não concede exceção de push direto a administradores ou bots. A configuração inicial permite merge pelo mantenedor único sem exigir a aprovação de uma segunda pessoa; contribuições externas devem ser revisadas pelo mantenedor antes do merge.
 
-O CodeRabbit tem configuração em `.coderabbit.yaml` para resumos e revisão em português. Sua ativação depende da instalação do [GitHub App](https://github.com/apps/coderabbitai) somente neste repositório público. Não autorize acesso aos repositórios privados. O serviço oferece revisão gratuita para projetos open source; confira as condições ao instalar.
+O CodeRabbit tem configuração em `.coderabbit.yaml` para resumos e revisão em português. O [GitHub App](https://github.com/apps/coderabbitai) está instalado na organização com acesso a repositórios selecionados; mantenha este público selecionado para receber as revisões. Não autorize acesso aos repositórios privados. O serviço oferece revisão gratuita para projetos open source; confira as condições ao instalar.
 
 Alertas do Dependabot, detecção de segredos e proteção de push com segredos estão habilitados. Análise automática ajuda a detectar vulnerabilidades e alterações suspeitas, mas não certifica ausência de malware, backdoors ou problemas de licença. Alterações em comandos, rede, instaladores, atualizadores e workflows exigem revisão humana cuidadosa.
 
 Os workflows de release não fazem push diretamente na `main`. Prepare mudanças de versão e changelog por PR antes de publicar.
+
+O workflow `PR security` analisa JavaScript/TypeScript e workflows do GitHub Actions com CodeQL (`security-extended`). A revisão de dependências bloqueia dependências novas com vulnerabilidades conhecidas de severidade moderada ou superior. A `main` exige `Security gate` bem-sucedido e resultados do CodeQL sem novos alertas de segurança altos/críticos ou erros que atinjam o bloqueio configurado. Corrija os achados e envie novos commits ao PR para executar novamente.
+
+O workflow usa `pull_request`, permissões mínimas e Actions fixadas por SHA; não instala dependências, não executa scripts do PR e não recebe credenciais de release. PRs de forks podem aguardar autorização do mantenedor para executar Actions. O CodeRabbit comenta e recomenda; a decisão de merge continua com o mantenedor. CodeQL não analisa integralmente shell scripts, arquivos binários ou código contido em patches: essas mudanças precisam de revisão humana.
