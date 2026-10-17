@@ -29,9 +29,11 @@ try {
     'LICENSE': 'Apache License',
     'NOTICE': 'Arara Bot',
     'dist/extension.js': '// extension bundle',
+    'dist/hub.js': '// hub bundle',
+    'dist/bridge.js': '// bridge bundle',
+    'dist/webview.js': '// webview bundle',
     'media/arara-bot.svg': '<svg/>',
     'server/index.js': '// server bundle',
-    'ui/index.html': '<title>Arara Bot</title>',
     'skills/a/SKILL.md': '# skill',
   };
   for (const [file, text] of Object.entries(assets)) write(path.join(bot, 'extension', file), text);
@@ -46,7 +48,8 @@ try {
   assert.ok(!fs.existsSync(path.join(dest, 'src')), 'sources stay out of the release');
   fs.unlinkSync(path.join(bot, 'extension/server/index.js'));
   assert.notEqual(run().status, 0, 'missing server bundle must fail the release');
-  console.log('PASS: release includes the Arara Bot extension, UI and server, and fails if the server bundle is missing.');
+  assert.ok(!fs.existsSync(path.join(dest, 'ui')), 'the old web UI is not shipped');
+  console.log('PASS: release includes the Arara Bot extension, webview, hub and server, and fails if the server bundle is missing.');
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }

@@ -164,20 +164,22 @@ embed_arara_ai() {
   cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
 }
 
-# --- 7b. extensão arara-bot embutida (open source, ../arara-bot/extension): web UI + servidor empacotados
+# --- 7b. extensão arara-bot embutida (open source, ../arara-bot/extension): servidor empacotado + webview própria
+# A interface é a webview da extensão (dist/webview.js, via esbuild); a antiga web UI React não é mais embarcada.
 embed_arara_bot() {
   [[ -f "${ARARA_BOT_DIR}/extension/package.json" ]] || { echo "! ${ARARA_BOT_DIR} não encontrado; build sem o Arara Bot" >&2; return 0; }
   echo "» Compilando arara-bot…"
-  ( cd "${ARARA_BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile; } && pnpm exec vite build && pnpm build:server )
+  ( cd "${ARARA_BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile; } && pnpm build:server )
   ( cd "${ARARA_BOT_DIR}/extension" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build && npm run --silent stage )
   local src="${ARARA_BOT_DIR}/extension" dest="${WORK}/vscode/extensions/arara-bot"
   rm -rf "${dest}"
   mkdir -p "${dest}/dist"
-  # mesmo conjunto do extension/.vscodeignore
   cp "${src}/package.json" "${src}/LICENSE" "${src}/NOTICE" "${dest}/"
-  cp "${src}/dist/extension.js" "${dest}/dist/"
-  cp -r "${src}/media" "${src}/server" "${src}/ui" "${src}/skills" "${dest}/"
-  test -s "${dest}/server/index.js" && test -s "${dest}/ui/index.html"
+  # extension.js (host), hub.js (processo da máquina), bridge.js (MCP do navegador), webview.js (interface)
+  local f
+  for f in extension hub bridge webview; do cp "${src}/dist/${f}.js" "${dest}/dist/"; done
+  cp -r "${src}/media" "${src}/server" "${src}/skills" "${dest}/"
+  test -s "${dest}/server/index.js" && test -s "${dest}/dist/webview.js"
 }
 
 if [[ "${PREPARE_ONLY}" == "yes" ]]; then

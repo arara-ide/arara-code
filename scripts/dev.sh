@@ -149,11 +149,11 @@ else
   echo "! ${EXT_DIR} não encontrado; abrindo sem a extensão arara-ai." >&2
 fi
 
-# 5. extensão arara-bot (open source). Compila a web UI e o servidor só na primeira vez ou com ARARA_BOT_REBUILD=1.
+# 5. extensão arara-bot (open source). Compila o servidor só na primeira vez ou com ARARA_BOT_REBUILD=1.
 if [[ -f "${BOT_DIR}/extension/package.json" ]]; then
   if [[ ! -s "${BOT_DIR}/extension/server/index.js" || "${ARARA_BOT_REBUILD:-0}" == 1 ]]; then
-    echo "» Compilando arara-bot (web UI + servidor)…"
-    ( cd "${BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile >/dev/null; } && pnpm exec vite build >/dev/null && pnpm build:server >/dev/null )
+    echo "» Compilando arara-bot (servidor)…"
+    ( cd "${BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile >/dev/null; } && pnpm build:server >/dev/null )
     ( cd "${BOT_DIR}/extension" && npm run --silent stage )
   fi
   ( cd "${BOT_DIR}/extension" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund >/dev/null; } && npm run --silent build >/dev/null )

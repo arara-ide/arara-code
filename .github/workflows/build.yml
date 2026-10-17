@@ -162,7 +162,8 @@ jobs:
           test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
           test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-bot/server/index.js"
-          test -s "$d/resources/app/extensions/arara-bot/ui/index.html"
+          test -s "$d/resources/app/extensions/arara-bot/dist/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/hub.js"
 
       - name: Hashes do build de development
         if: github.ref == 'refs/heads/development'
@@ -252,7 +253,8 @@ jobs:
           test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
           test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-bot/server/index.js"
-          test -s "$d/resources/app/extensions/arara-bot/ui/index.html"
+          test -s "$d/resources/app/extensions/arara-bot/dist/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/hub.js"
 
       - name: Hashes do build de development
         if: github.ref == 'refs/heads/development'
