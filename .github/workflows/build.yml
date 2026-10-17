@@ -29,6 +29,7 @@ concurrency:
 
 env:
   ARARA_AI_REPO: arara-ide/arara-ai
+  ARARA_BOT_REPO: arara-ide/arara-bot
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -46,6 +47,7 @@ jobs:
           for f in scripts/*.sh; do bash -n "$f"; done
           node --check scripts/apply-environment.cjs
           node scripts/tests/embed-arara-ai.cjs
+          node scripts/tests/embed-arara-bot.cjs
 
   # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
   version:
@@ -98,6 +100,19 @@ jobs:
           path: arara-ai
           persist-credentials: false
 
+      # arara-bot � p�blico: mesma branch, sem token.
+      - name: Checkout arara-bot
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_BOT_REPO }}
+          ref: ${{ github.ref_name }}
+          path: arara-bot
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: upstream/vscodium/.nvmrc
@@ -121,6 +136,7 @@ jobs:
       - name: Build
         env:
           ARARA_AI_DIR: ${{ github.workspace }}/arara-ai
+          ARARA_BOT_DIR: ${{ github.workspace }}/arara-bot
           MAX_OLD_SPACE_SIZE: '8192'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -134,7 +150,7 @@ jobs:
 
       - name: Validar artefatos
         run: |
-          dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|bin/arara-code-uninstall"
+          dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|extensions/arara-bot/package.json|bin/arara-code-uninstall"
 
       - name: Testar o binário (abre e traz o arara-ai)
         run: |
@@ -143,6 +159,9 @@ jobs:
           test -f "$d/resources/app/extensions/arara-ai/package.json"
           test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-bot/server/index.js"
+          test -s "$d/resources/app/extensions/arara-bot/ui/index.html"
 
       - name: Hashes do build de development
         if: github.ref == 'refs/heads/development'
@@ -183,6 +202,19 @@ jobs:
           path: arara-ai
           persist-credentials: false
 
+      # arara-bot � p�blico: mesma branch, sem token.
+      - name: Checkout arara-bot
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_BOT_REPO }}
+          ref: ${{ github.ref_name }}
+          path: arara-bot
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: upstream/vscodium/.nvmrc
@@ -200,6 +232,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export ARARA_AI_DIR="$(pwd)/arara-ai"
+          export ARARA_BOT_DIR="$(pwd)/arara-bot"
           scripts/build.sh
 
       - name: Conferir versão
@@ -215,6 +248,9 @@ jobs:
           test -f "$d/resources/app/extensions/arara-ai/package.json"
           test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-bot/server/index.js"
+          test -s "$d/resources/app/extensions/arara-bot/ui/index.html"
 
       - name: Hashes do build de development
         if: github.ref == 'refs/heads/development'
