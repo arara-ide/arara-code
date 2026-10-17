@@ -100,12 +100,13 @@ jobs:
           path: arara-ai
           persist-credentials: false
 
-      # arara-bot � p�blico: mesma branch, sem token.
+      # arara-bot é privado; usa a credencial dos componentes irmãos.
       - name: Checkout arara-bot
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_BOT_REPO }}
           ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-bot
           persist-credentials: false
 
@@ -202,12 +203,13 @@ jobs:
           path: arara-ai
           persist-credentials: false
 
-      # arara-bot � p�blico: mesma branch, sem token.
+      # arara-bot é privado; usa a credencial dos componentes irmãos.
       - name: Checkout arara-bot
         uses: actions/checkout@v4
         with:
           repository: ${{ env.ARARA_BOT_REPO }}
           ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
           path: arara-bot
           persist-credentials: false
 
