@@ -4,7 +4,7 @@
 # - Usa o código do VS Code já preparado em .work/vscodium/vscode (patches + branding
 #   aplicados). Se ele não existir, roda o preparo uma vez (clone + npm ci, ~10 min).
 # - Só transpila o TypeScript (~10 s, sem typecheck, sem minificar, sem empacotar).
-# - Carrega a extensão ../arara-ai direto da pasta (sem .vsix).
+# - Carrega as extensões ../arara-ai e ../arara-bot/extension direto da pasta (sem .vsix).
 # - Perfil isolado em .work/dev-profile (não mexe no seu VS Code/VSCodium).
 #
 # Uso:
@@ -13,15 +13,28 @@
 #   scripts/dev.sh --production    # desenvolvimento com APIs de produção
 #   scripts/dev.sh --reset         # apaga o perfil de dev antes de abrir
 #
-# Variáveis: ARARA_AI_DIR (padrão ../arara-ai), ARARA_DEV_PROFILE.
+# Variáveis: ARARA_AI_DIR (padrão ../arara-ai), ARARA_BOT_DIR (padrão ../arara-bot), ARARA_BOT_REBUILD=1, ARARA_DEV_PROFILE.
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 VSCODE="${ROOT}/.work/vscodium/vscode"
 EXT_DIR="${ARARA_AI_DIR:-$( cd "${ROOT}/.." && pwd )/arara-ai}"
+BOT_DIR="${ARARA_BOT_DIR:-$( cd "${ROOT}/.." && pwd )/arara-bot}"
 DEV_ENVIRONMENT="local"
 ENVIRONMENT_SELECTED=""
 RESET_PROFILE=false
+
+case "${OSTYPE}" in
+  msys*|cygwin*)
+    if [[ -f "${VSCODE}/.nvmrc" ]]; then
+      WINDOWS_NODE_VERSION="$(tr -d '\r\n' < "${VSCODE}/.nvmrc")"
+      WINDOWS_NODE_DIR="${ROOT}/.work/windows-tools/node-v${WINDOWS_NODE_VERSION}-win-x64"
+      if [[ -f "${WINDOWS_NODE_DIR}/node.exe" ]]; then
+        export PATH="${WINDOWS_NODE_DIR}:${PATH}"
+      fi
+    fi
+    ;;
+esac
 
 ARGS=()
 for arg in "$@"; do
@@ -60,6 +73,17 @@ cd "${VSCODE}"
 # Atualiza a fonte preparada quando os patches do projeto mudarem.
 bash "${ROOT}/scripts/sync-dev-patches.sh"
 
+# No Windows, uma tentativa interrompida pode deixar node_modules incompleto.
+case "${OSTYPE}" in
+  msys*|cygwin*)
+    if [[ ! -f node_modules/gulp/bin/gulp.js ]]; then
+      echo "» Reparando dependencias incompletas do workbench no Windows…"
+      ELECTRON_SKIP_BINARY_DOWNLOAD=1 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+        VSCODE_SKIP_NODE_VERSION_CHECK=1 npm ci --no-audit --no-fund
+    fi
+    ;;
+esac
+
 # Extensões padrão também no perfil de desenvolvimento (preLaunch é pulado).
 bash "${ROOT}/scripts/default-extensions.sh" "${VSCODE}"
 
@@ -87,7 +111,11 @@ if [[ ! -f extensions/git/out/main.js ]]; then
 fi
 
 # 3. Electron (baixa só se a versão mudou)
-if [[ ! -x ".build/electron/$( node -p "require('./product.json').applicationName" )" ]]; then
+ELECTRON_BIN=".build/electron/$( node -p "require('./product.json').applicationName" )"
+case "${OSTYPE}" in
+  msys*|cygwin*) ELECTRON_BIN=".build/electron/$( node -p "require('./product.json').nameShort" ).exe" ;;
+esac
+if [[ ! -x "${ELECTRON_BIN}" ]]; then
   echo "» Baixando Electron…"
   npm run --silent electron >/dev/null
 fi
@@ -121,9 +149,34 @@ else
   echo "! ${EXT_DIR} não encontrado; abrindo sem a extensão arara-ai." >&2
 fi
 
+# 5. extensão arara-bot (open source). Compila o servidor só na primeira vez ou com ARARA_BOT_REBUILD=1.
+if [[ -f "${BOT_DIR}/extension/package.json" ]]; then
+  if [[ ! -s "${BOT_DIR}/extension/server/index.js" || "${ARARA_BOT_REBUILD:-0}" == 1 ]]; then
+    echo "» Compilando arara-bot (servidor)…"
+    ( cd "${BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile >/dev/null; } && pnpm build:server >/dev/null )
+    ( cd "${BOT_DIR}/extension" && npm run --silent stage )
+  fi
+  ( cd "${BOT_DIR}/extension" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund >/dev/null; } && npm run --silent build >/dev/null )
+  EXT_ARGS+=("--extensionDevelopmentPath=${BOT_DIR}/extension")
+else
+  echo "! ${BOT_DIR} não encontrado; abrindo sem o Arara Bot." >&2
+fi
+
 mkdir -p "${PROFILE}/data" "${PROFILE}/extensions"
 
 echo "» Abrindo Arara Code (dev, ${DEV_ENVIRONMENT}) — perfil: ${PROFILE}"
+case "${OSTYPE}" in
+  msys*|cygwin*)
+    # Equivalente ao scripts/code.bat, sem passar argumentos pelo cmd.exe.
+    unset ELECTRON_RUN_AS_NODE
+    NODE_ENV=development VSCODE_DEV=1 VSCODE_CLI=1 \
+      ELECTRON_ENABLE_LOGGING=1 ELECTRON_ENABLE_STACK_DUMPING=1 \
+      exec "${ELECTRON_BIN}" . --disable-extension=vscode.vscode-api-tests \
+      --user-data-dir "${PROFILE}/data" \
+      --extensions-dir "${PROFILE}/extensions" \
+      "${EXT_ARGS[@]}" "${ARGS[@]}"
+    ;;
+esac
 # VSCODE_SKIP_PRELAUNCH: pula o preLaunch (que faria npm ci/compile completo se algo faltasse)
 VSCODE_SKIP_PRELAUNCH=1 exec ./scripts/code.sh \
   --user-data-dir "${PROFILE}/data" \

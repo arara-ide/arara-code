@@ -14,7 +14,7 @@
 #   --prepare-only  para depois de clone + patches + branding + npm ci (sem compilar); usado pelo scripts/dev.sh
 #   --no-deb        só a pasta VSCode-linux-<arch> (sem gerar o .deb)
 #
-# A extensão ../arara-ai (ARARA_AI_DIR) é compilada e entra como extensão built-in.
+# As extensões ../arara-ai (ARARA_AI_DIR) e ../arara-bot/extension (ARARA_BOT_DIR) são compiladas e entram como built-in.
 # No Linux o resultado vai para dist/: arara-code_<versão>_<arch>.deb e .tar.gz
 set -euo pipefail
 
@@ -25,6 +25,7 @@ SKIP_SOURCE="no"
 PREPARE_ONLY="no"
 BUILD_DEB="yes"
 ARARA_AI_DIR="${ARARA_AI_DIR:-$( cd "${ROOT}/.." && pwd )/arara-ai}"
+ARARA_BOT_DIR="${ARARA_BOT_DIR:-$( cd "${ROOT}/.." && pwd )/arara-bot}"
 
 for arg in "$@"; do
   case "${arg}" in
@@ -163,6 +164,24 @@ embed_arara_ai() {
   cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
 }
 
+# --- 7b. extensão arara-bot embutida (open source, ../arara-bot/extension): servidor empacotado + webview própria
+# A interface é a webview da extensão (dist/webview.js, via esbuild); a antiga web UI React não é mais embarcada.
+embed_arara_bot() {
+  [[ -f "${ARARA_BOT_DIR}/extension/package.json" ]] || { echo "! ${ARARA_BOT_DIR} não encontrado; build sem o Arara Bot" >&2; return 0; }
+  echo "» Compilando arara-bot…"
+  ( cd "${ARARA_BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile; } && pnpm build:server )
+  ( cd "${ARARA_BOT_DIR}/extension" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build && npm run --silent stage )
+  local src="${ARARA_BOT_DIR}/extension" dest="${WORK}/vscode/extensions/arara-bot"
+  rm -rf "${dest}"
+  mkdir -p "${dest}/dist"
+  cp "${src}/package.json" "${src}/LICENSE" "${src}/NOTICE" "${dest}/"
+  # extension.js (host), hub.js (processo da máquina), bridge.js (MCP do navegador), webview.js (interface)
+  local f
+  for f in extension hub bridge webview; do cp "${src}/dist/${f}.js" "${dest}/dist/"; done
+  cp -r "${src}/media" "${src}/server" "${src}/skills" "${dest}/"
+  test -s "${dest}/server/index.js" && test -s "${dest}/dist/webview.js"
+}
+
 if [[ "${PREPARE_ONLY}" == "yes" ]]; then
   # o mesmo que o build.sh do VSCodium faz antes de chamar o gulp
   . version.sh
@@ -178,6 +197,7 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   . version.sh
   . prepare_vscode.sh
   embed_arara_ai
+  embed_arara_bot
   cp "${ROOT}/branding/linux/control.template" vscode/resources/linux/debian/control.template
   (
     cd vscode
@@ -207,6 +227,7 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
   . version.sh
   . prepare_vscode.sh
   embed_arara_ai
+  embed_arara_bot
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
@@ -233,6 +254,7 @@ else
   . version.sh
   . prepare_vscode.sh
   embed_arara_ai
+  embed_arara_bot
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"

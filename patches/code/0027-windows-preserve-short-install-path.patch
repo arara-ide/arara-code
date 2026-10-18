@@ -1,0 +1,18 @@
+Arara Code: preserva o caminho curto de uma unidade subst no postinstall do Windows, evitando o limite de 260 caracteres do MSBuild.
+
+Why a patch: a instalacao de dependencias antecede as extensoes. Somente o Windows deixa de expandir o caminho via realpath; Linux e macOS preservam o comportamento original.
+Touches: build/npm/installStateHash.ts
+
+--- a/build/npm/installStateHash.ts
++++ b/build/npm/installStateHash.ts
+@@ -8,7 +8,9 @@
+ import path from 'path';
+ import { dirs } from './dirs.ts';
+ 
+-export const root = fs.realpathSync.native(path.dirname(path.dirname(import.meta.dirname)));
++export const root = process.platform === 'win32'
++	? path.dirname(path.dirname(import.meta.dirname))
++	: fs.realpathSync.native(path.dirname(path.dirname(import.meta.dirname)));
+ export const stateFile = path.join(root, 'node_modules', '.postinstall-state');
+ export const stateContentsFile = path.join(root, 'node_modules', '.postinstall-state-contents');
+ export const forceInstallMessage = 'Run \x1b[36mnode build/npm/fast-install.ts --force\x1b[0m to force a full install.';
