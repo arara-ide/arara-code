@@ -124,6 +124,10 @@ Pronto: o Arara Code aparece no menu de aplicativos. No terminal, abra com `arar
 
 A **Git History** (`donjayamanne.githistory`) vem embutida, com histórico de commits, arquivos e linhas. Para consultar uma linha, use **Git: View Line History**. O build e o modo dev baixam o VSIX do Open VSX, com versão e SHA256 fixados em `extensions.lock.json`.
 
+O **Prettier** (`esbenp.prettier-vscode`) também vem embutido pelo mesmo fluxo. A extensão Arara o define como formatador padrão para JavaScript, JSX (`javascriptreact`), TypeScript e TSX (`typescriptreact`), com `prettier.bracketSameLine: true`, `prettier.trailingComma: "none"`, `prettier.printWidth: 150` e `prettier.experimentalTernaries: true`. Esses defaults ficam em `contributes.configurationDefaults` do `arara-ai/package.json`; podem ser sobrescritos no `settings.json`. Configurações do Prettier no projeto (por exemplo, `.prettierrc`) têm precedência sobre as opções de estilo da IDE.
+
+A formatação ao salvar vem desativada por padrão (`editor.formatOnSave: false`): `Ctrl+S` apenas salva o arquivo. A formatação manual continua disponível; para formatar automaticamente, ative a opção nas configurações do usuário ou do projeto.
+
 Para entrar na conta e usar a IA, o backend precisa estar no ar (nesta fase de teste: `localhost:7010`, ver abaixo).
 
 ### Atualizar

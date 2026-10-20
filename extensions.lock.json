@@ -6,5 +6,13 @@
     "url": "https://open-vsx.org/api/donjayamanne/githistory/0.6.20/file/donjayamanne.githistory-0.6.20.vsix",
     "repo": "https://github.com/DonJayamanne/gitHistoryVSCode",
     "metadata": {}
+  },
+  {
+    "name": "esbenp.prettier-vscode",
+    "version": "12.4.0",
+    "sha256": "fb730ea4306d09cdc0a3aaa9e9baae28058cc97a4fbfce8b056b377a0639a9fe",
+    "url": "https://open-vsx.org/api/esbenp/prettier-vscode/12.4.0/file/esbenp.prettier-vscode-12.4.0.vsix",
+    "repo": "https://github.com/prettier/prettier-vscode",
+    "metadata": {}
   }
 ]

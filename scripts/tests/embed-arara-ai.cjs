@@ -29,13 +29,12 @@ try {
   }));
   const assets = {
     'dist/extension.js': '// extension bundle',
-    'dist/orquestra/webview.js': '// browser bundle',
-    'media/orquestra.css': 'body {}',
+    'media/chat.css': 'body {}',
     'media/marked.min.js': '// markdown',
     'themes/arara.json': '{}',
   };
   for (const [file, text] of Object.entries(assets)) write(path.join(extension, file), text);
-  write(path.join(extension, 'dist/orquestra/webview.js.map'), '{}');
+  write(path.join(extension, 'dist/extension.js.map'), '{}');
   const env = { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`,
     ROOT: root, ARARA_AI_DIR: extension, WORK: work, ARARA_ENVIRONMENT: 'production' };
   const run = () => spawnSync('bash', [script], { env, encoding: 'utf8' });
@@ -45,10 +44,10 @@ try {
     assert.equal(fs.readFileSync(path.join(dest, file), 'utf8'), text, file);
   }
   assert.equal(JSON.parse(fs.readFileSync(path.join(dest, 'package.json'))).araraEnvironment, 'production');
-  assert.ok(!fs.existsSync(path.join(dest, 'dist/orquestra/webview.js.map')));
-  fs.unlinkSync(path.join(extension, 'dist/orquestra/webview.js'));
-  assert.notEqual(run().status, 0, 'missing webview bundle must fail the release');
-  console.log('PASS: release includes Orquestra assets and fails if its bundle is missing.');
+  assert.ok(!fs.existsSync(path.join(dest, 'dist/extension.js.map')));
+  fs.unlinkSync(path.join(extension, 'dist/extension.js'));
+  assert.notEqual(run().status, 0, 'missing extension bundle must fail the release');
+  console.log('PASS: release includes arara-ai assets and fails if its bundle is missing.');
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }

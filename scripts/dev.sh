@@ -13,13 +13,14 @@
 #   scripts/dev.sh --production    # desenvolvimento com APIs de produção
 #   scripts/dev.sh --reset         # apaga o perfil de dev antes de abrir
 #
-# Variáveis: ARARA_AI_DIR (padrão ../arara-ai), ARARA_BOT_DIR (padrão ../arara-bot), ARARA_BOT_REBUILD=1, ARARA_DEV_PROFILE.
+# Variáveis: ARARA_AI_DIR (padrão ../arara-ai), ARARA_BOT_DIR (padrão ../arara-bot), ARARA_ORCHESTRA_DIR (padrão ../arara-orchestra), ARARA_BOT_REBUILD=1, ARARA_DEV_PROFILE.
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 VSCODE="${ROOT}/.work/vscodium/vscode"
 EXT_DIR="${ARARA_AI_DIR:-$( cd "${ROOT}/.." && pwd )/arara-ai}"
 BOT_DIR="${ARARA_BOT_DIR:-$( cd "${ROOT}/.." && pwd )/arara-bot}"
+ORCH_DIR="${ARARA_ORCHESTRA_DIR:-$( cd "${ROOT}/.." && pwd )/arara-orchestra}"
 DEV_ENVIRONMENT="local"
 ENVIRONMENT_SELECTED=""
 RESET_PROFILE=false
@@ -160,6 +161,15 @@ if [[ -f "${BOT_DIR}/extension/package.json" ]]; then
   EXT_ARGS+=("--extensionDevelopmentPath=${BOT_DIR}/extension")
 else
   echo "! ${BOT_DIR} não encontrado; abrindo sem o Arara Bot." >&2
+fi
+
+# 6. extensão Orquestra (../arara-orchestra): consome a API do arara-ai em tempo de execução
+if [[ -f "${ORCH_DIR}/package.json" ]]; then
+  echo "» Buildando arara-orchestra…"
+  ( cd "${ORCH_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund >/dev/null; } && npm run --silent build >/dev/null )
+  EXT_ARGS+=("--extensionDevelopmentPath=${ORCH_DIR}")
+else
+  echo "! ${ORCH_DIR} não encontrado; abrindo sem a Orquestra." >&2
 fi
 
 mkdir -p "${PROFILE}/data" "${PROFILE}/extensions"
