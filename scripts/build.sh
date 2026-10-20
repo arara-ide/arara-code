@@ -14,7 +14,8 @@
 #   --prepare-only  para depois de clone + patches + branding + npm ci (sem compilar); usado pelo scripts/dev.sh
 #   --no-deb        só a pasta VSCode-linux-<arch> (sem gerar o .deb)
 #
-# As extensões ../arara-ai (ARARA_AI_DIR) e ../arara-bot/extension (ARARA_BOT_DIR) são compiladas e entram como built-in.
+# As extensões ../arara-ai (ARARA_AI_DIR), ../arara-bot/extension (ARARA_BOT_DIR) e ../arara-orchestra
+# (ARARA_ORCHESTRA_DIR) são compiladas e entram como built-in.
 # No Linux o resultado vai para dist/: arara-code_<versão>_<arch>.deb e .tar.gz
 set -euo pipefail
 
@@ -26,6 +27,7 @@ PREPARE_ONLY="no"
 BUILD_DEB="yes"
 ARARA_AI_DIR="${ARARA_AI_DIR:-$( cd "${ROOT}/.." && pwd )/arara-ai}"
 ARARA_BOT_DIR="${ARARA_BOT_DIR:-$( cd "${ROOT}/.." && pwd )/arara-bot}"
+ARARA_ORCHESTRA_DIR="${ARARA_ORCHESTRA_DIR:-$( cd "${ROOT}/.." && pwd )/arara-orchestra}"
 
 for arg in "$@"; do
   case "${arg}" in
@@ -158,9 +160,8 @@ embed_arara_ai() {
   node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
   [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"
   [[ -f "${ARARA_AI_DIR}/.vscodeignore" ]] && cp "${ARARA_AI_DIR}/.vscodeignore" "${dest}/"
-  mkdir -p "${dest}/dist/orquestra"
+  mkdir -p "${dest}/dist"
   cp "${ARARA_AI_DIR}/dist/extension.js" "${dest}/dist/"
-  cp "${ARARA_AI_DIR}/dist/orquestra/webview.js" "${dest}/dist/orquestra/"
   cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
 }
 
@@ -182,6 +183,22 @@ embed_arara_bot() {
   test -s "${dest}/server/index.js" && test -s "${dest}/dist/webview.js"
 }
 
+# --- 7c. extensão Orquestra embutida (../arara-orchestra): usa a API do arara-ai em tempo de execução
+# (exports.orchestraHost); o build dela precisa do arara-ai ao lado, só para os tipos.
+embed_arara_orchestra() {
+  [[ -f "${ARARA_ORCHESTRA_DIR}/package.json" ]] || { echo "! ${ARARA_ORCHESTRA_DIR} não encontrado; build sem a Orquestra" >&2; return 0; }
+  echo "» Compilando arara-orchestra…"
+  ( cd "${ARARA_ORCHESTRA_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build )
+  local src="${ARARA_ORCHESTRA_DIR}" dest="${WORK}/vscode/extensions/arara-orchestra"
+  rm -rf "${dest}"
+  mkdir -p "${dest}/dist/webview"
+  cp "${src}/package.json" "${dest}/"
+  cp "${src}/dist/extension.js" "${dest}/dist/"
+  cp "${src}/dist/webview/webview.js" "${dest}/dist/webview/"
+  cp -r "${src}/media" "${dest}/"
+  test -s "${dest}/dist/extension.js" && test -s "${dest}/dist/webview/webview.js"
+}
+
 if [[ "${PREPARE_ONLY}" == "yes" ]]; then
   # o mesmo que o build.sh do VSCodium faz antes de chamar o gulp
   . version.sh
@@ -198,6 +215,7 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   . prepare_vscode.sh
   embed_arara_ai
   embed_arara_bot
+  embed_arara_orchestra
   cp "${ROOT}/branding/linux/control.template" vscode/resources/linux/debian/control.template
   (
     cd vscode
@@ -228,6 +246,7 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
   . prepare_vscode.sh
   embed_arara_ai
   embed_arara_bot
+  embed_arara_orchestra
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
@@ -255,6 +274,7 @@ else
   . prepare_vscode.sh
   embed_arara_ai
   embed_arara_bot
+  embed_arara_orchestra
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"

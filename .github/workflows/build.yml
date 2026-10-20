@@ -30,6 +30,7 @@ concurrency:
 env:
   ARARA_AI_REPO: arara-ide/arara-ai
   ARARA_BOT_REPO: arara-ide/arara-bot
+  ARARA_ORCHESTRA_REPO: arara-ide/arara-orchestra
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -48,6 +49,7 @@ jobs:
           node --check scripts/apply-environment.cjs
           node scripts/tests/embed-arara-ai.cjs
           node scripts/tests/embed-arara-bot.cjs
+          node scripts/tests/embed-arara-orchestra.cjs
 
   # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
   version:
@@ -110,6 +112,16 @@ jobs:
           path: arara-bot
           persist-credentials: false
 
+      # arara-orchestra é privado; o build dela usa os tipos do arara-ai ao lado.
+      - name: Checkout arara-orchestra
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_ORCHESTRA_REPO }}
+          ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-orchestra
+          persist-credentials: false
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
@@ -138,6 +150,7 @@ jobs:
         env:
           ARARA_AI_DIR: ${{ github.workspace }}/arara-ai
           ARARA_BOT_DIR: ${{ github.workspace }}/arara-bot
+          ARARA_ORCHESTRA_DIR: ${{ github.workspace }}/arara-orchestra
           MAX_OLD_SPACE_SIZE: '8192'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -151,7 +164,7 @@ jobs:
 
       - name: Validar artefatos
         run: |
-          dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|extensions/arara-bot/package.json|bin/arara-code-uninstall"
+          dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|extensions/arara-bot/package.json|extensions/arara-orchestra/package.json|bin/arara-code-uninstall"
 
       - name: Testar o binário (abre e traz o arara-ai)
         run: |
@@ -159,7 +172,8 @@ jobs:
           timeout 120 "$d/bin/arara-code" --version
           test -f "$d/resources/app/extensions/arara-ai/package.json"
           test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
-          test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+          test -s "$d/resources/app/extensions/arara-orchestra/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-orchestra/dist/webview/webview.js"
           test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-bot/server/index.js"
           test -s "$d/resources/app/extensions/arara-bot/dist/webview.js"
@@ -214,6 +228,16 @@ jobs:
           path: arara-bot
           persist-credentials: false
 
+      # arara-orchestra é privado; o build dela usa os tipos do arara-ai ao lado.
+      - name: Checkout arara-orchestra
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_ORCHESTRA_REPO }}
+          ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-orchestra
+          persist-credentials: false
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
@@ -236,6 +260,7 @@ jobs:
         run: |
           export ARARA_AI_DIR="$(pwd)/arara-ai"
           export ARARA_BOT_DIR="$(pwd)/arara-bot"
+          export ARARA_ORCHESTRA_DIR="$(pwd)/arara-orchestra"
           scripts/build.sh
 
       - name: Conferir versão
@@ -250,7 +275,8 @@ jobs:
           timeout 120 "$d/bin/arara-code" --version
           test -f "$d/resources/app/extensions/arara-ai/package.json"
           test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
-          test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+          test -s "$d/resources/app/extensions/arara-orchestra/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-orchestra/dist/webview/webview.js"
           test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-bot/server/index.js"
           test -s "$d/resources/app/extensions/arara-bot/dist/webview.js"
@@ -341,7 +367,7 @@ jobs:
   #         "$app/Contents/Resources/app/bin/arara-code" --version
   #         test -f "$app/Contents/Resources/app/extensions/arara-ai/package.json"
   #         test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/extension.js"
-  #         test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+  #         test -s "$app/Contents/Resources/app/extensions/arara-orchestra/dist/webview/webview.js"
   #         codesign --verify --deep "$app"
   #
   #     - uses: actions/upload-artifact@v4
