@@ -1,8 +1,9 @@
 name: Build
 
 on:
+  # A main é disparada pelo Deploy, que garante o build em todo push.
   push:
-    branches: [main, development]
+    branches: [development]
     paths:
       - 'patches/**'
       - 'scripts/**'
@@ -13,6 +14,7 @@ on:
       - '.github/workflows/**'
       - 'README.md'
       - 'AGENTS.md'
+  workflow_call:
   workflow_dispatch:
     inputs:
       prerelease:
