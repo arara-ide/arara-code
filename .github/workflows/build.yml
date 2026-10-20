@@ -28,8 +28,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # TEMPORÁRIO: o tempo de build da org acabou, então o arara-ai é buscado na conta pessoal.
-  # Para desfazer, volte para arara-ide/arara-ai (veja ac-docs/docs/31-arara-ai-repo-temporario.md).
   ARARA_AI_REPO: arara-ide/arara-ai
   ARARA_BOT_REPO: arara-ide/arara-bot
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
