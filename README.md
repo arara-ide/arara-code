@@ -33,11 +33,17 @@ CI de produto executa em `main` e `development`. Releases, tags de distribuiçã
 
 Este repositório é público. Mantenha somente patches, branding e infraestrutura de build aqui. O CI seleciona explicitamente a mesma branch da extensão privada: `development` para testes e `main` para distribuição estável.
 
+## Publicação por plataforma
+
+Na `main`, Linux, Windows e macOS (Intel e Apple Silicon) compilam em paralelo. O primeiro build aprovado cria e publica uma única release da versão; cada um dos demais acrescenta seus arquivos à mesma release assim que termina. Falhas de outra plataforma não bloqueiam os pacotes aprovados.
+
+Os uploads passam por uma fila para acumular todos os arquivos no `SHA256SUMS` e atualizar as instruções de instalação. Uma execução nova da `main` aguarda a atual terminar, para não interromper uma release parcialmente publicada. Releases precisam permanecer mutáveis para receber os próximos arquivos. Reexecutar um job aceita arquivos idênticos; arquivos com o mesmo nome e conteúdo diferente são recusados.
+
 ## Builds de development
 
 Pushes em `development` executam testes e build. A execução manual também aceita essa branch; o botão **Run workflow** depende da definição com `workflow_dispatch` estar na branch padrão do GitHub. Na aba **Actions**, selecione uma execução bem-sucedida de `development` e baixe o pacote na seção **Artifacts**. É necessário estar conectado ao GitHub e ter acesso de leitura ao repositório. Os arquivos expiram após 14 dias; execute novamente o workflow se precisar de outro pacote. Não há publicação em GitHub Releases, criação de tags ou atualização automática para esses builds.
 
-Os artifacts `arara-code-development-linux` e `arara-code-development-windows` contêm os instaladores/pacotes e `SHA256SUMS`. O build embute `arara-ai` da branch `development`; builds da `main` continuam usando `arara-ai/main`. macOS permanece pausado.
+Os artifacts `arara-code-development-linux` e `arara-code-development-windows` contêm os instaladores/pacotes e `SHA256SUMS`. O build embute `arara-ai` da branch `development`; builds da `main` continuam usando `arara-ai/main`. macOS (Intel e Apple Silicon) é compilado na `main`.
 
 ```sh
 gh run list -R arara-ide/arara-code --workflow build.yml --branch development --status success
