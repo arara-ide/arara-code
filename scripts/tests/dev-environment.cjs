@@ -40,6 +40,7 @@ try {
     assert.equal(pkg.araraEnvironment, 'production');
     assert.equal(pkg.contributes.configuration.properties['arara.apiUrl'].default, 'https://api.code.app.br');
     assert.equal(pkg.contributes.configuration.properties['arara.webUrl'].default, 'https://arara.code.app.br');
+    assert.equal(pkg.contributes.configuration.properties['arara.apiUrl'].description, JSON.parse(manifest).contributes.configuration.properties['arara.apiUrl'].description, 'staging preserves native translation references');
   }
   assert.equal(fs.readFileSync(path.join(extension, 'package.json'), 'utf8'), manifest);
   const local = launch(['--local', '--no-sandbox']);

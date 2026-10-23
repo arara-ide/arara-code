@@ -30,7 +30,7 @@ Touches: src/vs/workbench/contrib/scm/browser/scmInput.ts
  				id: MenuId.SCMInputBox,
  				when: ContextKeyExpr.and(
  					ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
-+					// Arara Code: o "Generate" do Copilot dá lugar ao da Arara (ver fim do arquivo)
++					// Arara Code: o "Generate" do Copilot dá lugar ao do Arara Code (ver fim do arquivo)
 +					ContextKeyExpr.false(),
  					ChatContextKeys.Setup.hidden.negate(),
  					ChatContextKeys.Setup.disabledInWorkspace.negate(),
@@ -46,7 +46,7 @@ Touches: src/vs/workbench/contrib/scm/browser/scmInput.ts
 +MenuRegistry.appendMenuItem(MenuId.SCMInputBox, {
 +	command: {
 +		id: 'arara.scm.generateCommitMessage',
-+		title: localize('arara.scm.generateCommitMessage', "Gerar mensagem de commit com IA"),
++		title: localize('arara.scm.generateCommitMessage', "Generate commit message with AI"),
 +		icon: Codicon.sparkle
 +	},
 +	order: -1,

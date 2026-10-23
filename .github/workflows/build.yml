@@ -5,6 +5,7 @@ on:
     branches: [main, development]
     paths:
       - 'patches/**'
+      - 'locales/**'
       - 'scripts/**'
       - 'branding/**'
       - 'upstream/**'
@@ -48,6 +49,7 @@ jobs:
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
           node --check scripts/apply-environment.cjs
+          node scripts/tests/localization.cjs
           node scripts/tests/embed-arara-ai.cjs
           node scripts/tests/embed-arara-bot.cjs
           node scripts/tests/embed-arara-orchestra.cjs

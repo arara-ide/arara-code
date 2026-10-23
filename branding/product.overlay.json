@@ -24,8 +24,12 @@
   "win32TunnelServiceMutex": "araracode-tunnelservice",
   "win32TunnelMutex": "araracode-tunnel",
   "win32ContextMenu": {
-    "x64": { "clsid": "AA54C0C7-980D-4131-B919-419712967746" },
-    "arm64": { "clsid": "6A531DED-205E-4CAD-B652-474623F77FA2" }
+    "x64": {
+      "clsid": "AA54C0C7-980D-4131-B919-419712967746"
+    },
+    "arm64": {
+      "clsid": "6A531DED-205E-4CAD-B652-474623F77FA2"
+    }
   },
   "updateUrl": "",
   "downloadUrl": "https://github.com/arara-ide/arara-code/releases",
@@ -40,6 +44,6 @@
     "extensionId": "arara.arara-ai",
     "viewType": "arara.setup",
     "completedKey": "arara.setup.v1.completed",
-    "title": "Bem-vindo ao Arara Code"
+    "title": "Welcome to Arara Code"
   }
 }

@@ -134,6 +134,7 @@ if [[ -f "${EXT_DIR}/package.json" ]]; then
   # ser resolvidos por essa cópia em janelas abertas sem extensionDevelopmentPath.
   mkdir -p "${VSCODE}/extensions/arara-ai"
   cp "${EXT_DIR}/package.json" "${VSCODE}/extensions/arara-ai/"
+  for catalog in "${EXT_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${VSCODE}/extensions/arara-ai/"; done
   cp -R "${EXT_DIR}/dist" "${EXT_DIR}/media" "${EXT_DIR}/themes" "${VSCODE}/extensions/arara-ai/"
   node "${ROOT}/scripts/apply-environment.cjs" "${DEV_ENVIRONMENT}" "${VSCODE}/extensions/arara-ai/package.json"
   DEV_EXT_DIR="${EXT_DIR}"
@@ -142,6 +143,7 @@ if [[ -f "${EXT_DIR}/package.json" ]]; then
     DEV_EXT_DIR="${ROOT}/.work/dev-extensions/production/arara-ai"
     mkdir -p "${DEV_EXT_DIR}"
     cp "${EXT_DIR}/package.json" "${DEV_EXT_DIR}/"
+    for catalog in "${EXT_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${DEV_EXT_DIR}/"; done
     cp -R "${EXT_DIR}/dist" "${EXT_DIR}/media" "${EXT_DIR}/themes" "${DEV_EXT_DIR}/"
     node "${ROOT}/scripts/apply-environment.cjs" production "${DEV_EXT_DIR}/package.json"
   fi

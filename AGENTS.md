@@ -1,3 +1,13 @@
+## Internacionalização e localização — obrigatório
+
+- Toda interface deve oferecer português (`pt-BR`/`pt`), inglês (`en`) e espanhol (`es`), com mensagens em arquivos de tradução estruturados. Toda alteração futura em texto visível exige atualizar os três catálogos na mesma mudança, inclusive títulos, comandos, configurações, validações, notificações, estados vazios e nomes acessíveis.
+- Não misture idiomas, concatene fragmentos traduzidos nem traduza identificadores, comandos, caminhos, marcas, conteúdo do usuário ou contratos de ferramentas. Use mensagens completas com parâmetros; preserve os mesmos parâmetros e chaves nos três idiomas e trate plurais quando necessário.
+- Datas, horas, números, percentuais e moedas seguem o locale efetivo com `Intl`; moeda, fuso e valores dos dados não mudam com o idioma. Não fixe `pt-BR` em formatadores da interface.
+- Verifique paridade de chaves/parâmetros, fallback e variantes regionais, além dos testes/builds pertinentes. Catálogo incompleto ou texto ainda fixo deve ser informado como pendência, nunca declarado traduzido.
+- No core, preserve o padrão nativo `localize`/`localize2` do Code-OSS e os pacotes de idioma. Mensagens próprias do Arara precisam de catálogos complementares versionados nos três idiomas, integrados ao preparo/build. Mudanças do upstream continuam somente em `patches/code/`; não introduza lógica privada no core.
+
+- Catálogos e validação: `locales/{en,pt,es}.json`; gere `patches/code/0032-arara-localization.patch` com `node scripts/generate-localization.cjs` e verifique com `node scripts/tests/localization.cjs`. O build exige o patch atualizado.
+
 # AGENTS.md — repo `arara-code` (build e branding da IDE)
 
 Este arquivo vai na raiz do repo `arara-code`. Leia também o AGENTS.md geral.

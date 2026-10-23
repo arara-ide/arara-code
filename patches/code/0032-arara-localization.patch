@@ -1,0 +1,118 @@
+Arara Code: localize downstream messages through the native NLS locale.
+
+Why a patch: upstream language packs do not contain keys added by downstream patches.
+The supplement is limited to public UI messages; no extension/business logic belongs here.
+Preserves upstream language packs, pseudo localization, formatting and English originals.
+Generated catalogs: locales/{en,pt,es}.json; run node scripts/generate-localization.cjs.
+Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
+
+--- /dev/null
++++ b/src/vs/araraNls.ts
+@@ -0,0 +1,80 @@
++/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
++// Generated from arara-code/locales/*.json. Edit the catalogs, then run scripts/generate-localization.cjs.
++const catalogs: Record<string, Record<string, string>> = {
++	"en": {
++		"Update": "Update",
++		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.",
++		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} is installed. It will restart when the AI finishes responding.",
++		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.",
++		"Arara Code {0} is installed. Restarting in {1} s to apply the update.": "Arara Code {0} is installed. Restarting in {1} s to apply the update.",
++		"Close now": "Close now",
++		"Restart now": "Restart now",
++		"Later": "Later",
++		"Trust this workspace?": "Trust this workspace?",
++		"Trust this folder?": "Trust this folder?",
++		"Trust everything inside '{0}'": "Trust everything inside '{0}'",
++		"Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.",
++		"&&Trust": "&&Trust",
++		"&&Restricted mode": "&&Restricted mode",
++		"Generate commit message with AI": "Generate commit message with AI",
++		"AI command": "AI command",
++		"Restart to update": "Restart to update",
++		"Close to update": "Close to update",
++		"New platform terminal": "New platform terminal",
++		"Welcome to Arara Code": "Welcome to Arara Code",
++		"Arara Code settings": "Arara Code settings"
++	},
++	"pt": {
++		"Update": "Atualizar",
++		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} foi instalado. Fecha assim que a IA terminar a resposta; depois, abra o Arara Code de novo.",
++		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} foi instalado. Reinicia assim que a IA terminar a resposta.",
++		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} foi instalado. Fechando em {1} s para aplicar a atualização; depois, abra o Arara Code de novo.",
++		"Arara Code {0} is installed. Restarting in {1} s to apply the update.": "Arara Code {0} foi instalado. Reiniciando em {1} s para aplicar a atualização.",
++		"Close now": "Fechar agora",
++		"Restart now": "Reiniciar agora",
++		"Later": "Depois",
++		"Trust this workspace?": "Confiar neste workspace?",
++		"Trust this folder?": "Confiar nesta pasta?",
++		"Trust everything inside '{0}'": "Confiar em tudo dentro de '{0}'",
++		"Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Sem confiança, a pasta abre em modo restrito: o agente e as tarefas não executam nada.",
++		"&&Trust": "&&Confiar",
++		"&&Restricted mode": "&&Modo restrito",
++		"Generate commit message with AI": "Gerar mensagem de commit com IA",
++		"AI command": "Comando com IA",
++		"Restart to update": "Reiniciar para atualizar",
++		"Close to update": "Fechar para atualizar",
++		"New platform terminal": "Novo terminal de plataforma",
++		"Welcome to Arara Code": "Bem-vindo ao Arara Code",
++		"Arara Code settings": "Configurações do Arara Code"
++	},
++	"es": {
++		"Update": "Actualizar",
++		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} está instalado. Se cerrará cuando la IA termine de responder; después, vuelve a abrir Arara Code.",
++		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} está instalado. Se reiniciará cuando la IA termine de responder.",
++		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} está instalado. Se cerrará en {1} s para aplicar la actualización; después, vuelve a abrir Arara Code.",
++		"Arara Code {0} is installed. Restarting in {1} s to apply the update.": "Arara Code {0} está instalado. Se reiniciará en {1} s para aplicar la actualización.",
++		"Close now": "Cerrar ahora",
++		"Restart now": "Reiniciar ahora",
++		"Later": "Más tarde",
++		"Trust this workspace?": "¿Confiar en este espacio de trabajo?",
++		"Trust this folder?": "¿Confiar en esta carpeta?",
++		"Trust everything inside '{0}'": "Confiar en todo dentro de '{0}'",
++		"Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Sin confianza, la carpeta se abre en modo restringido: el agente y las tareas no ejecutan nada.",
++		"&&Trust": "&&Confiar",
++		"&&Restricted mode": "&&Modo restringido",
++		"Generate commit message with AI": "Generar mensaje de commit con IA",
++		"AI command": "Comando con IA",
++		"Restart to update": "Reiniciar para actualizar",
++		"Close to update": "Cerrar para actualizar",
++		"New platform terminal": "Nuevo terminal de plataforma",
++		"Welcome to Arara Code": "Bienvenido a Arara Code",
++		"Arara Code settings": "Configuración de Arara Code"
++	}
++};
++
++/** Supplement upstream language packs with messages introduced by downstream patches. */
++export function localizeAraraMessage(message: string): string {
++	const language = (globalThis._VSCODE_NLS_LANGUAGE ?? 'en').toLowerCase().split(/[-_]/)[0];
++	const catalog = catalogs[language];
++	return catalog && Object.hasOwn(catalog, message) ? catalog[message] : message;
++}
+--- a/src/vs/nls.ts
++++ b/src/vs/nls.ts
+@@ -5,2 +5,4 @@
+ 
++import { localizeAraraMessage } from './araraNls.js';
++
+ export function getNLSMessages(): string[] {
+@@ -95,3 +97,3 @@
+ 	}
+-	return _format(message, args);
++	return _format(localizeAraraMessage(message), args);
+ }
+@@ -107,3 +109,3 @@
+ 		if (typeof fallback === 'string') {
+-			return fallback;
++			return localizeAraraMessage(fallback);
+ 		}
+@@ -112,3 +114,3 @@
+ 	}
+-	return message;
++	return localizeAraraMessage(message);
+ }
+@@ -150,3 +152,3 @@
+ 	} else {
+-		message = originalMessage;
++		message = localizeAraraMessage(originalMessage);
+ 	}
