@@ -32,17 +32,20 @@ while IFS= read -r entry; do
   dest="${VSCODE}/.build/builtInExtensions/${name}"
   if [[ ! -f "${dest}/package.json" ]] || [[ "$(jq -r '.version' "${dest}/package.json")" != "${version}" ]]; then
     temp="$(mktemp -d "${CACHE}/extract.XXXXXX")"
+    # Extrai o VSIX inteiro: filtrar por 'extension/*' não é recursivo no unzip do
+    # Git for Windows nem no 7z (os VSIX não têm entradas de pasta), e as subpastas
+    # (dist/, icons/…) sumiam no build do Windows.
     if command -v unzip >/dev/null 2>&1; then
-      unzip -q "${vsix}" 'extension/*' -d "${temp}"
+      unzip -q "${vsix}" -d "${temp}"
     else
-      7z x -y -bd -o"${temp}" "${vsix}" 'extension/*' >/dev/null
+      7z x -y -bd -o"${temp}" "${vsix}" >/dev/null
     fi
     jq -e --arg name "${name}" --arg version "${version}" \
       '(.publisher + "." + .name) == $name and .version == $version' \
       "${temp}/extension/package.json" >/dev/null
     rm -rf "${dest}"
     mv "${temp}/extension" "${dest}"
-    rmdir "${temp}"
+    rm -rf "${temp}"
   fi
 
   # O gulp usa a cópia extraída; o VSIX local permite recriá-la caso .build seja limpo.
