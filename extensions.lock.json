@@ -1,0 +1,10 @@
+[
+  {
+    "name": "donjayamanne.githistory",
+    "version": "0.6.20",
+    "sha256": "aaea597276f089922e5b785f5c1ca1f1bef523ee17d6766889b67c0c76c35104",
+    "url": "https://open-vsx.org/api/donjayamanne/githistory/0.6.20/file/donjayamanne.githistory-0.6.20.vsix",
+    "repo": "https://github.com/DonJayamanne/gitHistoryVSCode",
+    "metadata": {}
+  }
+]
