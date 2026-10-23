@@ -1,0 +1,435 @@
+name: Build
+
+on:
+  push:
+    branches: [main, development]
+    paths:
+      - 'patches/**'
+      - 'scripts/**'
+      - 'branding/**'
+      - 'upstream/**'
+      - 'extensions.lock.json'
+      - 'CHANGELOG.md'
+      - '.github/workflows/**'
+      - 'README.md'
+      - 'AGENTS.md'
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Publicar como pre-release (versão de teste)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # TEMPORÁRIO: o tempo de build da org acabou, então o arara-ai é buscado na conta pessoal.
+  # Para desfazer, volte para arara-ide/arara-ai (veja ac-docs/docs/31-arara-ai-repo-temporario.md).
+  ARARA_AI_REPO: arara-ide/arara-ai
+  ARARA_BOT_REPO: arara-ide/arara-bot
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar scripts e empacotamento
+        run: |
+          for f in scripts/*.sh; do bash -n "$f"; done
+          node --check scripts/apply-environment.cjs
+          node scripts/tests/embed-arara-ai.cjs
+          node scripts/tests/embed-arara-bot.cjs
+
+  # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
+  version:
+    needs: verify
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$(jq -r '.tag' upstream/vscodium/upstream/stable.json)"
+          base_patch=$(( $(date +%-j) * 24 + $(date +%-H) ))
+          patch="$(printf '%04d' $base_patch)"
+          release="${tag}${patch}"
+          while git ls-remote --exit-code --tags origin "refs/tags/${release}" >/dev/null 2>&1 || gh release view "${release}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; do
+            echo "Versão ${release} já existe. Incrementando patch automaticamente..."
+            base_patch=$(( base_patch + 1 ))
+            patch="$(printf '%04d' $base_patch)"
+            release="${tag}${patch}"
+          done
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+
+  linux:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      # arara-ai é privado; o build.sh espera encontrá-lo em ARARA_AI_DIR.
+      - name: Checkout arara-ai
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_AI_REPO }}
+          ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-ai
+          persist-credentials: false
+
+      # arara-bot é privado; usa a credencial dos componentes irmãos.
+      - name: Checkout arara-bot
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_BOT_REPO }}
+          ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-bot
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: upstream/vscodium/.nvmrc
+
+      - name: Liberar disco e instalar dependências
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            jq rsync fakeroot dpkg-dev libkrb5-dev libx11-dev libxkbfile-dev libsecret-1-dev
+          df -h /
+
+      - name: Swap extra (o build chega a ~13 GB de RAM)
+        run: |
+          sudo fallocate -l 8G /swapfile2
+          sudo chmod 600 /swapfile2
+          sudo mkswap /swapfile2
+          sudo swapon /swapfile2
+          free -h
+
+      - name: Build
+        env:
+          ARARA_AI_DIR: ${{ github.workspace }}/arara-ai
+          ARARA_BOT_DIR: ${{ github.workspace }}/arara-bot
+          MAX_OLD_SPACE_SIZE: '8192'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/build.sh
+
+      - name: Conferir versão e gerar hashes
+        run: |
+          . .work/vscodium/dev/build.env
+          [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
+          ls -lh dist
+
+      - name: Validar artefatos
+        run: |
+          dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|extensions/arara-bot/package.json|bin/arara-code-uninstall"
+
+      - name: Testar o binário (abre e traz o arara-ai)
+        run: |
+          d=.work/vscodium/VSCode-linux-x64
+          timeout 120 "$d/bin/arara-code" --version
+          test -f "$d/resources/app/extensions/arara-ai/package.json"
+          test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-bot/server/index.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/hub.js"
+
+      - name: Hashes do build de development
+        if: github.ref == 'refs/heads/development'
+        run: (cd dist && sha256sum ./* > SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref_name == 'development' && 'arara-code-development-linux' || 'linux' }}
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
+
+  windows:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    needs: version
+    runs-on: windows-2022
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.release }}
+    steps:
+      - name: Caminhos longos
+        run: git config --system core.longpaths true
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Checkout arara-ai
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_AI_REPO }}
+          ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-ai
+          persist-credentials: false
+
+      # arara-bot é privado; usa a credencial dos componentes irmãos.
+      - name: Checkout arara-bot
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_BOT_REPO }}
+          ref: ${{ github.ref_name }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-bot
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: upstream/vscodium/.nvmrc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build
+        env:
+          ARARA_AI_DIR_NAME: arara-ai
+          MAX_OLD_SPACE_SIZE: '8192'
+          CI_BUILD: 'no'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export ARARA_AI_DIR="$(pwd)/arara-ai"
+          export ARARA_BOT_DIR="$(pwd)/arara-bot"
+          scripts/build.sh
+
+      - name: Conferir versão
+        run: |
+          . .work/vscodium/dev/build.env
+          [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
+          ls -lh dist
+
+      - name: Testar o binário (abre e traz o arara-ai)
+        run: |
+          d=.work/vscodium/VSCode-win32-x64
+          timeout 120 "$d/bin/arara-code" --version
+          test -f "$d/resources/app/extensions/arara-ai/package.json"
+          test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/extension.js"
+          test -s "$d/resources/app/extensions/arara-bot/server/index.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/webview.js"
+          test -s "$d/resources/app/extensions/arara-bot/dist/hub.js"
+
+      - name: Hashes do build de development
+        if: github.ref == 'refs/heads/development'
+        run: (cd dist && sha256sum ./* > SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref_name == 'development' && 'arara-code-development-windows' || 'windows' }}
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
+
+  # macOS PAUSADO: builds desativados temporariamente.
+  # Para reativar: descomente o job abaixo (remova o "# " do início das linhas)
+  # e troque o `needs` do job release pela linha comentada que inclui macos.
+  # macos:
+  #   if: github.ref == 'refs/heads/main'
+  #   needs: version
+  #   continue-on-error: true
+  #   runs-on: ${{ matrix.runner }}
+  #   timeout-minutes: 360
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - runner: macos-15-intel
+  #           arch: x64
+  #           heap: '12288'
+  #         - runner: macos-14
+  #           arch: arm64
+  #           heap: '12288'
+  #   env:
+  #     RELEASE_VERSION: ${{ needs.version.outputs.release }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
+  #         persist-credentials: false
+  #
+  #     - name: Checkout arara-ai
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ env.ARARA_AI_REPO }}
+  #         ref: main
+  #         token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+  #         path: arara-ai
+  #         persist-credentials: false
+  #
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version-file: upstream/vscodium/.nvmrc
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
+  #
+  #     # O patch do macOS (BSD) não aceita as opções usadas no build.sh; usa o GNU patch como `patch`.
+  #     - name: Dependências
+  #       run: |
+  #         brew install gpatch jq
+  #         mkdir -p "$HOME/gnubin"
+  #         ln -sf "$(brew --prefix gpatch)/bin/gpatch" "$HOME/gnubin/patch"
+  #         echo "$HOME/gnubin" >> "$GITHUB_PATH"
+  #         vm_stat | head -3; sysctl hw.memsize
+  #
+  #     - name: Build
+  #       env:
+  #         MAX_OLD_SPACE_SIZE: ${{ matrix.heap }}
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         export ARARA_AI_DIR="$(pwd)/arara-ai"
+  #         scripts/build.sh
+  #
+  #     - name: Conferir versão
+  #       run: |
+  #         . .work/vscodium/dev/build.env
+  #         [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
+  #         ls -lh dist
+  #
+  #     - name: Testar o binário (abre e traz o arara-ai)
+  #       run: |
+  #         for app in .work/vscodium/VSCode-darwin-${{ matrix.arch }}/*.app; do break; done
+  #         "$app/Contents/Resources/app/bin/arara-code" --version
+  #         test -f "$app/Contents/Resources/app/extensions/arara-ai/package.json"
+  #         test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/extension.js"
+  #         test -s "$app/Contents/Resources/app/extensions/arara-ai/dist/orquestra/webview.js"
+  #         codesign --verify --deep "$app"
+  #
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: macos-${{ matrix.arch }}
+  #         path: dist/
+  #         retention-days: 14
+
+  release:
+    # Publica mesmo que Windows/macOS falhem (Linux é a plataforma estável); eles entram quando passarem.
+    if: ${{ !cancelled() && needs.linux.result == 'success' && github.ref == 'refs/heads/main' }}
+    # needs: [version, linux, windows, macos]  # <- use esta ao reativar o macOS
+    needs: [version, linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      V: ${{ needs.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: SHA256SUMS
+        run: |
+          cd dist
+          ls -lh
+          sha256sum ./* > SHA256SUMS
+
+      - name: Texto da release
+        run: |
+          {
+            echo "Versão de teste."
+            echo
+            # seção do CHANGELOG desta versão ou, na falta, a de "Não lançado"
+            awk -v v="$V" '
+              /^## \[/ { if (on) exit; if (index($0, "[" v "]") || index($0, "[Não lançado]")) { on=1; next } }
+              on { print }
+            ' CHANGELOG.md
+            echo
+            echo "### Instalar ou atualizar (Ubuntu/Debian)"
+            echo "Baixe o \`.deb\` abaixo e rode:"
+            echo
+            echo "    sudo apt install ./arara-code_${V}_amd64.deb"
+            echo
+            echo "Para atualizar, é o mesmo comando com o arquivo novo. Suas configurações ficam."
+            echo
+            echo "### Desinstalar"
+            echo
+            echo "    arara-code-uninstall          # mantém configurações"
+            echo "    arara-code-uninstall --all    # apaga tudo"
+            if ls dist/*.exe >/dev/null 2>&1; then
+              echo
+              echo "### Windows (teste)"
+              echo "Baixe \`AraraCodeUserSetup-x64-${V}.exe\` (só para o seu usuário) ou \`AraraCodeSetup-x64-${V}.exe\` (todos os usuários) e execute."
+              echo "Também há o \`.zip\`, sem instalar. O instalador ainda não é assinado: o Windows pode avisar."
+            fi
+            if ls dist/*darwin*.zip >/dev/null 2>&1; then
+              echo
+              echo "### macOS (teste)"
+              echo "Baixe o \`AraraCode-darwin-arm64-${V}.zip\` (Apple Silicon) ou \`AraraCode-darwin-x64-${V}.zip\` (Intel), descompacte e arraste o app para Aplicativos."
+              echo "O app não é notarizado. Na primeira vez, rode no Terminal:"
+              echo
+              echo "    xattr -cr \"/Applications/Arara Code.app\""
+            fi
+          } > release-notes.md
+
+      - name: Conferir workflows da main
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          if ! git diff --quiet "${GITHUB_SHA}" FETCH_HEAD -- .github/workflows; then
+            echo "::error::A main mudou arquivos em .github/workflows depois deste build começar; o GITHUB_TOKEN não pode criar a tag ${V} em ${GITHUB_SHA}. Rode o workflow de novo (workflow_dispatch) na main atual."
+            git diff --stat "${GITHUB_SHA}" FETCH_HEAD -- .github/workflows
+            exit 1
+          fi
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease == false && 'false' || 'true' }}
+        run: |
+          flag=()
+          [ "${PRERELEASE}" = "true" ] && flag+=(--prerelease)
+          gh release create "$V" dist/* \
+            --target "${GITHUB_SHA}" --title "Arara Code $V" \
+            --notes-file release-notes.md "${flag[@]}"
