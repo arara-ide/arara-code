@@ -1,0 +1,45 @@
+Arara Code: generic hook for extension-supplied default view container order.
+
+Why a patch: the extension API cannot reorder native secondary sidebar containers.
+The extension detects installed CLIs and supplies ids; the core only orders those
+containers and preserves manual ordering while the supplied default is unchanged.
+No provider names, CLI detection or product heuristics live in this public patch.
+Touches: src/vs/workbench/browser/parts/paneCompositeBar.ts
+
+--- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
++++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
+@@ -3,6 +3,7 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
++import { CommandsRegistry } from '../../../platform/commands/common/commands.js';
+ import { localize } from '../../../nls.js';
+ import { ActionsOrientation } from '../../../base/browser/ui/actionbar/actionbar.js';
+ import { IActivityService } from '../../services/activity/common/activity.js';
+@@ -128,6 +129,26 @@
+ 		this.compositeBar = this.createCompositeBar(cachedItems);
+ 		this.onDidRegisterViewContainers(this.getViewContainers());
+ 		this.registerListeners();
++		// Generic hook: the extension supplies the order; no provider logic in the core.
++		this._register(CommandsRegistry.registerCommand(`_workbench.orderViewContainers.${this.location}`, (_accessor, ids: unknown) => {
++			if (!Array.isArray(ids) || !ids.every(isString) || new Set(ids).size !== ids.length) {
++				return;
++			}
++			const key = `workbench.viewContainers.defaultOrder.${this.location}`;
++			const signature = JSON.stringify(ids);
++			if (this.storageService.get(key, StorageScope.PROFILE) === signature) {
++				return; // Preserve manual ordering until the supplied default changes.
++			}
++			const items = this.compositeBar.getCompositeBarItems();
++			const ordered = ids.map(id => items.find(item => item.id === id)).filter((item): item is ICompositeBarItem => !!item);
++			if (ordered.length !== ids.length) {
++				return;
++			}
++			let index = 0;
++			this.compositeBar.setCompositeBarItems(items.map(item => ids.includes(item.id) ? ordered[index++] : item));
++			this.saveCachedViewContainers();
++			this.storageService.store(key, signature, StorageScope.PROFILE, StorageTarget.USER);
++		}));
+ 	}
+ 
+ 	private createCompositeBar(cachedItems: ICompositeBarItem[]) {
