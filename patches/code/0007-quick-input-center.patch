@@ -1,0 +1,57 @@
+Arara Code: quick input (Quick Open, history, transfer pickers) opens centered by default.
+
+- quickInputController.ts: with no saved position, start at the same spot as
+  'Align Quick Input Center' (25% from the top, centered) and mark the
+  'Center' option in the layout menu. Choosing 'Top' (or double-clicking the
+  title bar) is stored, so it sticks.
+
+Why a patch: the quick input position is only stored in application storage;
+there is no setting or product.json key for its default.
+Touches: src/vs/platform/quickinput/browser/quickInputController.ts
+
+--- a/src/vs/platform/quickinput/browser/quickInputController.ts
++++ b/src/vs/platform/quickinput/browser/quickInputController.ts
+@@ -44,6 +44,8 @@
+ const $ = dom.$;
+ 
+ const VIEWSTATE_STORAGE_KEY = 'workbench.quickInput.viewState';
++/** Arara Code: altura relativa da linha de snap "centro" (igual a `_snapLineHorizontalRatio`). */
++const ARARA_CENTER_TOP = 0.25;
+ const QUICK_INPUT_MOTION_CLOSING_CLASS = 'quick-input-widget-closing';
+ const QUICK_INPUT_OVERLAY_CLASS = 'quick-input-widget-overlay';
+ const QUICK_INPUT_CLOSE_ANIMATION_DURATION = 150;
+@@ -1106,7 +1108,12 @@
+ 
+ 	private loadViewState(): QuickInputViewState | undefined {
+ 		try {
+-			const data = JSON.parse(this.storageService.get(VIEWSTATE_STORAGE_KEY, StorageScope.APPLICATION, '{}'));
++			const raw = this.storageService.get(VIEWSTATE_STORAGE_KEY, StorageScope.APPLICATION);
++			// Arara Code: sem posição salva, abre centralizado (mesma posição de "Align Quick Input Center")
++			if (raw === undefined) {
++				return { top: ARARA_CENTER_TOP, left: 0.5 };
++			}
++			const data = JSON.parse(raw);
+ 			if (data.top !== undefined || data.left !== undefined) {
+ 				return data;
+ 			}
+@@ -1124,7 +1131,8 @@
+ 		if (viewState !== undefined) {
+ 			this.storageService.store(VIEWSTATE_STORAGE_KEY, JSON.stringify(viewState), StorageScope.APPLICATION, StorageTarget.MACHINE);
+ 		} else {
+-			this.storageService.remove(VIEWSTATE_STORAGE_KEY, StorageScope.APPLICATION);
++			// Arara Code: guarda "topo" explicitamente para não voltar ao centro padrão
++			this.storageService.store(VIEWSTATE_STORAGE_KEY, '{}', StorageScope.APPLICATION, StorageTarget.MACHINE);
+ 		}
+ 	}
+ }
+@@ -1169,7 +1177,9 @@
+ 		// Initialize alignment from restored state. The exact snap alignment will
+ 		// be refined in layoutContainer() once pixel dimensions are available.
+ 		if (initialViewState?.top !== undefined && initialViewState?.left !== undefined) {
+-			this._setAlignmentState(undefined);
++			// Arara Code: posição padrão (centro) marca "Center" no menu de layout
++			const isCenter = Math.abs(initialViewState.top - ARARA_CENTER_TOP) < 0.01 && Math.abs(initialViewState.left - 0.5) < 0.01;
++			this._setAlignmentState(isCenter ? 'center' : undefined);
+ 		}
+ 	}
+ 
