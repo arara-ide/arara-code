@@ -302,7 +302,20 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   if [[ "${BUILD_DEB}" == "yes" ]]; then
     # O dpkg-shlibdeps.pl do Chromium não funciona com o dpkg ≥ 1.23 (Ubuntu 26.04+).
     # Nesse caso usa a lista de dependências que o próprio VS Code mantém (dep-lists.ts).
-    if ! perl -e 'use Dpkg; exit(($Dpkg::PROGVERSION =~ /^1\.(2[3-9]|[3-9]\d)/) ? 0 : 1)' 2>/dev/null; then :; else
+    if ! perl -e 'use Dpkg; exit(($Dpkg::PROGVERSION =~ /^1\.(2[3-9]|[3-9]\d)/) ? 0 : 1)' 2>/dev/null; then
+      # O calculate-deps.ts baixa o script com `curl` sem `-f`, uma vez por binário: um 429 do
+      # raw.githubusercontent.com vira o corpo do .pl e quebra com "syntax error near 429:".
+      # Baixa uma vez aqui, falhando de verdade e com retry, e faz o calculate-deps.ts reutilizá-lo.
+      DPKG_SHLIBDEPS_PL="$(cd "${WORK}/vscode" && node -p "require('os').tmpdir()")/dpkg-shlibdeps.pl"
+      CHROMIUM_REV="$(cd "${WORK}/vscode" && node -p "require('./cgmanifest.json').registrations.find(r => r.component.type === 'git' && r.component.git.name === 'chromium').version")"
+      curl -fsSL --retry 6 --retry-delay 15 --retry-all-errors \
+        "https://raw.githubusercontent.com/chromium/chromium/${CHROMIUM_REV}/third_party/dpkg-shlibdeps/dpkg-shlibdeps.pl" \
+        -o "${DPKG_SHLIBDEPS_PL}"
+      perl -c "${DPKG_SHLIBDEPS_PL}"
+      sed -i "s|\tconst result = spawnSync('curl', \[dpkgShlibdepsUrl, '-o', dpkgShlibdepsScriptLocation\]);|\tconst result = { status: 0, stderr: '' }; // Arara: baixado e validado em scripts/build.sh|" "${WORK}/vscode/build/linux/debian/calculate-deps.ts"
+      grep -q "Arara: baixado e validado" "${WORK}/vscode/build/linux/debian/calculate-deps.ts" \
+        || { echo "! calculate-deps.ts mudou; ajuste o sed do dpkg-shlibdeps em scripts/build.sh" >&2; exit 1; }
+    else
       sed -i 's|\tconst dpkgShlibdepsResult = spawnSync(.perl., cmd, { cwd: chromiumSysroot });|\tconst dpkgShlibdepsResult = { status: 0, stdout: Buffer.from(""), stderr: "" }; // Arara: dpkg novo, usa dep-lists.ts|' "${WORK}/vscode/build/linux/debian/calculate-deps.ts"
       sed -i 's|\tconst sortedDependencies: string\[\] = Array.from(mergedDependencies)|\tif (packageType === "deb" \&\& !mergedDependencies.size) { return [...debianGeneratedDeps[arch as DebianArchString]]; }\n\tconst sortedDependencies: string[] = Array.from(mergedDependencies)|' "${WORK}/vscode/build/linux/dependencies-generator.ts"
     fi
