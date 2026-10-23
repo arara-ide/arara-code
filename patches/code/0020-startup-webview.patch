@@ -1,0 +1,117 @@
+Arara Code: product-configured startup webview before the first workbench render.
+
+Why a patch: extension activation happens after workbench rendering. No extension
+API can select the first rendered surface or hide all workbench parts before
+activation. Read the extension's existing completion state synchronously through
+IExtensionStorageService, using the product's generic startupWebview descriptor.
+Keep all workbench chrome hidden while the extension-owned modal is active;
+reuse its context gate and native modal, without changing saved user layout.
+The extension owns the steps, choices and completion. No timers/reopening tabs.
+Touches: product type, workbench startup, startupWebview and its scoped CSS.
+
+--- a/src/vs/base/common/product.ts
++++ b/src/vs/base/common/product.ts
+@@ -97,6 +97,9 @@
+ }
+ 
+ export interface IProductConfiguration {
++	/** Extension-owned startup surface; checked before rendering the workbench. */
++	readonly startupWebview?: { readonly extensionId: string; readonly viewType: string; readonly completedKey: string; readonly title: string };
++
+ 	readonly version: string;
+ 	readonly date?: string;
+ 	readonly quality?: string;
+--- a/src/vs/workbench/browser/workbench.ts
++++ b/src/vs/workbench/browser/workbench.ts
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import './style.js';
++import { StartupWebview } from './startupWebview.js';
+ import { runWhenWindowIdle } from '../../base/browser/dom.js';
+ import { Event, Emitter, setGlobalLeakWarningThreshold } from '../../base/common/event.js';
+ import { RunOnceScheduler, timeout } from '../../base/common/async.js';
+@@ -169,6 +170,8 @@
+ 				// Register Listeners
+ 				this.registerListeners(lifecycleService, storageService, configurationService, hostService, dialogService);
+ 
++				this._register(instantiationService.createInstance(StartupWebview, this.mainContainer));
++
+ 				// Render Workbench
+ 				this.renderWorkbench(instantiationService, notificationService, storageService, configurationService);
+ 
+--- /dev/null
++++ b/src/vs/workbench/browser/startupWebview.ts
+@@ -0,0 +1,48 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import './media/startupWebview.css';
++import { Disposable } from '../../base/common/lifecycle.js';
++import { IContextKeyService } from '../../platform/contextkey/common/contextkey.js';
++import { IExtensionStorageService } from '../../platform/extensionManagement/common/extensionStorage.js';
++import { IProductService } from '../../platform/product/common/productService.js';
++import { ILifecycleService, ShutdownReason } from '../services/lifecycle/common/lifecycle.js';
++
++/** Decide the first visible surface before rendering any workbench parts. */
++export class StartupWebview extends Disposable {
++	constructor(
++		container: HTMLElement,
++		@IProductService product: IProductService,
++		@IExtensionStorageService extensionStorage: IExtensionStorageService,
++		@IContextKeyService contextKeys: IContextKeyService,
++		@ILifecycleService lifecycle: ILifecycleService,
++	) {
++		super();
++		const startup = product.startupWebview;
++		if (startup && extensionStorage.getExtensionState(startup.extensionId, true)?.[startup.completedKey] !== true) {
++			contextKeys.createKey('arara.modal.allowedCommands', ['workbench.action.reloadWindow']);
++			contextKeys.createKey('arara.modal.viewType', startup.viewType);
++		}
++		const placeholder = document.createElement('div');
++		placeholder.className = 'startup-webview-placeholder';
++		placeholder.setAttribute('role', 'status');
++		placeholder.textContent = startup?.title ?? product.nameLong;
++		container.appendChild(placeholder);
++		const update = () => {
++			const active = !!contextKeys.getContextKeyValue('arara.modal.viewType');
++			container.classList.toggle('blocking-webview', active);
++			placeholder.hidden = !active;
++		};
++		update();
++		this._register(contextKeys.onDidChangeContext(event => {
++			if (event.affectsSome(new Set(['arara.modal.viewType']))) { update(); }
++		}));
++		this._register(lifecycle.onBeforeShutdown(event => {
++			if (contextKeys.getContextKeyValue('arara.modal.viewType') && event.reason !== ShutdownReason.RELOAD) {
++				event.veto(true, 'arara.modal');
++			}
++		}));
++	}
++}
+--- /dev/null
++++ b/src/vs/workbench/browser/media/startupWebview.css
+@@ -0,0 +1,21 @@
++/* A blocking webview is the only workbench surface, including the first frame. */
++.monaco-workbench.blocking-webview > :not(.monaco-modal-editor-block):not(.quick-input-widget):not(.monaco-dialog-modal-block):not(.startup-webview-placeholder):not(:has(> .blocking-webview-content)) {
++	visibility: hidden !important;
++	pointer-events: none !important;
++}
++.monaco-workbench > .startup-webview-placeholder {
++	position: absolute;
++	inset: 0;
++	z-index: 2540;
++	display: flex;
++	align-items: center;
++	justify-content: center;
++	background: var(--vscode-editor-background);
++	color: var(--vscode-foreground);
++	font-size: 24px;
++}
++.monaco-workbench > .startup-webview-placeholder[hidden],
++.monaco-workbench:has(> .monaco-modal-editor-block) > .startup-webview-placeholder { display: none; }
++.monaco-workbench.blocking-webview *,
++.monaco-workbench.blocking-webview *:focus,
++.monaco-workbench.blocking-webview *:focus-visible { outline: none !important; }
