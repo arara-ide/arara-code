@@ -1,0 +1,57 @@
+Arara Code: ícone de IA para gerar a mensagem de commit dentro da caixa do Source Control.
+
+- scmInput.ts: adiciona arara.scm.generateCommitMessage (extensão arara-ai,
+  ícone sparkle) no MenuId.SCMInputBox. A toolbar da caixa já fica no canto
+  superior direito e reserva a largura dela à direita do texto (o "padding-right"),
+  passa (rootUri, grupos, CancellationToken) e troca o ícone por "parar" enquanto
+  roda. Cada repositório tem a sua caixa, então funciona com 1 ou vários
+  repositórios no Source Control. Só aparece para git e quando a extensão liga a
+  context key arara.scm.generateAvailable; fica desabilitado sem alterações.
+- Esconde o "Generate Commit Message" do Copilot (SetupAction), que abriria o
+  setup do Copilot no mesmo lugar.
+
+Why a patch: scm/inputBox é proposed API (contribSourceControlInputBoxMenu) e
+não está liberada para a arara-ai no product.json; registrar no core evita
+habilitar a proposta e permite esconder a ação do Copilot.
+Touches: src/vs/workbench/contrib/scm/browser/scmInput.ts
+
+--- a/src/vs/workbench/contrib/scm/browser/scmInput.ts
++++ b/src/vs/workbench/contrib/scm/browser/scmInput.ts
+@@ -13,7 +13,7 @@
+ import { IContextKeyService, IContextKey, ContextKeyExpr, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
+ import { ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+-import { MenuItemAction, IMenuService, registerAction2, MenuId, Action2 } from '../../../../platform/actions/common/actions.js';
++import { MenuItemAction, IMenuService, registerAction2, MenuId, Action2, MenuRegistry } from '../../../../platform/actions/common/actions.js';
+ import { IAction, ActionRunner, Action } from '../../../../base/common/actions.js';
+ import { ActionBar } from '../../../../base/browser/ui/actionbar/actionbar.js';
+ import { IConfigurationService, ConfigurationTarget } from '../../../../platform/configuration/common/configuration.js';
+@@ -848,6 +848,8 @@
+ 				id: MenuId.SCMInputBox,
+ 				when: ContextKeyExpr.and(
+ 					ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
++					// Arara Code: o "Generate" do Copilot dá lugar ao da Arara (ver fim do arquivo)
++					ContextKeyExpr.false(),
+ 					ChatContextKeys.Setup.hidden.negate(),
+ 					ChatContextKeys.Setup.disabledInWorkspace.negate(),
+ 					ChatContextKeys.Setup.completed.negate(),
+@@ -875,3 +877,19 @@
+ });
+ 
+ setupSimpleEditorSelectionStyling('.scm-view .scm-editor-container');
++
++// Arara Code: ícone de IA no canto superior direito da caixa de mensagem de commit.
++// O comando é da extensão arara-ai, que liga a context key ao registrar. A toolbar
++// passa (rootUri, grupos, CancellationToken) e troca o ícone por "parar" enquanto roda.
++MenuRegistry.appendMenuItem(MenuId.SCMInputBox, {
++	command: {
++		id: 'arara.scm.generateCommitMessage',
++		title: localize('arara.scm.generateCommitMessage', "Gerar mensagem de commit com IA"),
++		icon: Codicon.sparkle
++	},
++	order: -1,
++	when: ContextKeyExpr.and(
++		ContextKeyExpr.has('arara.scm.generateAvailable'),
++		ContextKeyExpr.equals('scmProvider', 'git')
++	)
++});
