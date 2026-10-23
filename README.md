@@ -207,6 +207,8 @@ Na IDE, clique em **Arara: entrar** na barra de status (ou `Ctrl+Shift+P` → *A
 
 Para criar/alterar um patch: edite em `.work/vscodium/vscode`, teste com `scripts/dev.sh` e rode `scripts/new-patch.sh NNNN-nome arquivo…`. Detalhes em `AGENTS.md`.
 
+No Source Control, a divisória entre **Repositories** e **Changes** pode ser arrastada para ajustar a altura de Repositories. O padrão do produto é `scm.repositories.visible: 0`, que habilita o redimensionamento nativo; um valor maior que zero nas configurações do usuário ou do workspace fixa a quantidade de linhas visíveis.
+
 ## Build de release (Linux)
 
 ```bash
