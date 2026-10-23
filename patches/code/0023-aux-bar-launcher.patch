@@ -1,0 +1,112 @@
+Arara Code: gancho genérico de lançador no cabeçalho do Secondary Side Bar.
+
+Mostra um botão com ícone + texto na linha das plataformas (composite bar no header),
+no header acima do título da plataforma, com justify-content:space-between. O texto vem
+da context key `arara.ui.auxLauncher` (vazio = oculto) e o clique executa o comando
+`arara.ui.auxLauncher.run`. A extensão (arara-ai) decide rótulo, quando mostrar e o que
+abrir (hoje: Orquestra). O core só define `arara.ui.auxLauncherAvailable` para a
+extensão saber que o gancho existe e esconder o fallback em view/title.
+
+Why a patch: menus de extensão (`view/title`, `viewContainer/title`) só renderizam
+ícones dentro da barra de ações da view, abaixo da linha das plataformas; não há API
+para inserir um botão com texto no título do AuxiliaryBarPart (MenuId.AuxiliaryBarTitle
+não é contribuível). Nenhuma lógica de produto, rede ou processo no core.
+Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.css
+
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+@@ -34,6 +34,9 @@
+ import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+ import { VisibleViewContainersTracker } from '../visibleViewContainersTracker.js';
+ import { Extensions } from '../../panecomposite.js';
++import { $, addDisposableListener, append } from '../../../../base/browser/dom.js';
++import { ThemeIcon } from '../../../../base/common/themables.js';
++import { Codicon } from '../../../../base/common/codicons.js';
+ import { FONT, getFontSize, updateSidebarSize } from '../../../../base/common/font.js';
+ import { SidebarPart } from '../sidebar/sidebarPart.js';
+ 
+@@ -84,7 +87,7 @@
+ 	private readonly visibleViewContainersTracker: VisibleViewContainersTracker;
+ 
+ 	constructor(
+-		@INotificationService notificationService: INotificationService,
++		@INotificationService private readonly launcherNotificationService: INotificationService,
+ 		@IStorageService storageService: IStorageService,
+ 		@IContextMenuService contextMenuService: IContextMenuService,
+ 		@IWorkbenchLayoutService layoutService: IWorkbenchLayoutService,
+@@ -116,7 +119,7 @@
+ 			ViewContainerLocation.AuxiliaryBar,
+ 			Extensions.Auxiliary,
+ 			MenuId.AuxiliaryBarTitle,
+-			notificationService,
++			launcherNotificationService,
+ 			storageService,
+ 			contextMenuService,
+ 			layoutService,
+@@ -241,6 +244,33 @@
+ 		this._onDidChange.fire(undefined); // Signal grid that size constraints changed
+ 	}
+ 
++	// Arara Code: gancho genérico de lançador no cabeçalho do Secondary Side Bar. A extensão
++	// define o rótulo (context key `arara.ui.auxLauncher`) e o comando `arara.ui.auxLauncher.run`;
++	// vazio = oculto. `arara.ui.auxLauncherAvailable` avisa que o gancho existe nesta build.
++	protected override createHeaderArea(): HTMLElement {
++		const area = super.createHeaderArea();
++		this.contextKeyService.createKey('arara.ui.auxLauncherAvailable', true);
++		const button = $('button.arara-aux-launcher', { type: 'button' });
++		const iconEl = append(button, $('span'));
++		iconEl.className = ThemeIcon.asClassName(Codicon.wand);
++		const label = append(button, $('span.label'));
++		area.appendChild(button);
++		const update = () => {
++			const text = this.contextKeyService.getContextKeyValue<string>('arara.ui.auxLauncher');
++			button.hidden = typeof text !== 'string' || !text;
++			label.textContent = text || '';
++			button.title = text || '';
++		};
++		update();
++		this.headerFooterCompositeBarDispoables.add(this.contextKeyService.onDidChangeContext(e => {
++			if (e.affectsSome(new Set(['arara.ui.auxLauncher']))) { update(); }
++		}));
++		this.headerFooterCompositeBarDispoables.add(addDisposableListener(button, 'click', () => {
++			this.commandService.executeCommand('arara.ui.auxLauncher.run').catch(error => this.launcherNotificationService.error(error));
++		}));
++		return area;
++	}
++
+ 	protected getCompositeBarOptions(): IPaneCompositeBarOptions {
+ 		const $this = this;
+ 		return {
+--- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
++++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
+@@ -111,3 +111,30 @@
+ .monaco-workbench .auxiliarybar.pane-composite-part > .title.has-composite-bar > .title-actions .monaco-action-bar .action-item {
+ 	max-width: 150px;
+ }
++
++/* Arara Code: lançador da extensão, à direita das plataformas e antes das ações do painel */
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher {
++	margin-left: auto;
++	display: inline-flex;
++	align-items: center;
++	gap: 4px;
++	height: 22px;
++	padding: 0 8px;
++	border: 0;
++	border-radius: 4px;
++	background: transparent;
++	color: var(--vscode-foreground);
++	font: inherit;
++	font-size: 12px;
++	cursor: pointer;
++	white-space: nowrap;
++	flex-shrink: 0;
++}
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:hover { background: var(--vscode-toolbar-hoverBackground); }
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher[hidden] { display: none; }
++
++
++.monaco-workbench .part.auxiliarybar > .header-or-footer { justify-content: space-between; }
++
++.monaco-workbench .part.auxiliarybar > .header > .composite-bar-container { min-width: 0; overflow: hidden; flex-shrink: 1; }
