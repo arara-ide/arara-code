@@ -1,0 +1,261 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'patches/**'
+      - 'scripts/**'
+      - 'branding/**'
+      - 'upstream/**'
+      - 'extensions.lock.json'
+      - 'CHANGELOG.md'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'patches/**'
+      - 'scripts/**'
+      - 'branding/**'
+      - 'upstream/**'
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Publicar como pre-release (versão de teste)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARARA_AI_REPO: arara-ide/arara-ai
+
+jobs:
+  # PR: só prova que clone + patches + branding + npm ci funcionam (sem compilar, sem secrets).
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: upstream/vscodium/.nvmrc
+
+      - name: Dependências do sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq rsync libkrb5-dev libx11-dev libxkbfile-dev libsecret-1-dev
+
+      - name: Preparar (patches aplicam do zero)
+        run: scripts/prepare.sh
+
+  # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
+  version:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - id: v
+        run: |
+          tag="$(jq -r '.tag' upstream/vscodium/upstream/stable.json)"
+          patch="$(printf '%04d' $(( $(date +%-j) * 24 + $(date +%-H) )))"
+          echo "release=${tag}${patch}" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      # arara-ai é privado; o build.sh espera encontrá-lo em ARARA_AI_DIR.
+      - name: Checkout arara-ai
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_AI_REPO }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-ai
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: upstream/vscodium/.nvmrc
+
+      - name: Liberar disco e instalar dependências
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            jq rsync fakeroot dpkg-dev libkrb5-dev libx11-dev libxkbfile-dev libsecret-1-dev
+          df -h /
+
+      - name: Swap extra (o build chega a ~13 GB de RAM)
+        run: |
+          sudo fallocate -l 8G /swapfile2
+          sudo chmod 600 /swapfile2
+          sudo mkswap /swapfile2
+          sudo swapon /swapfile2
+          free -h
+
+      - name: Build
+        env:
+          ARARA_AI_DIR: ${{ github.workspace }}/arara-ai
+          MAX_OLD_SPACE_SIZE: '8192'
+        run: scripts/build.sh
+
+      - name: Conferir versão e gerar hashes
+        run: |
+          . .work/vscodium/dev/build.env
+          [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
+          ls -lh dist
+
+      - name: Validar artefatos
+        run: |
+          dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|bin/arara-code-uninstall"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/
+          retention-days: 14
+
+  windows:
+    needs: version
+    runs-on: windows-2022
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.release }}
+    steps:
+      - name: Caminhos longos
+        run: git config --system core.longpaths true
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Checkout arara-ai
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARARA_AI_REPO }}
+          token: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
+          path: arara-ai
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: upstream/vscodium/.nvmrc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build
+        env:
+          ARARA_AI_DIR_NAME: arara-ai
+          MAX_OLD_SPACE_SIZE: '8192'
+          CI_BUILD: 'no'
+        run: |
+          export ARARA_AI_DIR="$(pwd)/arara-ai"
+          scripts/build.sh
+
+      - name: Conferir versão
+        run: |
+          . .work/vscodium/dev/build.env
+          [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/
+          retention-days: 14
+
+  release:
+    # Publica mesmo que o Windows falhe (Linux é a plataforma estável); o Windows entra quando passar.
+    if: ${{ !cancelled() && needs.linux.result == 'success' && github.event_name != 'pull_request' }}
+    needs: [version, linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      V: ${{ needs.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: SHA256SUMS
+        run: |
+          cd dist
+          ls -lh
+          sha256sum ./* > SHA256SUMS
+
+      - name: Texto da release
+        run: |
+          {
+            echo "Versão de teste."
+            echo
+            # seção do CHANGELOG desta versão ou, na falta, a de "Não lançado"
+            awk -v v="$V" '
+              /^## \[/ { if (on) exit; if (index($0, "[" v "]") || index($0, "[Não lançado]")) { on=1; next } }
+              on { print }
+            ' CHANGELOG.md
+            echo
+            echo "### Instalar ou atualizar (Ubuntu/Debian)"
+            echo "Baixe o \`.deb\` abaixo e rode:"
+            echo
+            echo "    sudo apt install ./arara-code_${V}_amd64.deb"
+            echo
+            echo "Para atualizar, é o mesmo comando com o arquivo novo. Suas configurações ficam."
+            echo
+            echo "### Desinstalar"
+            echo
+            echo "    arara-code-uninstall          # mantém configurações"
+            echo "    arara-code-uninstall --all    # apaga tudo"
+            if ls dist/*.exe >/dev/null 2>&1; then
+              echo
+              echo "### Windows (teste)"
+              echo "Baixe \`AraraCodeUserSetup-x64-${V}.exe\` (só para o seu usuário) ou \`AraraCodeSetup-x64-${V}.exe\` (todos os usuários) e execute."
+              echo "Também há o \`.zip\`, sem instalar. O instalador ainda não é assinado: o Windows pode avisar."
+            fi
+          } > release-notes.md
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease == false && 'false' || 'true' }}
+        run: |
+          flag=()
+          [ "${PRERELEASE}" = "true" ] && flag+=(--prerelease)
+          gh release create "$V" dist/* \
+            --target "${GITHUB_SHA}" --title "Arara Code $V" \
+            --notes-file release-notes.md "${flag[@]}"
