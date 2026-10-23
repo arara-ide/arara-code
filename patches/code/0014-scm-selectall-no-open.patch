@@ -1,0 +1,67 @@
+Arara Code: Ctrl+A em listas/árvores (ex.: Changes do Source Control) não abre
+mais o arquivo no editor.
+
+Sintoma: dar Ctrl+A no grupo "Changes" quando ele tem 1 único arquivo abria/focava
+esse arquivo no editor "do nada". O list.selectAll (listCommands.ts) chama
+setSelection com um KeyboardEvent sintético; isso dispara o onDidChangeSelection
+com browserEvent de teclado e o ResourceNavigator.onSelectionFromKeyboard
+(listService.ts) abre o recurso sempre que a seleção resulta em exatamente 1
+elemento — o que acontece quando o escopo do "selecionar tudo" tem só 1 item.
+
+Correção: marcar o evento sintético do list.selectAll com __selectAll e, no
+onSelectionFromKeyboard, retornar antes de abrir quando essa marca estiver
+presente. A navegação legítima por teclado (setas) não é afetada, pois usa
+getSelectionKeyboardEvent (sem a marca) e continua abrindo o item focado.
+
+Why a patch: list.selectAll e o ResourceNavigator são do core (platform/list e
+workbench/browser), fora do alcance da API de extensão.
+Touches: src/vs/platform/list/browser/listService.ts src/vs/workbench/browser/actions/listCommands.ts
+
+--- a/src/vs/platform/list/browser/listService.ts
++++ b/src/vs/platform/list/browser/listService.ts
+@@ -662,6 +662,9 @@
+ 	preserveFocus?: boolean;
+ 	pinned?: boolean;
+ 	__forceEvent?: boolean;
++	// Arara Code: marca uma selecao programatica de "selecionar tudo" (list.selectAll),
++	// para o navigator nao abrir/focar o recurso quando a selecao resulta em 1 elemento.
++	__selectAll?: boolean;
+ }
+ 
+ export function getSelectionKeyboardEvent(typeArg = 'keydown', preserveFocus?: boolean, pinned?: boolean): SelectionKeyboardEvent {
+@@ -708,6 +711,14 @@
+ 		}
+ 
+ 		const selectionKeyboardEvent = event.browserEvent as SelectionKeyboardEvent;
++
++		// Arara Code: nao abrir/focar o recurso quando a selecao vem de "selecionar tudo"
++		// (list.selectAll). Em grupos com 1 item (ex.: Changes com 1 arquivo) o select-all
++		// resultava em 1 elemento e disparava a abertura do arquivo no editor.
++		if (selectionKeyboardEvent.__selectAll) {
++			return;
++		}
++
+ 		const preserveFocus = typeof selectionKeyboardEvent.preserveFocus === 'boolean' ? selectionKeyboardEvent.preserveFocus : true;
+ 		const pinned = typeof selectionKeyboardEvent.pinned === 'boolean' ? selectionKeyboardEvent.pinned : !preserveFocus;
+ 		const sideBySide = false;
+--- a/src/vs/workbench/browser/actions/listCommands.ts
++++ b/src/vs/workbench/browser/actions/listCommands.ts
+@@ -610,6 +610,8 @@
+ 		if (focused instanceof List || focused instanceof PagedList || focused instanceof Table) {
+ 			const list = focused;
+ 			const fakeKeyboardEvent = new KeyboardEvent('keydown');
++			// Arara Code: marca como select-all para o navigator nao abrir/focar o recurso.
++			(fakeKeyboardEvent as any).__selectAll = true;
+ 			list.setSelection(range(list.length), fakeKeyboardEvent);
+ 		}
+ 
+@@ -661,6 +663,9 @@
+ 			}
+ 
+ 			const fakeKeyboardEvent = new KeyboardEvent('keydown');
++			// Arara Code: marca como select-all para o navigator nao abrir/focar o recurso
++			// quando a selecao resulta em 1 elemento (ex.: Changes com 1 arquivo).
++			(fakeKeyboardEvent as any).__selectAll = true;
+ 			tree.setSelection(newSelection, fakeKeyboardEvent);
+ 		}
+ 	}
