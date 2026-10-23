@@ -1,0 +1,517 @@
+Arara Code: botão "Atualizar" no topo e reinício automático quando o .deb novo é instalado.
+
+- contrib/arara/electron-browser/araraUpdate.contribution.ts (novo):
+  - Botão com texto "Atualizar" na barra de título, à esquerda do Customize Layout
+    (MenuId.LayoutControlMenu, order -1). Só aparece com a context key
+    arara.update.available, ligada pela extensão arara-ai quando o ac-services
+    (GET /v1/ide/version, checado a cada 5 min) diz que há versão nova. O clique
+    roda arara.update.open (extensão), que abre a página da release no GitHub.
+  - O apt troca os arquivos de /usr/share/arara-code com a IDE aberta e o processo
+    segue com o código antigo. O workbench relê <appRoot>/product.json a cada 30 s
+    e ao ganhar foco; se duas leituras seguidas mostram outra versão, liga
+    arara.update.installed, avisa com contagem de 10 s (espera a IA terminar se
+    arara.*.running estiver ligado) e chama o relaunch nativo: o main process sai
+    e o binário novo sobe pelo mesmo caminho. Hot exit preserva o que não foi salvo.
+    "Depois" troca o botão por "Reiniciar para atualizar". Com várias janelas, só a
+    de menor id mostra o aviso. Desligado em modo dev (isBuilt = false).
+- media/araraUpdate.css (novo): estilo de botão para o item com texto.
+- workbench.desktop.main.ts: importa a contribution (só desktop).
+
+Why a patch: extensão não põe item no LayoutControlMenu nem desenha botão com texto
+na barra de título, e só o core consegue reiniciar o app inteiro (main process);
+workbench.action.reloadWindow recarrega só a janela, com o Electron antigo.
+Revisão de segurança: lê só o product.json do próprio appRoot; não abre URL nem
+executa nada vindo da rede (a URL do botão é validada na extensão).
+Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts src/vs/workbench/contrib/arara/electron-browser/media/araraUpdate.css src/vs/workbench/workbench.desktop.main.ts
+
+--- /dev/null
++++ b/src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts
+@@ -0,0 +1,209 @@
++/*---------------------------------------------------------------------------------------------
++ *  Arara Code: atualização da IDE.
++ *
++ *  1. Botão "Atualizar" na barra de título, à esquerda do Customize Layout
++ *     (MenuId.LayoutControlMenu). Aparece quando a extensão arara-ai liga a
++ *     context key `arara.update.available` (ela pergunta ao ac-services a cada
++ *     5 min) e roda `arara.update.open` (abre a página da release no GitHub).
++ *  2. Pacote novo no disco: o `apt install ./arara-code_*.deb` troca os arquivos
++ *     em /usr/share/arara-code com a IDE aberta, mas o processo continua com o
++ *     código antigo na memória. Aqui o workbench relê `<appRoot>/product.json`
++ *     a cada 30 s (e ao ganhar foco); se a versão no disco for outra, mostra um
++ *     aviso com contagem de 10 s e reinicia o app inteiro (relaunch nativo: o
++ *     main process sai e o binário novo sobe no mesmo caminho). O hot exit
++ *     guarda arquivos não salvos e as janelas reabrem.
++ *     "Depois" troca o botão do topo por "Reiniciar para atualizar".
++ *     Se alguma IA estiver gerando resposta, a contagem espera ela terminar.
++ *--------------------------------------------------------------------------------------------*/
++
++import './media/araraUpdate.css';
++import { reset } from '../../../../base/browser/dom.js';
++import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
++import { IntervalTimer, timeout } from '../../../../base/common/async.js';
++import { Disposable, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
++import { joinPath } from '../../../../base/common/resources.js';
++import { URI } from '../../../../base/common/uri.js';
++import { mainWindow } from '../../../../base/browser/window.js';
++import { localize, localize2 } from '../../../../nls.js';
++import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
++import { MenuEntryActionViewItem } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
++import { Action2, MenuId, MenuItemAction, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { ContextKeyExpr, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
++import { IFileService } from '../../../../platform/files/common/files.js';
++import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
++import { ILogService } from '../../../../platform/log/common/log.js';
++import { INativeHostService } from '../../../../platform/native/common/native.js';
++import { INotificationHandle, INotificationService, NotificationPriority, Severity } from '../../../../platform/notification/common/notification.js';
++import { IProductService } from '../../../../platform/product/common/productService.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
++import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++import { INativeWorkbenchEnvironmentService } from '../../../services/environment/electron-browser/environmentService.js';
++import { IHostService } from '../../../services/host/browser/host.js';
++
++/** Ligada pela extensão arara-ai quando o ac-services diz que há versão nova. */
++const UpdateAvailable = new RawContextKey<boolean>('arara.update.available', false);
++/** Ligada aqui quando o pacote novo já está instalado no disco (falta reiniciar). */
++const UpdateInstalled = new RawContextKey<boolean>('arara.update.installed', false, localize('arara.update.installed', "A newer Arara Code is installed and waits for a restart"));
++
++const OPEN_COMMAND = 'arara.update.open'; // registrado pela extensão arara-ai
++const RESTART_COMMAND = 'arara.update.restart';
++const POLL_MS = 30_000;
++const COUNTDOWN_S = 10;
++/** Context keys de "IA gerando" (arara-ai: chat e CLIs). */
++const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running'];
++
++const notInAuxWindow = IsAuxiliaryWindowContext.negate();
++
++// order -1: fica à esquerda dos botões de layout (Customize Layout tem order 0)
++MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++	group: 'navigation',
++	order: -1,
++	command: { id: OPEN_COMMAND, title: localize('arara.update.open', "Atualizar") },
++	when: ContextKeyExpr.and(notInAuxWindow, UpdateAvailable, UpdateInstalled.negate()),
++});
++
++registerAction2(class extends Action2 {
++	constructor() {
++		super({
++			id: RESTART_COMMAND,
++			title: localize2('arara.update.restart', "Reiniciar para atualizar"),
++			f1: true,
++			precondition: UpdateInstalled,
++			menu: { id: MenuId.LayoutControlMenu, group: 'navigation', order: -1, when: ContextKeyExpr.and(notInAuxWindow, UpdateInstalled) },
++		});
++	}
++	run(accessor: ServicesAccessor): Promise<void> {
++		return accessor.get(INativeHostService).relaunch();
++	}
++});
++
++/** Botão com texto (os vizinhos são só ícone): "⤓ Atualizar" / "↻ Reiniciar para atualizar". */
++class AraraUpdateActionViewItem extends MenuEntryActionViewItem {
++	override render(container: HTMLElement): void {
++		super.render(container);
++		container.classList.add('arara-update-action');
++	}
++
++	protected override updateLabel(): void {
++		if (!this.label) {
++			return;
++		}
++		const icon = this._commandAction.id === RESTART_COMMAND ? '$(debug-restart)' : '$(cloud-download)';
++		reset(this.label, ...renderLabelWithIcons(`${icon} ${this._commandAction.label}`));
++	}
++}
++
++export class AraraUpdateContribution extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.araraUpdate';
++
++	private readonly installed = UpdateInstalled.bindTo(this.contextKeyService);
++	private readonly productJson: URI;
++	/** Versão vista na leitura anterior: só age quando duas leituras seguidas concordam (dpkg terminou). */
++	private seen: string | undefined;
++	private handled = false;
++	private readonly prompt = this._register(new MutableDisposable());
++
++	constructor(
++		@IActionViewItemService actionViewItemService: IActionViewItemService,
++		@IInstantiationService instantiationService: IInstantiationService,
++		@IContextKeyService private readonly contextKeyService: IContextKeyService,
++		@IFileService private readonly fileService: IFileService,
++		@INativeWorkbenchEnvironmentService environmentService: INativeWorkbenchEnvironmentService,
++		@IProductService private readonly productService: IProductService,
++		@INativeHostService private readonly nativeHostService: INativeHostService,
++		@INotificationService private readonly notificationService: INotificationService,
++		@IHostService hostService: IHostService,
++		@ILogService private readonly logService: ILogService,
++	) {
++		super();
++
++		for (const id of [OPEN_COMMAND, RESTART_COMMAND]) {
++			this._register(actionViewItemService.register(MenuId.LayoutControlMenu, id, (action, options) =>
++				action instanceof MenuItemAction ? instantiationService.createInstance(AraraUpdateActionViewItem, action, { ...options, hoverDelegate: options.hoverDelegate }) : undefined
++			));
++		}
++
++		this.productJson = joinPath(URI.file(environmentService.appRoot), 'product.json');
++
++		// modo dev (scripts/dev.sh): appRoot é o código-fonte, não um pacote instalado
++		if (!environmentService.isBuilt) {
++			return;
++		}
++
++		const timer = this._register(new IntervalTimer());
++		timer.cancelAndSet(() => void this.check(), POLL_MS, mainWindow);
++		this._register(hostService.onDidChangeFocus(focused => focused && void this.check()));
++	}
++
++	private async check(): Promise<void> {
++		if (this.handled) {
++			return;
++		}
++		let onDisk: string | undefined;
++		try {
++			const raw = (await this.fileService.readFile(this.productJson)).value.toString();
++			const v = (JSON.parse(raw) as { version?: unknown }).version;
++			onDisk = typeof v === 'string' ? v : undefined;
++		} catch {
++			// no meio do dpkg o arquivo some/fica pela metade; tenta no próximo ciclo
++			this.seen = undefined;
++			return;
++		}
++		if (!onDisk || onDisk === this.productService.version) {
++			this.seen = undefined;
++			return;
++		}
++		if (this.seen !== onDisk) {
++			this.seen = onDisk; // espera a próxima leitura confirmar
++			return;
++		}
++
++		this.handled = true;
++		this.installed.set(true);
++		this.logService.info(`[arara] versão ${onDisk} instalada no disco (rodando ${this.productService.version}); reiniciando`);
++
++		// várias janelas: só a de menor id pergunta; as outras só mostram o botão "Reiniciar"
++		const windows = await this.nativeHostService.getWindows({ includeAuxiliaryWindows: false });
++		if (Math.min(...windows.map(w => w.id)) !== this.nativeHostService.windowId) {
++			return;
++		}
++		void this.countdown(onDisk);
++	}
++
++	private aiRunning(): boolean {
++		return AI_RUNNING_KEYS.some(k => this.contextKeyService.getContextKeyValue<boolean>(k) === true);
++	}
++
++	private async countdown(version: string): Promise<void> {
++		let cancelled = false;
++		const message = (s: number) => this.aiRunning()
++			? localize('arara.update.waitingAi', "Arara Code {0} foi instalado. Reinicia assim que a IA terminar a resposta.", version)
++			: localize('arara.update.countdown', "Arara Code {0} foi instalado. Reiniciando em {1} s para aplicar a atualização.", version, s);
++
++		const handle: INotificationHandle = this.notificationService.prompt(Severity.Info, message(COUNTDOWN_S), [
++			{ label: localize('arara.update.now', "Reiniciar agora"), run: () => { cancelled = true; void this.nativeHostService.relaunch(); } },
++			{ label: localize('arara.update.later', "Depois"), run: () => { cancelled = true; } },
++		], { sticky: true, priority: NotificationPriority.URGENT, onCancel: () => { cancelled = true; } });
++		this.prompt.value = toDisposable(() => handle.close());
++
++		for (let s = COUNTDOWN_S; s > 0; s--) {
++			// com a IA gerando, segura o relógio (não perde a resposta no meio)
++			while (!cancelled && this.aiRunning()) {
++				handle.updateMessage(message(s));
++				await timeout(1000);
++			}
++			if (cancelled) {
++				return;
++			}
++			handle.updateMessage(message(s));
++			await timeout(1000);
++		}
++		if (!cancelled) {
++			handle.close();
++			await this.nativeHostService.relaunch();
++		}
++	}
++}
++
++registerWorkbenchContribution2(AraraUpdateContribution.ID, AraraUpdateContribution, WorkbenchPhase.Eventually);
+--- /dev/null
++++ b/src/vs/workbench/contrib/arara/electron-browser/media/araraUpdate.css
+@@ -0,0 +1,22 @@
++/* Arara Code: botão "Atualizar" / "Reiniciar para atualizar" na barra de título (ao lado do Customize Layout). */
++.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label {
++	display: flex;
++	align-items: center;
++	gap: 4px;
++	width: auto;
++	padding: 0 8px;
++	border-radius: 4px;
++	font-size: 12px;
++	white-space: nowrap;
++	color: var(--vscode-button-foreground);
++	background-color: var(--vscode-button-background);
++}
++
++.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label:hover {
++	background-color: var(--vscode-button-hoverBackground);
++}
++
++.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label .codicon {
++	color: inherit;
++	font-size: 14px;
++}
+
+--- /dev/null
++++ b/src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts
+@@ -0,0 +1,213 @@
++/*---------------------------------------------------------------------------------------------
++ *  Arara Code: atualização da IDE.
++ *
++ *  1. Botão "Atualizar" na barra de título, à esquerda do Customize Layout
++ *     (MenuId.LayoutControlMenu). Aparece quando a extensão arara-ai liga a
++ *     context key `arara.update.available` (ela pergunta ao ac-services a cada
++ *     5 min) e roda `arara.update.open` (abre a página da release no GitHub).
++ *  2. Pacote novo no disco: o `apt install ./arara-code_*.deb` troca os arquivos
++ *     em /usr/share/arara-code com a IDE aberta, mas o processo continua com o
++ *     código antigo na memória. Aqui o workbench relê `<appRoot>/product.json`
++ *     a cada 30 s (e ao ganhar foco); se a versão no disco for outra, mostra um
++ *     aviso com contagem de 10 s e reinicia o app inteiro (relaunch nativo: o
++ *     main process sai e o binário novo sobe no mesmo caminho). O hot exit
++ *     guarda arquivos não salvos e as janelas reabrem.
++ *     "Depois" troca o botão do topo por "Reiniciar para atualizar".
++ *     Se alguma IA estiver gerando resposta, a contagem espera ela terminar.
++ *--------------------------------------------------------------------------------------------*/
++
++import './media/araraUpdate.css';
++import { reset } from '../../../../base/browser/dom.js';
++import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
++import { IntervalTimer, timeout } from '../../../../base/common/async.js';
++import { Disposable, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
++import { joinPath } from '../../../../base/common/resources.js';
++import { URI } from '../../../../base/common/uri.js';
++import { mainWindow } from '../../../../base/browser/window.js';
++import { localize, localize2 } from '../../../../nls.js';
++import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
++import { MenuEntryActionViewItem } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
++import { Action2, MenuId, MenuItemAction, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { ContextKeyExpr, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
++import { IFileService } from '../../../../platform/files/common/files.js';
++import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
++import { ILogService } from '../../../../platform/log/common/log.js';
++import { INativeHostService } from '../../../../platform/native/common/native.js';
++import { INotificationHandle, INotificationService, NotificationPriority, Severity } from '../../../../platform/notification/common/notification.js';
++import { IProductService } from '../../../../platform/product/common/productService.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
++import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++import { INativeWorkbenchEnvironmentService } from '../../../services/environment/electron-browser/environmentService.js';
++import { IHostService } from '../../../services/host/browser/host.js';
++
++/** Ligada pela extensão arara-ai quando o ac-services diz que há versão nova. */
++const UpdateAvailable = new RawContextKey<boolean>('arara.update.available', false);
++/** Ligada aqui quando o pacote novo já está instalado no disco (falta reiniciar). */
++const UpdateInstalled = new RawContextKey<boolean>('arara.update.installed', false, localize('arara.update.installed', "A newer Arara Code is installed and waits for a restart"));
++
++const OPEN_COMMAND = 'arara.update.open'; // registrado pela extensão arara-ai
++const RESTART_COMMAND = 'arara.update.restart';
++const POLL_MS = 30_000;
++const COUNTDOWN_S = 10;
++/** Context keys de "IA gerando" (arara-ai: chat e CLIs). */
++const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running'];
++
++const notInAuxWindow = IsAuxiliaryWindowContext.negate();
++
++// order -1: fica à esquerda dos botões de layout (Customize Layout tem order 0)
++MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++	group: 'navigation',
++	order: -1,
++	command: { id: OPEN_COMMAND, title: localize('arara.update.open', "Atualizar") },
++	when: ContextKeyExpr.and(notInAuxWindow, UpdateAvailable, UpdateInstalled.negate()),
++});
++
++registerAction2(class extends Action2 {
++	constructor() {
++		super({
++			id: RESTART_COMMAND,
++			title: localize2('arara.update.restart', "Reiniciar para atualizar"),
++			f1: true,
++			precondition: UpdateInstalled,
++			menu: { id: MenuId.LayoutControlMenu, group: 'navigation', order: -1, when: ContextKeyExpr.and(notInAuxWindow, UpdateInstalled) },
++		});
++	}
++	run(accessor: ServicesAccessor): Promise<void> {
++		return accessor.get(INativeHostService).relaunch();
++	}
++});
++
++/**
++ * Botão com texto (os vizinhos são só ícone): "⤓ Atualizar" / "↻ Reiniciar para atualizar".
++ * Os itens de menu acima não têm `icon`, então o MenuEntryActionViewItem renderiza como
++ * rótulo e aqui só trocamos o texto puro por ícone + texto.
++ */
++class AraraUpdateActionViewItem extends MenuEntryActionViewItem {
++	override render(container: HTMLElement): void {
++		super.render(container);
++		container.classList.add('arara-update-action');
++	}
++
++	protected override updateLabel(): void {
++		if (!this.label) {
++			return;
++		}
++		const icon = this._commandAction.id === RESTART_COMMAND ? '$(debug-restart)' : '$(cloud-download)';
++		reset(this.label, ...renderLabelWithIcons(`${icon} ${this._commandAction.label}`));
++	}
++}
++
++export class AraraUpdateContribution extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.araraUpdate';
++
++	private readonly installed = UpdateInstalled.bindTo(this.contextKeyService);
++	private readonly productJson: URI;
++	/** Versão vista na leitura anterior: só age quando duas leituras seguidas concordam (dpkg terminou). */
++	private seen: string | undefined;
++	private handled = false;
++	private readonly prompt = this._register(new MutableDisposable());
++
++	constructor(
++		@IActionViewItemService actionViewItemService: IActionViewItemService,
++		@IInstantiationService instantiationService: IInstantiationService,
++		@IContextKeyService private readonly contextKeyService: IContextKeyService,
++		@IFileService private readonly fileService: IFileService,
++		@INativeWorkbenchEnvironmentService environmentService: INativeWorkbenchEnvironmentService,
++		@IProductService private readonly productService: IProductService,
++		@INativeHostService private readonly nativeHostService: INativeHostService,
++		@INotificationService private readonly notificationService: INotificationService,
++		@IHostService hostService: IHostService,
++		@ILogService private readonly logService: ILogService,
++	) {
++		super();
++
++		for (const id of [OPEN_COMMAND, RESTART_COMMAND]) {
++			this._register(actionViewItemService.register(MenuId.LayoutControlMenu, id, (action, options) =>
++				action instanceof MenuItemAction ? instantiationService.createInstance(AraraUpdateActionViewItem, action, options) : undefined
++			));
++		}
++
++		this.productJson = joinPath(URI.file(environmentService.appRoot), 'product.json');
++
++		// modo dev (scripts/dev.sh): appRoot é o código-fonte, não um pacote instalado
++		if (!environmentService.isBuilt) {
++			return;
++		}
++
++		const timer = this._register(new IntervalTimer());
++		timer.cancelAndSet(() => void this.check(), POLL_MS, mainWindow);
++		this._register(hostService.onDidChangeFocus(focused => focused && void this.check()));
++	}
++
++	private async check(): Promise<void> {
++		if (this.handled) {
++			return;
++		}
++		let onDisk: string | undefined;
++		try {
++			const raw = (await this.fileService.readFile(this.productJson)).value.toString();
++			const v = (JSON.parse(raw) as { version?: unknown }).version;
++			onDisk = typeof v === 'string' ? v : undefined;
++		} catch {
++			// no meio do dpkg o arquivo some/fica pela metade; tenta no próximo ciclo
++			this.seen = undefined;
++			return;
++		}
++		if (!onDisk || onDisk === this.productService.version) {
++			this.seen = undefined;
++			return;
++		}
++		if (this.seen !== onDisk) {
++			this.seen = onDisk; // espera a próxima leitura confirmar
++			return;
++		}
++
++		this.handled = true;
++		this.installed.set(true);
++		this.logService.info(`[arara] versão ${onDisk} instalada no disco (rodando ${this.productService.version}); reiniciando`);
++
++		// várias janelas: só a de menor id pergunta; as outras só mostram o botão "Reiniciar"
++		const windows = await this.nativeHostService.getWindows({ includeAuxiliaryWindows: false });
++		if (Math.min(...windows.map(w => w.id)) !== this.nativeHostService.windowId) {
++			return;
++		}
++		void this.countdown(onDisk);
++	}
++
++	private aiRunning(): boolean {
++		return AI_RUNNING_KEYS.some(k => this.contextKeyService.getContextKeyValue<boolean>(k) === true);
++	}
++
++	private async countdown(version: string): Promise<void> {
++		let cancelled = false;
++		const message = (s: number) => this.aiRunning()
++			? localize('arara.update.waitingAi', "Arara Code {0} foi instalado. Reinicia assim que a IA terminar a resposta.", version)
++			: localize('arara.update.countdown', "Arara Code {0} foi instalado. Reiniciando em {1} s para aplicar a atualização.", version, s);
++
++		const handle: INotificationHandle = this.notificationService.prompt(Severity.Info, message(COUNTDOWN_S), [
++			{ label: localize('arara.update.now', "Reiniciar agora"), run: () => { cancelled = true; void this.nativeHostService.relaunch(); } },
++			{ label: localize('arara.update.later', "Depois"), run: () => { cancelled = true; } },
++		], { sticky: true, priority: NotificationPriority.URGENT, onCancel: () => { cancelled = true; } });
++		this.prompt.value = toDisposable(() => handle.close());
++
++		for (let s = COUNTDOWN_S; s > 0; s--) {
++			// com a IA gerando, segura o relógio (não perde a resposta no meio)
++			while (!cancelled && this.aiRunning()) {
++				handle.updateMessage(message(s));
++				await timeout(1000);
++			}
++			if (cancelled) {
++				return;
++			}
++			handle.updateMessage(message(s));
++			await timeout(1000);
++		}
++		if (!cancelled) {
++			handle.close();
++			await this.nativeHostService.relaunch();
++		}
++	}
++}
++
++registerWorkbenchContribution2(AraraUpdateContribution.ID, AraraUpdateContribution, WorkbenchPhase.Eventually);
+--- /dev/null
++++ b/src/vs/workbench/contrib/arara/electron-browser/media/araraUpdate.css
+@@ -0,0 +1,22 @@
++/* Arara Code: botão "Atualizar" / "Reiniciar para atualizar" na barra de título (ao lado do Customize Layout). */
++.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label {
++	display: flex;
++	align-items: center;
++	gap: 4px;
++	width: auto;
++	padding: 0 8px;
++	border-radius: 4px;
++	font-size: 12px;
++	white-space: nowrap;
++	color: var(--vscode-button-foreground);
++	background-color: var(--vscode-button-background);
++}
++
++.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label:hover {
++	background-color: var(--vscode-button-hoverBackground);
++}
++
++.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label .codicon {
++	color: inherit;
++	font-size: 14px;
++}
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -197,6 +197,9 @@
+ // Emergency Alert
+ import './contrib/emergencyAlert/electron-browser/emergencyAlert.contribution.js';
+ 
++// Arara Code: botão Atualizar + reinício quando o pacote novo é instalado
++import './contrib/arara/electron-browser/araraUpdate.contribution.js';
++
+ // MCP
+ import './contrib/mcp/electron-browser/mcp.contribution.js';
+ 
