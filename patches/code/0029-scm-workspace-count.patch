@@ -1,0 +1,41 @@
+Arara Code: count changes across all workspace repositories in the SCM badge.
+
+Why a patch: scm.countBadge=all currently counts only visible repositories.
+Neither the stable nor proposed extension API exposes the built-in SCM activity
+badge or changes its repository selection. Use the SCM service's full repository
+collection, observing additions/removals and preserving focused/off modes.
+Touches: src/vs/workbench/contrib/scm/browser/activity.ts
+
+--- a/src/vs/workbench/contrib/scm/browser/activity.ts
++++ b/src/vs/workbench/contrib/scm/browser/activity.ts
+@@ -29,7 +29,7 @@
+ };
+ 
+ export class SCMActiveRepositoryController extends Disposable implements IWorkbenchContribution {
+-	private readonly _visibleRepositories: IObservable<readonly ISCMRepository[]>;
++	private readonly _repositories: IObservable<readonly ISCMRepository[]>;
+ 	private readonly _activeRepositoryHistoryItemRefName: IObservable<string | undefined>;
+ 	private readonly _countBadgeConfig: IObservable<'all' | 'focused' | 'off'>;
+ 	private readonly _countBadgeRepositories: IObservable<readonly { provider: ISCMProvider; resourceCount: IObservable<number> }[]>;
+@@ -59,9 +59,9 @@
+ 
+ 		this._countBadgeConfig = observableConfigValue<'all' | 'focused' | 'off'>('scm.countBadge', 'all', this.configurationService);
+ 
+-		this._visibleRepositories = observableFromEvent(this,
+-			Event.any(this.scmViewService.onDidChangeVisibleRepositories, this.scmService.onDidAddRepository, this.scmService.onDidRemoveRepository),
+-			() => this.scmViewService.visibleRepositories);
++		this._repositories = observableFromEvent(this,
++			Event.any(this.scmService.onDidAddRepository, this.scmService.onDidRemoveRepository),
++			() => Array.from(this.scmService.repositories));
+ 
+ 		this._activeRepositoryHistoryItemRefName = derived(reader => {
+ 			const activeRepository = this.scmViewService.activeRepository.read(reader);
+@@ -74,7 +74,7 @@
+ 		this._countBadgeRepositories = derived(this, reader => {
+ 			switch (this._countBadgeConfig.read(reader)) {
+ 				case 'all': {
+-					const repositories = this._visibleRepositories.read(reader);
++					const repositories = this._repositories.read(reader);
+ 					return repositories.map(r => ({ provider: r.provider, resourceCount: this._getRepositoryResourceCount(r) }));
+ 				}
+ 				case 'focused': {
