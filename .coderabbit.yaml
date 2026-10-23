@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://www.coderabbit.ai/integrations/schema.v2.json
+language: pt-BR
+reviews:
+  profile: assertive
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - ".*"
+  path_instructions:
+    - path: "**/*"
+      instructions: >-
+        Revise riscos de execução de comandos, downloads e atualizações sem verificação,
+        exfiltração, código ofuscado, bypass de autenticação, dependências suspeitas,
+        alterações de workflows e incompatibilidade de licenças. Explique evidências
+        concretas; não declare ausência garantida de malware ou conformidade jurídica.
+        Não gere assinaturas de IA nem trailers de coautoria em commits.
