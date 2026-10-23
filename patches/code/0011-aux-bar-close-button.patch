@@ -1,0 +1,34 @@
+Arara Code: botão de fechar (X) na barra do Secondary Side Bar sempre visível.
+
+O VS Code só mostrava o X de "Hide Secondary Side Bar" (ao lado do botão de
+maximizar) quando a activity bar estava na posição 'default'. Como nosso padrão
+põe a activity bar no topo (workbench.activityBar.location = 'top', patch 0003),
+esse X ficava escondido. Removemos o `when` para o X aparecer junto do maximizar
+independentemente da posição da activity bar. O comando é o mesmo
+workbench.action.toggleAuxiliaryBar (fecha/esconde o painel lateral da direita).
+
+Why a patch: a barra de título do Secondary Side Bar (MenuId.AuxiliaryBarTitle) e
+a condição `when` dessa ação são do core; não há API de extensão para alterá-las.
+Touches: src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
+
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
+@@ -11,7 +11,7 @@
+ import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+ import { AuxiliaryBarMaximizedContext, AuxiliaryBarVisibleContext, IsAuxiliaryWindowContext, SecondarySideBarVisibleContext } from '../../../common/contextkeys.js';
+ import { ViewContainerLocation, ViewContainerLocationToString } from '../../../common/views.js';
+-import { ActivityBarPosition, IWorkbenchLayoutService, LayoutSettings, Parts } from '../../../services/layout/browser/layoutService.js';
++import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
+ import { IPaneCompositePartService } from '../../../services/panecomposite/browser/panecomposite.js';
+ import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
+ import { KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
+@@ -81,7 +81,8 @@
+ 	},
+ 	group: 'navigation',
+ 	order: 2,
+-	when: ContextKeyExpr.equals(`config.${LayoutSettings.ACTIVITY_BAR_LOCATION}`, ActivityBarPosition.DEFAULT)
++	// Arara Code: mostra o X de fechar ao lado do maximizar mesmo com a activity bar
++	// no topo (nosso padrão). O VS Code só mostrava quando a activity bar era 'default'.
+ });
+ 
+ registerAction2(class extends Action2 {
