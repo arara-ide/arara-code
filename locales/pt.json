@@ -1,0 +1,23 @@
+{
+  "Update": "Atualizar",
+  "Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} foi instalado. Fecha assim que a IA terminar a resposta; depois, abra o Arara Code de novo.",
+  "Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} foi instalado. Reinicia assim que a IA terminar a resposta.",
+  "Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} foi instalado. Fechando em {1} s para aplicar a atualização; depois, abra o Arara Code de novo.",
+  "Arara Code {0} is installed. Restarting in {1} s to apply the update.": "Arara Code {0} foi instalado. Reiniciando em {1} s para aplicar a atualização.",
+  "Close now": "Fechar agora",
+  "Restart now": "Reiniciar agora",
+  "Later": "Depois",
+  "Trust this workspace?": "Confiar neste workspace?",
+  "Trust this folder?": "Confiar nesta pasta?",
+  "Trust everything inside '{0}'": "Confiar em tudo dentro de '{0}'",
+  "Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Sem confiança, a pasta abre em modo restrito: o agente e as tarefas não executam nada.",
+  "&&Trust": "&&Confiar",
+  "&&Restricted mode": "&&Modo restrito",
+  "Generate commit message with AI": "Gerar mensagem de commit com IA",
+  "AI command": "Comando com IA",
+  "Restart to update": "Reiniciar para atualizar",
+  "Close to update": "Fechar para atualizar",
+  "New platform terminal": "Novo terminal de plataforma",
+  "Welcome to Arara Code": "Bem-vindo ao Arara Code",
+  "Arara Code settings": "Configurações do Arara Code"
+}

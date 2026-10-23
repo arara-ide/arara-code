@@ -25,6 +25,9 @@ try {
   fs.mkdirSync(path.join(extension, 'node_modules'), { recursive: true });
   write(path.join(extension, 'package.json'), JSON.stringify({ publisher: 'arara', name: 'arara-orchestra', main: './dist/extension.js', extensionDependencies: ['arara.arara-ai'] }));
   const assets = {
+    'package.nls.json': '{"test":"Settings"}',
+    'package.nls.pt-br.json': '{"test":"Configurações"}',
+    'package.nls.es.json': '{"test":"Configuración"}',
     'dist/extension.js': '// extension bundle',
     'dist/webview/webview.js': '// browser bundle',
     'media/orquestra.css': 'body {}',

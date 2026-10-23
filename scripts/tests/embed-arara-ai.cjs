@@ -28,6 +28,9 @@ try {
     contributes: { configuration: { properties: { 'arara.apiUrl': {}, 'arara.webUrl': {} } } },
   }));
   const assets = {
+    'package.nls.json': '{"test":"Settings"}',
+    'package.nls.pt-br.json': '{"test":"Configurações"}',
+    'package.nls.es.json': '{"test":"Configuración"}',
     'dist/extension.js': '// extension bundle',
     'media/chat.css': 'body {}',
     'media/marked.min.js': '// markdown',

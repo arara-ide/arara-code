@@ -42,13 +42,14 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
  
 --- /dev/null
 +++ b/src/vs/workbench/browser/startupWebview.ts
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,49 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
 + *--------------------------------------------------------------------------------------------*/
 +
 +import './media/startupWebview.css';
++import { localize } from '../../nls.js';
 +import { Disposable } from '../../base/common/lifecycle.js';
 +import { IContextKeyService } from '../../platform/contextkey/common/contextkey.js';
 +import { IExtensionStorageService } from '../../platform/extensionManagement/common/extensionStorage.js';
@@ -73,7 +74,7 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
 +		const placeholder = document.createElement('div');
 +		placeholder.className = 'startup-webview-placeholder';
 +		placeholder.setAttribute('role', 'status');
-+		placeholder.textContent = startup?.title ?? product.nameLong;
++		placeholder.textContent = localize('arara.startup.title', 'Welcome to Arara Code');
 +		container.appendChild(placeholder);
 +		const update = () => {
 +			const active = !!contextKeys.getContextKeyValue('arara.modal.viewType');

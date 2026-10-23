@@ -31,7 +31,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +/*---------------------------------------------------------------------------------------------
 + *  Arara Code: atualização da IDE.
 + *
-+ *  1. Botão "Atualizar" na barra de título, à esquerda do Customize Layout
++ *  1. Botão "Update" na barra de título, à esquerda do Customize Layout
 + *     (MenuId.LayoutControlMenu). Aparece quando a extensão arara-ai liga a
 + *     context key `arara.update.available` (ela pergunta ao ac-services a cada
 + *     5 min) e roda `arara.update.open` (abre a página da release no GitHub).
@@ -43,7 +43,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 + *     main process sai e o binário novo sobe no mesmo caminho). O hot exit
 + *     guarda arquivos não salvos e as janelas reabrem. No Linux só fecha (o
 + *     usuário abre o Arara Code de novo).
-+ *     "Depois" troca o botão do topo por "Reiniciar para atualizar".
++ *     "Later" troca o botão do topo por "Restart to update".
 + *     Se alguma IA estiver gerando resposta, a contagem espera ela terminar.
 + *--------------------------------------------------------------------------------------------*/
 +
@@ -95,7 +95,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +	group: 'navigation',
 +	order: -1,
-+	command: { id: OPEN_COMMAND, title: localize('arara.update.open', "Atualizar") },
++	command: { id: OPEN_COMMAND, title: localize('arara.update.open', "Update") },
 +	when: ContextKeyExpr.and(notInAuxWindow, UpdateAvailable, UpdateInstalled.negate()),
 +});
 +
@@ -103,7 +103,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +	constructor() {
 +		super({
 +			id: RESTART_COMMAND,
-+			title: isLinux ? localize2('arara.update.close', "Fechar para atualizar") : localize2('arara.update.restart', "Reiniciar para atualizar"),
++			title: isLinux ? localize2('arara.update.close', "Close to update") : localize2('arara.update.restart', "Restart to update"),
 +			f1: true,
 +			precondition: UpdateInstalled,
 +			menu: { id: MenuId.LayoutControlMenu, group: 'navigation', order: -1, when: ContextKeyExpr.and(notInAuxWindow, UpdateInstalled) },
@@ -220,15 +220,15 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		let cancelled = false;
 +		const message = (s: number) => this.aiRunning()
 +			? (isLinux
-+				? localize('arara.update.waitingAiClose', "Arara Code {0} foi instalado. Fecha assim que a IA terminar a resposta; depois, abra o Arara Code de novo.", version)
-+				: localize('arara.update.waitingAi', "Arara Code {0} foi instalado. Reinicia assim que a IA terminar a resposta.", version))
++				? localize('arara.update.waitingAiClose', "Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.", version)
++				: localize('arara.update.waitingAi', "Arara Code {0} is installed. It will restart when the AI finishes responding.", version))
 +			: isLinux
-+				? localize('arara.update.countdownClose', "Arara Code {0} foi instalado. Fechando em {1} s para aplicar a atualização; depois, abra o Arara Code de novo.", version, s)
-+				: localize('arara.update.countdown', "Arara Code {0} foi instalado. Reiniciando em {1} s para aplicar a atualização.", version, s);
++				? localize('arara.update.countdownClose', "Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.", version, s)
++				: localize('arara.update.countdown', "Arara Code {0} is installed. Restarting in {1} s to apply the update.", version, s);
 +
 +		const handle: INotificationHandle = this.notificationService.prompt(Severity.Info, message(COUNTDOWN_S), [
-+			{ label: isLinux ? localize('arara.update.closeNow', "Fechar agora") : localize('arara.update.now', "Reiniciar agora"), run: () => { cancelled = true; void restart(this.nativeHostService); } },
-+			{ label: localize('arara.update.later', "Depois"), run: () => { cancelled = true; } },
++			{ label: isLinux ? localize('arara.update.closeNow', "Close now") : localize('arara.update.now', "Restart now"), run: () => { cancelled = true; void restart(this.nativeHostService); } },
++			{ label: localize('arara.update.later', "Later"), run: () => { cancelled = true; } },
 +		], { sticky: true, priority: NotificationPriority.URGENT, onCancel: () => { cancelled = true; } });
 +		this.prompt.value = toDisposable(() => handle.close());
 +
@@ -255,7 +255,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/media/araraUpdate.css
 @@ -0,0 +1,22 @@
-+/* Arara Code: botão "Atualizar" / "Reiniciar para atualizar" na barra de título (ao lado do Customize Layout). */
++/* Arara Code: botão "Update" / "Restart to update" na barra de título (ao lado do Customize Layout). */
 +.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label {
 +	display: flex;
 +	align-items: center;

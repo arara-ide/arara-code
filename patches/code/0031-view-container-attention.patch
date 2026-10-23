@@ -27,7 +27,7 @@ Touches: src/vs/workbench/browser/parts/compositeBarActions.ts
 +const viewContainerAttention = new Map<string, string>();
 +const viewContainerAttentionChanged = new Emitter<string>();
 +CommandsRegistry.registerCommand('_workbench.setViewContainerAttention', (_accessor, id: unknown, color: unknown) => {
-+	if (typeof id !== 'string' || !id || (color !== undefined && (typeof color !== 'string' || !color))) {
++	if (typeof id !== 'string' || !id || (color !== undefined && color !== null && (typeof color !== 'string' || !color))) {
 +		return;
 +	}
 +	if (typeof color === 'string') {
@@ -51,11 +51,14 @@ Touches: src/vs/workbench/browser/parts/compositeBarActions.ts
  	}
  
  	protected get compositeBarActionItem(): ICompositeBarActionItem {
-@@ -193,7 +211,9 @@
+@@ -193,7 +211,12 @@
  
  		if (this.label) {
  			if (this.options.icon) {
 -				const foreground = this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;
++				if (this._action.checked) {
++					viewContainerAttention.delete(this.compositeBarActionItem.id);
++				}
 +				const attentionColor = !this._action.checked && viewContainerAttention.get(this.compositeBarActionItem.id);
 +				const foreground = attentionColor ? theme.getColor(attentionColor) ?? colors.inactiveForegroundColor
 +					: this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;

@@ -40,7 +40,7 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
 +				item: {
 +					command: {
 +						id: 'arara.terminal.command',
-+						title: localize('arara.terminal.command', "Comando com IA"),
++						title: localize('arara.terminal.command', "AI command"),
 +						icon: Codicon.sparkle
 +					},
 +					group: 'navigation',
@@ -70,7 +70,7 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
 +		// Arara Code: comando de terminal com IA entre o split e a lixeira, no terminal desta linha
 +		// (só se a extensão arara-ai registrou o comando)
 +		if (CommandsRegistry.getCommand('arara.terminal.command')) {
-+			actions.push(template.elementDisposables.add(new Action('arara.terminal.command', localize('arara.terminal.command', "Comando com IA"), ThemeIcon.asClassName(Codicon.sparkle), true, async () => {
++			actions.push(template.elementDisposables.add(new Action('arara.terminal.command', localize('arara.terminal.command', "AI command"), ThemeIcon.asClassName(Codicon.sparkle), true, async () => {
 +				this._terminalService.setActiveInstance(instance);
 +				await this._commandService.executeCommand('arara.terminal.command');
 +			})));

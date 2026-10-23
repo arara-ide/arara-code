@@ -2,7 +2,7 @@ Arara Code: gancho genérico de lançador (só ícone) na barra de título.
 
 - contrib/arara/electron-browser/araraTitleLauncher.contribution.ts (novo): item em
   MenuId.LayoutControlMenu (order -2, à esquerda do "Atualizar" do 0015 e do Customize
-  Layout) com o ícone `arara-logo`, que a extensão contribui via contributes.icons.
+  Layout) com o ícone `sparkle` (estrelinha de IA).
   Só aparece com a context key `arara.ui.titleLauncher` ligada pela extensão; o clique
   roda `arara.ui.titleLauncher.run`. O que abre (hoje: a seção lateral do Arara AI) é
   decisão da extensão arara-ai.
@@ -15,17 +15,17 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,39 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Arara Code: gancho genérico de lançador (só ícone) na barra de título.
 + *
-+ *  Botão à esquerda do "Atualizar" e do Customize Layout (MenuId.LayoutControlMenu).
++ *  Botão à esquerda do "Update" e do Customize Layout (MenuId.LayoutControlMenu).
 + *  Aparece quando a extensão liga a context key `arara.ui.titleLauncher` e o clique
-+ *  roda `arara.ui.titleLauncher.run`. O ícone `arara-logo`
-+ *  é contribuído pela extensão (contributes.icons). O que o botão abre é decisão dela.
++ *  roda `arara.ui.titleLauncher.run`. O ícone é `Codicon.sparkle` (estrelinha de IA).
++ *  O que o botão abre é decisão da extensão.
 + *--------------------------------------------------------------------------------------------*/
 +
-+import { ThemeIcon } from '../../../../base/common/themables.js';
++import { Codicon } from '../../../../base/common/codicons.js';
 +import { localize } from '../../../../nls.js';
 +import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
 +import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
@@ -38,10 +38,23 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +	command: {
 +		id: 'arara.ui.titleLauncher.run', // registrado pela extensão
 +		title: localize('arara.ui.titleLauncher', "Arara"),
-+		icon: ThemeIcon.fromId('arara-logo'),
++		icon: Codicon.sparkle,
 +	},
 +	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.ui.titleLauncher')),
 +});
++
++// File > Preferences (e engrenagem): logo abaixo de Settings (2_configuration, order 2)
++for (const id of [MenuId.MenubarPreferencesMenu, MenuId.GlobalActivity]) {
++	MenuRegistry.appendMenuItem(id, {
++		group: '2_configuration',
++		order: 2.5,
++		command: {
++			id: 'arara.openSettings',
++			title: localize('arara.openSettings', "Arara Code settings"),
++		},
++		when: ContextKeyExpr.has('arara.ui.titleLauncher'),
++	});
++}
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
 @@ -200,6 +200,9 @@

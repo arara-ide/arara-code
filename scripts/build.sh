@@ -89,6 +89,8 @@ mv "${WORK}/product.json.tmp" "${WORK}/product.json"
 printf '\nbash "%s/scripts/default-extensions.sh" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
 
 # --- 5. patches no Code-OSS
+node "${ROOT}/scripts/check-patches.cjs"
+node "${ROOT}/scripts/generate-localization.cjs" --check
 mkdir -p "${WORK}/patches/user"
 for p in "${ROOT}"/patches/code/*.patch; do
   cp "${p}" "${WORK}/patches/user/"
@@ -157,6 +159,7 @@ embed_arara_ai() {
   mkdir -p "${dest}"
   # mesmo conjunto do .vscodeignore: só o que roda (sem src/, testes, node_modules)
   cp "${ARARA_AI_DIR}/package.json" "${dest}/"
+  for catalog in "${ARARA_AI_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
   node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
   [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"
   [[ -f "${ARARA_AI_DIR}/.vscodeignore" ]] && cp "${ARARA_AI_DIR}/.vscodeignore" "${dest}/"
@@ -176,6 +179,7 @@ embed_arara_bot() {
   rm -rf "${dest}"
   mkdir -p "${dest}/dist"
   cp "${src}/package.json" "${src}/LICENSE" "${src}/NOTICE" "${dest}/"
+  for catalog in "${src}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
   # extension.js (host), hub.js (processo da máquina), bridge.js (MCP do navegador), webview.js (interface)
   local f
   for f in extension hub bridge webview; do cp "${src}/dist/${f}.js" "${dest}/dist/"; done
@@ -193,6 +197,7 @@ embed_arara_orchestra() {
   rm -rf "${dest}"
   mkdir -p "${dest}/dist/webview"
   cp "${src}/package.json" "${dest}/"
+  for catalog in "${src}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
   cp "${src}/dist/extension.js" "${dest}/dist/"
   cp "${src}/dist/webview/webview.js" "${dest}/dist/webview/"
   cp -r "${src}/media" "${dest}/"

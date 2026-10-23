@@ -25,8 +25,8 @@ try {
       const property = sections.find(section => section?.properties?.[key])?.properties[key];
       if (!property) throw new Error(`Missing setting: ${key}`);
       property.default = value;
-      if (key === 'arara.apiUrl') {
-        property.description = 'URL do servidor da Arara. Uma URL definida pelo usuário substitui o padrão do build.';
+      if (key === 'arara.apiUrl' && !/^%[^%]+%$/.test(property.description ?? '')) {
+        property.description = 'Arara Code server URL. A user-defined URL overrides the build default.';
       }
     }
     manifest.araraEnvironment = environment;

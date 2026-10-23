@@ -25,6 +25,9 @@ try {
   fs.mkdirSync(path.join(bot, 'node_modules'), { recursive: true });
   fs.mkdirSync(path.join(bot, 'extension/node_modules'), { recursive: true });
   const assets = {
+    'package.nls.json': '{"test":"Settings"}',
+    'package.nls.pt-br.json': '{"test":"Configurações"}',
+    'package.nls.es.json': '{"test":"Configuración"}',
     'package.json': JSON.stringify({ publisher: 'arara', name: 'arara-bot', main: './dist/extension.js' }),
     'LICENSE': 'Apache License',
     'NOTICE': 'Arara Bot',
