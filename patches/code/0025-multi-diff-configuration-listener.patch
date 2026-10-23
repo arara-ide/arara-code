@@ -1,0 +1,176 @@
+Arara Code: compartilha a subscription de configuração do MultiDiffEditor por input e mantém callbacks filtrados por URI, evitando um listener global por arquivo em diffs grandes.
+
+Why a patch: a API de extensão não controla o listener interno do MultiDiffEditor nem o ciclo de vida de `TextResourceConfigurationService`; a correção precisa alterar o núcleo do Code-OSS. O dispatcher é descartado junto com `MultiDiffEditorInput` e possui teste browser de cobertura.
+Touches: src/vs/workbench/contrib/multiDiffEditor/browser/multiDiffEditorInput.ts src/vs/workbench/contrib/multiDiffEditor/test/browser/multiDiffEditorInput.test.ts
+
+--- a/src/vs/workbench/contrib/multiDiffEditor/browser/multiDiffEditorInput.ts
++++ b/src/vs/workbench/contrib/multiDiffEditor/browser/multiDiffEditorInput.ts
+@@ -7,7 +7,7 @@
+ import { BugIndicatingError, CancellationError, onUnexpectedError } from '../../../../base/common/errors.js';
+ import { Event, ValueWithChangeEvent } from '../../../../base/common/event.js';
+ import { IMarkdownString } from '../../../../base/common/htmlContent.js';
+-import { Disposable, DisposableStore, IDisposable, IReference } from '../../../../base/common/lifecycle.js';
++import { Disposable, DisposableStore, IDisposable, IReference, toDisposable } from '../../../../base/common/lifecycle.js';
+ import { parse } from '../../../../base/common/marshalling.js';
+ import { Schemas } from '../../../../base/common/network.js';
+ import { deepClone } from '../../../../base/common/objects.js';
+@@ -20,7 +20,7 @@
+ import { MultiDiffEditorViewModel } from '../../../../editor/browser/widget/multiDiffEditor/multiDiffEditorViewModel.js';
+ import { IDiffEditorOptions } from '../../../../editor/common/config/editorOptions.js';
+ import { IResolvedTextEditorModel, ITextModelService } from '../../../../editor/common/services/resolverService.js';
+-import { ITextResourceConfigurationService } from '../../../../editor/common/services/textResourceConfiguration.js';
++import { ITextResourceConfigurationChangeEvent, ITextResourceConfigurationService } from '../../../../editor/common/services/textResourceConfiguration.js';
+ import { localize } from '../../../../nls.js';
+ import { ConfirmResult } from '../../../../platform/dialogs/common/dialogs.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+@@ -75,6 +75,7 @@
+ 	override get typeId(): string { return MultiDiffEditorInput.ID; }
+ 
+ 	private _name: string;
++	private readonly _textResourceConfigurationOnDidChange: MultiDiffEditorConfigurationChangeDispatcher;
+ 	override getName(): string { return this._name; }
+ 
+ 	override get editorId(): string { return DEFAULT_EDITOR_ASSOCIATION.id; }
+@@ -130,6 +131,7 @@
+ 			item => item.resource.toString(),
+ 			uri => uri.toString()
+ 		);
++		this._textResourceConfigurationOnDidChange = this._register(new MultiDiffEditorConfigurationChangeDispatcher(_textResourceConfigurationService));
+ 		this._isDirtyObservables = mapObservableArrayCached(this, this.resources.map(r => r ?? []), res => {
+ 			const isModifiedDirty = res.modifiedUri ? isUriDirty(this.textFileServiceOnDidChange, this._textFileService, res.modifiedUri) : constObservable(false);
+ 			const isOriginalDirty = res.originalUri ? isUriDirty(this.textFileServiceOnDidChange, this._textFileService, res.originalUri) : constObservable(false);
+@@ -252,11 +254,7 @@
+ 						...computeOptions(textResourceConfigurationService.getValue(uri)),
+ 					} satisfies IDiffEditorOptions;
+ 				},
+-				onOptionsDidChange: h => this._textResourceConfigurationService.onDidChangeConfiguration(e => {
+-					if (e.affectsConfiguration(uri, 'editor') || e.affectsConfiguration(uri, 'diffEditor')) {
+-						h();
+-					}
+-				}),
++				onOptionsDidChange: h => this._textResourceConfigurationOnDidChange.onDidChange(uri, h),
+ 			};
+ 			return store.add(RefCounted.createOfNonDisposable(result, multiDiffItemStore, this));
+ 		}, i => JSON.stringify([i.modifiedUri?.toString(), i.originalUri?.toString()]));
+@@ -340,6 +338,55 @@
+ 	multiDiffEditorItem: MultiDiffEditorItem;
+ }
+ 
++export class MultiDiffEditorConfigurationChangeDispatcher implements IDisposable {
++	private readonly _listeners = new Map<string, { resource: URI; listeners: Set<() => void> }>();
++	private readonly _configurationService: ITextResourceConfigurationService;
++	private _subscription: IDisposable | undefined;
++
++	constructor(configurationService: ITextResourceConfigurationService) {
++		this._configurationService = configurationService;
++	}
++
++	public onDidChange(resource: URI, listener: () => void): IDisposable {
++		const key = resource.toString();
++		let bucket = this._listeners.get(key);
++		if (!bucket) {
++			bucket = { resource, listeners: new Set() };
++			this._listeners.set(key, bucket);
++		}
++		bucket.listeners.add(listener);
++		this._subscription ??= this._configurationService.onDidChangeConfiguration(this._handleEventChange);
++
++		return toDisposable(() => {
++			bucket!.listeners.delete(listener);
++			if (bucket!.listeners.size === 0) {
++				this._listeners.delete(key);
++			}
++			if (this._listeners.size === 0) {
++				this._subscription?.dispose();
++				this._subscription = undefined;
++			}
++		});
++	}
++
++	public dispose(): void {
++		this._subscription?.dispose();
++		this._subscription = undefined;
++		this._listeners.clear();
++	}
++
++	private readonly _handleEventChange = (event: ITextResourceConfigurationChangeEvent): void => {
++		for (const { resource, listeners } of this._listeners.values()) {
++			if (!event.affectsConfiguration(resource, 'editor') && !event.affectsConfiguration(resource, 'diffEditor')) {
++				continue;
++			}
++			for (const listener of listeners) {
++				listener();
++			}
++		}
++	};
++}
++
+ /**
+  * Uses a map to efficiently dispatch events to listeners that are interested in a specific key.
+ */
+--- a/src/vs/workbench/contrib/multiDiffEditor/test/browser/multiDiffEditorInput.test.ts
++++ b/src/vs/workbench/contrib/multiDiffEditor/test/browser/multiDiffEditorInput.test.ts
+@@ -6,23 +6,60 @@
+ import assert from 'assert';
+ import { DeferredPromise } from '../../../../../base/common/async.js';
+ import { CancellationError } from '../../../../../base/common/errors.js';
+-import { Event, ValueWithChangeEvent } from '../../../../../base/common/event.js';
++import { Emitter, Event, ValueWithChangeEvent } from '../../../../../base/common/event.js';
+ import { IReference } from '../../../../../base/common/lifecycle.js';
+ import { observableValue, ValueWithChangeEventFromObservable } from '../../../../../base/common/observable.js';
+ import { URI } from '../../../../../base/common/uri.js';
+ import { mock } from '../../../../../base/test/common/mock.js';
+ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
+ import { IResolvedTextEditorModel, ITextModelService } from '../../../../../editor/common/services/resolverService.js';
+-import { ITextResourceConfigurationService } from '../../../../../editor/common/services/textResourceConfiguration.js';
++import { ITextResourceConfigurationChangeEvent, ITextResourceConfigurationService } from '../../../../../editor/common/services/textResourceConfiguration.js';
+ import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
+ import { ITextFileEditorModelManager, ITextFileService } from '../../../../services/textfile/common/textfiles.js';
+-import { MultiDiffEditorInput } from '../../browser/multiDiffEditorInput.js';
++import { MultiDiffEditorConfigurationChangeDispatcher, MultiDiffEditorInput } from '../../browser/multiDiffEditorInput.js';
+ import { IMultiDiffSourceResolverService, MultiDiffEditorItem } from '../../browser/multiDiffSourceResolverService.js';
+ 
+ suite('MultiDiffEditorInput', () => {
+ 
+ 	const disposables = ensureNoDisposablesAreLeakedInTestSuite();
+ 
++	test('shares one configuration subscription across diff items', () => {
++		const configurationChanges = new Emitter<ITextResourceConfigurationChangeEvent>();
++		let subscriptionCount = 0;
++		const configurationService = new class extends mock<ITextResourceConfigurationService>() {
++			override readonly onDidChangeConfiguration = (listener: (event: ITextResourceConfigurationChangeEvent) => unknown) => {
++				subscriptionCount++;
++				const subscription = configurationChanges.event(listener);
++				return {
++					dispose: () => {
++						subscriptionCount--;
++						subscription.dispose();
++					},
++				};
++			};
++		}();
++		const dispatcher = disposables.add(new MultiDiffEditorConfigurationChangeDispatcher(configurationService));
++		const affectedResource = URI.parse('file:///affected.ts');
++		const unaffectedResource = URI.parse('file:///unaffected.ts');
++		let affectedCalls = 0;
++		let unaffectedCalls = 0;
++
++		for (let i = 0; i < 100; i++) {
++			disposables.add(dispatcher.onDidChange(affectedResource, () => affectedCalls++));
++		}
++		disposables.add(dispatcher.onDidChange(unaffectedResource, () => unaffectedCalls++));
++
++		assert.strictEqual(subscriptionCount, 1);
++		configurationChanges.fire({
++			affectedKeys: new Set(['editor']),
++			affectsConfiguration: (resource, section) => resource?.toString() === affectedResource.toString() && section === 'editor',
++		});
++		assert.strictEqual(affectedCalls, 100);
++		assert.strictEqual(unaffectedCalls, 0);
++
++		dispatcher.dispose();
++		assert.strictEqual(subscriptionCount, 0);
++	});
+ 	test('updates its name from the resolved source label', async () => {
+ 		const sourceLabel = observableValue('sourceLabel', 'Current Turn Changes');
+ 		const sourceResolverService = new class extends mock<IMultiDiffSourceResolverService>() {
