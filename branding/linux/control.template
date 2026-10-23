@@ -1,0 +1,13 @@
+Package: @@NAME@@
+Version: @@VERSION@@
+Section: devel
+Depends: @@DEPENDS@@
+Recommends: @@RECOMMENDS@@
+Priority: optional
+Architecture: @@ARCHITECTURE@@
+Maintainer: Arara <https://github.com/arara-ide>
+Homepage: https://github.com/arara-ide/arara-ide
+Installed-Size: @@INSTALLEDSIZE@@
+Description: Editor de código com IA
+ Arara Code é um editor baseado no Code-OSS (via VSCodium) com chat,
+ agente e autocomplete de IA integrados.

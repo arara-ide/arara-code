@@ -1,0 +1,4 @@
+.work/
+*.rej
+*.orig
+dist/
