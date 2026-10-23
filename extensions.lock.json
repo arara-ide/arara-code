@@ -14,5 +14,13 @@
     "url": "https://open-vsx.org/api/esbenp/prettier-vscode/12.4.0/file/esbenp.prettier-vscode-12.4.0.vsix",
     "repo": "https://github.com/prettier/prettier-vscode",
     "metadata": {}
+  },
+  {
+    "name": "vscode-icons-team.vscode-icons",
+    "version": "13.0.0",
+    "sha256": "89aa767f87f09dc966efe2e70bed20321d5cb5b2f43fd413598fb6913a9f99c5",
+    "url": "https://open-vsx.org/api/vscode-icons-team/vscode-icons/13.0.0/file/vscode-icons-team.vscode-icons-13.0.0.vsix",
+    "repo": "https://github.com/vscode-icons/vscode-icons",
+    "metadata": {}
   }
 ]
