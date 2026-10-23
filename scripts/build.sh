@@ -89,6 +89,7 @@ mv "${WORK}/product.json.tmp" "${WORK}/product.json"
 printf '\nbash "%s/scripts/default-extensions.sh" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
 
 # --- 5. patches no Code-OSS
+node "${ROOT}/scripts/check-patches.cjs"
 node "${ROOT}/scripts/generate-localization.cjs" --check
 mkdir -p "${WORK}/patches/user"
 for p in "${ROOT}"/patches/code/*.patch; do

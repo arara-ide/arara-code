@@ -44,6 +44,7 @@ Este repo é **open source**: todo patch fica público. Quanto menos lógica na 
 - Cabeçalho obrigatório: o que faz, por que não dá pra fazer via extensão, arquivos do upstream que toca.
 - Um patch = um assunto. Mantenha o diff mínimo; não reformatar código do upstream.
 - Patch que lida com processos, caminhos ou rede precisa de revisão de segurança.
+- Antes de concluir alterações em patches, execute `node scripts/tests/patches.cjs` e `node scripts/tests/localization.cjs`. Preserve LF nos `.patch` conforme `.gitattributes`; não ajuste a contagem de linhas de um hunk sem conferir o arquivo realmente aplicado pelo Git.
 
 ## Comandos
 

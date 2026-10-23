@@ -15,7 +15,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Arara Code: gancho genérico de lançador (só ícone) na barra de título.
 + *

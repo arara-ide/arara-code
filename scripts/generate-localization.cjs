@@ -64,5 +64,5 @@ ${source.trimEnd().split('\n').map(line => '+' + line).join('\n')}
 `;
 const target = path.join(root, 'patches/code/0032-arara-localization.patch');
 if (process.argv.includes('--check')) {
-  if (fs.readFileSync(target, 'utf8') !== patch) throw new Error('Localization patch is stale; run node scripts/generate-localization.cjs');
+  if (fs.readFileSync(target, 'utf8').replace(/\r\n/g, '\n') !== patch) throw new Error('Localization patch is stale; run node scripts/generate-localization.cjs');
 } else fs.writeFileSync(target, patch);
