@@ -1,0 +1,56 @@
+Arara Code: gancho genérico de lançador (só ícone) na barra de título.
+
+- contrib/arara/electron-browser/araraTitleLauncher.contribution.ts (novo): item em
+  MenuId.LayoutControlMenu (order -2, à esquerda do "Atualizar" do 0015 e do Customize
+  Layout) com o ícone `arara-logo`, que a extensão contribui via contributes.icons.
+  Só aparece com a context key `arara.ui.titleLauncher` ligada pela extensão; o clique
+  roda `arara.ui.titleLauncher.run`. O que abre (hoje: a seção lateral do Arara AI) é
+  decisão da extensão arara-ai.
+- workbench.desktop.main.ts: importa a contribution.
+
+Why a patch: extensões não contribuem itens para o LayoutControlMenu nem para a barra
+de título (MenuId.TitleBar/LayoutControlMenu não estão no menusExtensionPoint).
+Sem lógica de produto, rede ou processo no core.
+Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts src/vs/workbench/workbench.desktop.main.ts
+
+--- /dev/null
++++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
+@@ -0,0 +1,26 @@
++/*---------------------------------------------------------------------------------------------
++ *  Arara Code: gancho genérico de lançador (só ícone) na barra de título.
++ *
++ *  Botão à esquerda do "Atualizar" e do Customize Layout (MenuId.LayoutControlMenu).
++ *  Aparece quando a extensão liga a context key `arara.ui.titleLauncher` e o clique
++ *  roda `arara.ui.titleLauncher.run`. O ícone `arara-logo`
++ *  é contribuído pela extensão (contributes.icons). O que o botão abre é decisão dela.
++ *--------------------------------------------------------------------------------------------*/
++
++import { ThemeIcon } from '../../../../base/common/themables.js';
++import { localize } from '../../../../nls.js';
++import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
++import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
++import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++
++// order -2: à esquerda do botão de atualização (-1) e dos botões de layout (0)
++MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++	group: 'navigation',
++	order: -2,
++	command: {
++		id: 'arara.ui.titleLauncher.run', // registrado pela extensão
++		title: localize('arara.ui.titleLauncher', "Arara"),
++		icon: ThemeIcon.fromId('arara-logo'),
++	},
++	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.ui.titleLauncher')),
++});
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -200,6 +200,9 @@
+ // Arara Code: botão Atualizar + reinício quando o pacote novo é instalado
+ import './contrib/arara/electron-browser/araraUpdate.contribution.js';
+ 
++// Arara Code: lançador da extensão (ícone) na barra de título
++import './contrib/arara/electron-browser/araraTitleLauncher.contribution.js';
++
+ // MCP
+ import './contrib/mcp/electron-browser/mcp.contribution.js';
+ 

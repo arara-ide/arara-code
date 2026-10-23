@@ -1,0 +1,64 @@
+Arara Code: generic theme-color attention hook for native view container icons.
+
+Why a patch: WebviewView.badge (stable) and the available proposed APIs only
+provide numeric badges, not the foreground of a native composite-bar icon.
+The extension owns completion/unread state and supplies a theme color id through
+_workbench.setViewContainerAttention(containerId, colorId | undefined). The core
+only stores/renders this presentation override. No provider names or product
+rules live here; selection and theme changes retain the native icon behavior.
+Touches: src/vs/workbench/browser/parts/compositeBarActions.ts
+
+--- a/src/vs/workbench/browser/parts/compositeBarActions.ts
++++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
+@@ -6,7 +6,7 @@
+ import { localize } from '../../../nls.js';
+ import { Action, IAction, Separator } from '../../../base/common/actions.js';
+ import { $, addDisposableListener, append, clearNode, EventHelper, EventType, getDomNodePagePosition, hide, show } from '../../../base/browser/dom.js';
+-import { ICommandService } from '../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../platform/commands/common/commands.js';
+ import { toDisposable, DisposableStore, MutableDisposable } from '../../../base/common/lifecycle.js';
+ import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
+ import { IThemeService, IColorTheme } from '../../../platform/theme/common/themeService.js';
+@@ -31,6 +31,21 @@
+ import { createConfigureKeybindingAction } from '../../../platform/actions/common/menuService.js';
+ import { HoverStyle } from '../../../base/browser/ui/hover/hover.js';
+ 
++// Generic extension hook: the extension owns the attention state and supplies a theme color token.
++const viewContainerAttention = new Map<string, string>();
++const viewContainerAttentionChanged = new Emitter<string>();
++CommandsRegistry.registerCommand('_workbench.setViewContainerAttention', (_accessor, id: unknown, color: unknown) => {
++	if (typeof id !== 'string' || !id || (color !== undefined && (typeof color !== 'string' || !color))) {
++		return;
++	}
++	if (typeof color === 'string') {
++		viewContainerAttention.set(id, color);
++	} else {
++		viewContainerAttention.delete(id);
++	}
++	viewContainerAttentionChanged.fire(id);
++});
++
+ export interface ICompositeBar {
+ 
+ 	/**
+@@ -181,6 +196,9 @@
+ 		this._register(action.onDidChangeCompositeBarActionItem(() => this.update()));
+ 		this._register(Event.filter(keybindingService.onDidUpdateKeybindings, () => this.keybindingLabel !== this.computeKeybindingLabel())(() => this.updateTitle()));
+ 		this._register(action.onDidChangeActivity(() => this.updateActivity()));
++		this._register(viewContainerAttentionChanged.event(id => {
++			if (id === this.compositeBarActionItem.id) { this.updateStyles(); }
++		}));
+ 	}
+ 
+ 	protected get compositeBarActionItem(): ICompositeBarActionItem {
+@@ -193,7 +211,9 @@
+ 
+ 		if (this.label) {
+ 			if (this.options.icon) {
+-				const foreground = this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;
++				const attentionColor = !this._action.checked && viewContainerAttention.get(this.compositeBarActionItem.id);
++				const foreground = attentionColor ? theme.getColor(attentionColor) ?? colors.inactiveForegroundColor
++					: this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;
+ 				if (this.compositeBarActionItem.iconUrl) {
+ 					// Apply background color to activity bar item provided with iconUrls
+ 					this.label.style.backgroundColor = foreground ? foreground.toString() : '';
