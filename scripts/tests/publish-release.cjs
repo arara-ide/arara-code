@@ -23,7 +23,7 @@ function fixture(t) {
   fs.mkdirSync(dist);
   const changelog = path.join(root, 'CHANGELOG.md');
   fs.writeFileSync(changelog, '# Changelog\n\n## [Não lançado]\n\n### Correções\n- Editor: correção nova.\n\n## [1.0.00000]\n- Mudança antiga.\n');
-  const state = { release: undefined, releases: [], assets: [], creates: 0, uploads: [], failUpload: undefined, omitDigest: false, apiError: false, listError: false };
+  const state = { release: undefined, releases: [], assets: [], creates: 0, uploads: [], failUpload: undefined, omitDigest: false, apiError: false, listError: false, hiddenListings: 0, sleeps: 0 };
   const env = { RELEASE_VERSION: version, GITHUB_REPOSITORY: 'arara-ide/arara-code', GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main', PRERELEASE: 'true' };
   const gh = args => {
     const option = flag => args[args.indexOf(flag) + 1];
@@ -42,7 +42,8 @@ function fixture(t) {
       const page = Number(url.searchParams.get('page'));
       if (url.pathname.endsWith('/releases')) {
         if (state.listError) throw Object.assign(new Error('Release listing denied'), { stderr: 'gh: forbidden (HTTP 403)' });
-        return JSON.stringify([...state.releases, ...(state.release ? [state.release] : [])].slice((page - 1) * 100, page * 100));
+        const hidden = state.hiddenListings > 0 && page === 1 ? state.hiddenListings-- > 0 : false;
+        return JSON.stringify([...state.releases, ...(state.release && !hidden ? [state.release] : [])].slice((page - 1) * 100, page * 100));
       }
       return JSON.stringify(state.assets.slice((page - 1) * 100, page * 100).map(({ bytes, ...asset }) => ({ ...asset, digest: state.omitDigest ? null : `sha256:${hash(bytes)}` })));
     }
@@ -51,6 +52,7 @@ function fixture(t) {
       assert.ok(args.includes('--draft'), 'first upload must remain private until checksums exist');
       state.creates++;
       state.release = { id: 42, tag_name: args[2], target_commitish: option('--target'), draft: true, prerelease: args.includes('--prerelease'), immutable: false };
+      if (state.hideAfterCreate) state.hiddenListings = state.hideAfterCreate;
     } else if (args[1] === 'upload') {
       const file = args[3];
       const name = path.basename(file);
@@ -76,9 +78,38 @@ function fixture(t) {
     fs.rmSync(dist, { recursive: true });
     fs.mkdirSync(dist);
     if (name) fs.writeFileSync(path.join(dist, name), `package ${name}`);
-    return publish({ env, dist, changelog, gh });
+    return publish({ env, dist, changelog, gh, sleep: async () => { state.sleeps++; } });
   } };
 }
+
+test('a just-created draft that the listing does not return yet is awaited instead of crashing', async t => {
+  const f = fixture(t);
+  f.state.hideAfterCreate = 4;
+  await f.run(names[1]);
+  assert.equal(f.state.creates, 1);
+  assert.equal(f.state.release.draft, false);
+  assert.ok(f.state.sleeps >= 4, 'waited for the draft to be listed');
+  assert.ok(f.state.assets.some(a => a.name === names[1]));
+});
+
+test('a draft from the previous platform that is still unlisted is not duplicated', async t => {
+  const f = fixture(t);
+  f.state.failUpload = 'SHA256SUMS';
+  await assert.rejects(f.run(), /Upload interrupted/);
+  f.state.failUpload = undefined;
+  f.state.hiddenListings = 2;
+  await f.run(names[1]);
+  assert.equal(f.state.creates, 1);
+  assert.equal(f.state.release.draft, false);
+});
+
+test('a draft that never becomes visible stops with an actionable error', async t => {
+  const f = fixture(t);
+  f.state.hideAfterCreate = 1000;
+  await assert.rejects(f.run(), /created but is not listed yet; rerun/);
+  assert.equal(f.state.creates, 1);
+  assert.equal(f.state.uploads.length, 0);
+});
 
 test('Windows can publish first; Linux and both Macs append to the same release, with cumulative checksums', async t => {
   const f = fixture(t);

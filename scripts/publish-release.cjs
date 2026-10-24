@@ -39,7 +39,8 @@ function releaseNotes(version, names, changelog, prerelease) {
 }
 
 async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELOG.md',
-  gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) } = {}) {
+  gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }),
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), retryMs = 5000 } = {}) {
   const version = env.RELEASE_VERSION;
   const repo = env.GITHUB_REPOSITORY;
   const sha = env.GITHUB_SHA;
@@ -69,7 +70,14 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
     return matches[0];
   };
   const assetsFor = release => list(`${endpoint}/${release.id}/assets`);
-  let release = readRelease();
+  const findRelease = async attempts => {
+    for (let attempt = 1; ; attempt++) {
+      const found = readRelease();
+      if (found || attempt >= attempts) return found;
+      await sleep(retryMs);
+    }
+  };
+  let release = await findRelease(3);
   if (release && (release.target_commitish !== sha || release.immutable || release.prerelease !== prerelease)) {
     throw new Error('Existing release has a different commit, immutability or prerelease setting');
   }
@@ -81,7 +89,8 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
     if (!release) {
       gh(['release', 'create', version, '--repo', repo, '--target', sha, '--draft',
         '--title', `Arara Code ${version}`, '--notes-file', notes, ...(prerelease ? ['--prerelease'] : [])]);
-      release = readRelease();
+      release = await findRelease(12);
+      if (!release) throw new Error(`Draft ${version} was created but is not listed yet; rerun this job to resume it`);
     }
     let assets = assetsFor(release);
     const hashOfAsset = async asset => {
