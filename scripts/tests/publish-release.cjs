@@ -23,14 +23,14 @@ function fixture(t) {
   fs.mkdirSync(dist);
   const changelog = path.join(root, 'CHANGELOG.md');
   fs.writeFileSync(changelog, '# Changelog\n\n## [Não lançado]\n\n### Correções\n- Editor: correção nova.\n\n## [1.0.00000]\n- Mudança antiga.\n');
-  const state = { release: undefined, assets: [], creates: 0, uploads: [], failUpload: undefined, omitDigest: false, apiError: false };
+  const state = { release: undefined, releases: [], assets: [], creates: 0, uploads: [], failUpload: undefined, omitDigest: false, apiError: false, listError: false };
   const env = { RELEASE_VERSION: version, GITHUB_REPOSITORY: 'arara-ide/arara-code', GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main', PRERELEASE: 'true' };
   const gh = args => {
     const option = flag => args[args.indexOf(flag) + 1];
     if (args[0] === 'api') {
       if (state.apiError) throw Object.assign(new Error('Access denied'), { stderr: 'gh: forbidden (HTTP 403)' });
       if (args.at(-1).includes('/tags/')) {
-        if (!state.release) throw Object.assign(new Error('Not found'), { stderr: 'gh: Not Found (HTTP 404)' });
+        if (!state.release || state.release.draft) throw Object.assign(new Error('Not found'), { stderr: 'gh: Not Found (HTTP 404)' });
         return JSON.stringify(state.release);
       }
       if (args.includes('--method')) {
@@ -38,14 +38,19 @@ function fixture(t) {
         state.assets = state.assets.filter(a => a.id !== id);
         return '';
       }
-      const page = Number(new URL(`https://api.github.com/${args.at(-1)}`).searchParams.get('page'));
+      const url = new URL(`https://api.github.com/${args.at(-1)}`);
+      const page = Number(url.searchParams.get('page'));
+      if (url.pathname.endsWith('/releases')) {
+        if (state.listError) throw Object.assign(new Error('Release listing denied'), { stderr: 'gh: forbidden (HTTP 403)' });
+        return JSON.stringify([...state.releases, ...(state.release ? [state.release] : [])].slice((page - 1) * 100, page * 100));
+      }
       return JSON.stringify(state.assets.slice((page - 1) * 100, page * 100).map(({ bytes, ...asset }) => ({ ...asset, digest: state.omitDigest ? null : `sha256:${hash(bytes)}` })));
     }
     if (args[1] === 'create') {
       assert.equal(state.release, undefined, 'only one release is created');
       assert.ok(args.includes('--draft'), 'first upload must remain private until checksums exist');
       state.creates++;
-      state.release = { id: 42, target_commitish: option('--target'), draft: true, prerelease: args.includes('--prerelease'), immutable: false };
+      state.release = { id: 42, tag_name: args[2], target_commitish: option('--target'), draft: true, prerelease: args.includes('--prerelease'), immutable: false };
     } else if (args[1] === 'upload') {
       const file = args[3];
       const name = path.basename(file);
@@ -116,6 +121,43 @@ test('each platform can independently be the first successful build', async t =>
     if (!name.endsWith('.deb')) assert.doesNotMatch(f.state.notes, /sudo apt install/);
     if (!name.includes('-darwin-')) assert.doesNotMatch(f.state.notes, /xattr -cr/);
   }
+});
+
+test('a draft on a later release page is resumed without creating another release', async t => {
+  const f = fixture(t);
+  f.state.failUpload = 'SHA256SUMS';
+  await assert.rejects(f.run(), /Upload interrupted/);
+  for (let i = 0; i < 100; i++) f.state.releases.push({ id: 1000 + i, tag_name: `other-${i}`, draft: true });
+  f.state.failUpload = undefined;
+  await f.run(names[1]);
+  assert.equal(f.state.creates, 1);
+  assert.equal(f.state.release.draft, false);
+  assert.ok(f.state.assets.some(asset => asset.name === names[0]));
+});
+
+test('duplicate releases on different pages stop publication without changing assets', async t => {
+  for (const draft of [true, false]) {
+    const f = fixture(t);
+    f.state.failUpload = 'SHA256SUMS';
+    await assert.rejects(f.run(), /Upload interrupted/);
+    f.state.releases.push({ ...f.state.release, id: 43 });
+    f.state.release.draft = draft;
+    for (let i = 0; i < 99; i++) f.state.releases.push({ id: 1000 + i, tag_name: `other-${i}`, draft: true });
+    const uploads = [...f.state.uploads];
+    f.state.failUpload = undefined;
+    await assert.rejects(f.run(names[1]), /Multiple releases found/);
+    assert.equal(f.state.creates, 1);
+    assert.equal(f.state.release.draft, draft);
+    assert.deepEqual(f.state.uploads, uploads);
+  }
+});
+
+test('release listing failures are propagated without creating a release', async t => {
+  const f = fixture(t);
+  f.state.listError = true;
+  await assert.rejects(f.run(), /Release listing denied/);
+  assert.equal(f.state.creates, 0);
+  assert.equal(f.state.uploads.length, 0);
 });
 
 test('a later platform repairs a failed checksum update without losing published packages', async t => {
