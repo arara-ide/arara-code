@@ -100,7 +100,6 @@ test('interrupted first upload is resumed and remains draft until checksum publi
   await assert.rejects(f.run(), /Upload interrupted/);
   assert.equal(f.state.release.draft, true);
   f.state.failUpload = undefined;
-  // Another platform recovers the manifest from actual assets, without an old SHA256SUMS.
   await f.run(names[1]);
   assert.equal(f.state.creates, 1);
   assert.equal(f.state.release.draft, false);

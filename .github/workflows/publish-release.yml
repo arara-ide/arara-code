@@ -23,7 +23,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
-    # queue: max mantém todos os uploads pendentes; o padrão cancela o anterior.
     concurrency:
       group: release-${{ inputs.version }}
       cancel-in-progress: false
@@ -44,7 +43,6 @@ jobs:
           V: ${{ inputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Os próximos uploads não criam tag; mudanças posteriores na main não os bloqueiam.
           if gh release view "$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             exit 0
           fi

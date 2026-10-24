@@ -1,4 +1,3 @@
-// Called only by the serialized publish job. Builds never publish from development.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -69,7 +68,6 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
   try {
     release = readRelease();
   } catch (error) {
-    // Authentication/network/server errors must never be interpreted as a missing release.
     if (!String(error.stderr || '').includes('(HTTP 404)')) throw error;
   }
   if (release && (release.target_commitish !== sha || release.immutable || release.prerelease !== prerelease)) {
@@ -89,7 +87,6 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
     const hashOfAsset = async asset => {
       const digest = assetDigest(asset);
       if (digest) return digest;
-      // Older assets may lack GitHub's digest. Hash the downloaded bytes in that case.
       const dir = fs.mkdtempSync(path.join(scratch, 'asset-'));
       gh(['release', 'download', version, '--repo', repo, '--pattern', asset.name, '--dir', dir]);
       return digestOf(path.join(dir, asset.name));
@@ -100,7 +97,6 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
         if (await hashOfAsset(existing) !== hashes.get(name)) throw new Error(`Refusing to replace different published bytes: ${name}`);
         continue;
       }
-      // A failed GitHub upload can leave an empty starter asset; remove only that entry.
       const starter = assets.find(a => a.name === name && a.state === 'starter');
       if (starter) gh(['api', '--method', 'DELETE', `${endpoint}/assets/${starter.id}`]);
       gh(['release', 'upload', version, path.join(dist, name), '--repo', repo]);
@@ -118,8 +114,6 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
     fs.writeFileSync(checksums, sums.join(''));
     gh(['release', 'upload', version, checksums, '--repo', repo, '--clobber']);
     fs.writeFileSync(notes, releaseNotes(version, assets.map(a => a.name), changes, prerelease));
-    // First publisher exposes the release only after its packages and checksums exist.
-    // Later publishers leave its release date/latest status untouched.
     gh(['release', 'edit', version, '--repo', repo, '--notes-file', notes, ...(release.draft ? ['--draft=false'] : [])]);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });

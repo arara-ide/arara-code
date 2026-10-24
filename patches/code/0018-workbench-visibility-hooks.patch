@@ -220,14 +220,13 @@ menubar contribution, panel part and panel CSS.
  
 --- a/src/vs/workbench/browser/parts/panel/media/panelpart.css
 +++ b/src/vs/workbench/browser/parts/panel/media/panelpart.css
-@@ -152,4 +152,12 @@
+@@ -152,4 +152,11 @@
  
  .monaco-workbench .part.panel > .content {
      font-size: calc(var(--vscode-workbench-bottompane-font-size) * 1)
 -}
 \ No newline at end of file
 +}
-+/* Inline extension-owned terminal launcher. */
 +.monaco-workbench .part.panel .arara-panel-launcher { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
 +.monaco-workbench .part.panel .arara-panel-launcher[hidden],
 +.monaco-workbench .part.panel .arara-panel-launcher [hidden] { display: none !important; }

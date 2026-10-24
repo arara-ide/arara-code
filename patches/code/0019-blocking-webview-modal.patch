@@ -42,12 +42,10 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  	}
  
  	private _activateStar(): Promise<void> {
-@@ -63,6 +65,12 @@
+@@ -63,6 +65,10 @@
  	}
  
  	async executeCommand<T>(id: string, ...args: unknown[]): Promise<T> {
-+		// Blocking extension-owned modal: commands are admitted centrally, so native
-+		// menus, custom shortcuts and webview-forwarded keybindings share the gate.
 +		if (this._contextKeyService.getContextKeyValue('arara.modal.viewType') && id !== 'setContext' && id !== '_setContext') {
 +			const allowed = this._contextKeyService.getContextKeyValue<readonly string[]>('arara.modal.allowedCommands');
 +			if (!allowed?.includes(id)) { return undefined as T; }
@@ -150,12 +148,11 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  		if (options?.mergeAllEditorsToMainPart) {
 --- a/src/vs/workbench/browser/parts/editor/media/modalEditorPart.css
 +++ b/src/vs/workbench/browser/parts/editor/media/modalEditorPart.css
-@@ -206,3 +206,7 @@
+@@ -206,3 +206,6 @@
  .monaco-modal-editor-block.compact-header .modal-editor-title .monaco-icon-label > .monaco-icon-label-iconpath {
  	display: none;
  }
 +
-+/* A blocking editor owns navigation until its extension releases it. */
 +.monaco-modal-editor-block.blocking-modal { background: var(--vscode-editor-background); }
 +.monaco-modal-editor-block.blocking-modal .modal-editor-header { visibility: hidden; pointer-events: none; }
 --- a/src/vs/workbench/services/commands/test/common/commandService.test.ts

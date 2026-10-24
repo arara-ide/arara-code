@@ -45,7 +45,6 @@ jobs:
           path: arara-ai
           persist-credentials: false
 
-      # arara-bot é privado; usa a credencial dos componentes irmãos.
       - name: Checkout arara-bot
         uses: actions/checkout@v4
         with:
@@ -55,7 +54,6 @@ jobs:
           path: arara-bot
           persist-credentials: false
 
-      # arara-orchestra é privado; o build dela usa os tipos do arara-ai ao lado.
       - name: Checkout arara-orchestra
         uses: actions/checkout@v4
         with:
@@ -77,7 +75,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      # O patch do macOS (BSD) não aceita as opções usadas no build.sh; usa o GNU patch como `patch`.
       - name: Dependências
         run: |
           brew install gpatch jq

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Gera os ícones do Arara Code a partir de branding/icons/*.svg, no layout
-# que o VSCodium espera em src/stable/ (que o prepare_vscode.sh copia sobre vscode/).
-#
-# Uso: scripts/build-icons.sh [diretório-src-stable-de-destino]
-# Por padrão gera em branding/src-stable, versionando os assets para o build.
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -14,9 +9,6 @@ MONO="${ROOT}/branding/icons/arara-mono.svg"
 TMP="$( mktemp -d )"
 trap 'rm -rf "${TMP}"' EXIT
 
-# Renderiza SVG em PNG com fidelidade de cores (gradientes e máscaras).
-# rsvg-convert real primeiro (alguns ambientes têm um shim que achata cores); depois
-# python3 com librsvg/cairo, que exige o binding gi-cairo e falha sem ele.
 render_png() {
   local in_svg="$1"
   local size="$2"
@@ -46,18 +38,15 @@ surface.write_to_png('${out_png}')
 
 command -v convert >/dev/null || { echo "faltando: convert (ImageMagick)" >&2; exit 1; }
 
-# --- linux
 mkdir -p "${DEST}/resources/linux/rpm"
 render_png "${ICON}" 512 "${DEST}/resources/linux/code.png"
 cp "${ICON}" "${DEST}/resources/linux/code.svg"
 convert "${DEST}/resources/linux/code.png" -resize 256x256 "${DEST}/resources/linux/rpm/code.xpm"
 
-# --- server / web
 mkdir -p "${DEST}/resources/server"
 render_png "${ICON}" 192 "${DEST}/resources/server/code-192.png"
 render_png "${ICON}" 512 "${DEST}/resources/server/code-512.png"
 
-# --- windows
 mkdir -p "${DEST}/resources/win32"
 render_png "${ICON}" 256 "${TMP}/256.png"
 convert "${TMP}/256.png" -define icon:auto-resize=256,128,96,64,48,32,24,20,16 "${DEST}/resources/win32/code.ico"
@@ -67,10 +56,7 @@ convert -size 70x70 canvas:transparent "${TMP}/45.png" -gravity center -composit
 render_png "${ICON}" 64 "${TMP}/64.png"
 convert -size 150x150 canvas:transparent "${TMP}/64.png" -gravity NorthWest -geometry +44+25 -composite PNG32:"${DEST}/resources/win32/code_150x150.png"
 
-# Imagens do assistente de instalação (Inno Setup: WizardImageFile/WizardSmallImageFile)
-# e do MSI (WiX). Mesmas dimensões e posições do icons/build_icons.sh do VSCodium; sem
-# isto o instalador mostra o logo do VSCodium. BMP3 24 bits: formato aceito por Inno e WiX.
-bmp() { # $1 destino, $2 tamanho da tela, $3 lado do logo, $4 gravidade (center ou +x+y)
+bmp() {
   render_png "${ICON}" "$3" "${TMP}/logo.png"
   if [[ "$4" == center ]]; then
     convert -size "$2" xc:white "${TMP}/logo.png" -gravity center -composite -alpha remove -type TrueColor BMP3:"$1"
@@ -98,9 +84,6 @@ mkdir -p "${MSI}"
 bmp "${MSI}/wix-banner.bmp" 493x58 50 +438+6
 bmp "${MSI}/wix-dialog.bmp" 493x312 120 +22+152
 
-# --- macOS
-# .icns montado direto (PNG embutido por tipo: ic07 128 … ic10 1024, ic11–ic14 @2x),
-# para não depender do png2icns, que não existe na maioria das máquinas.
 mkdir -p "${DEST}/resources/darwin"
 for s in 16 32 64 128 256 512 1024; do render_png "${ICON}" "${s}" "${TMP}/m${s}.png"; done
 python3 - "${TMP}" "${DEST}/resources/darwin/code.icns" <<'PY'
@@ -115,11 +98,10 @@ for kind, size in types:
 open(out, 'wb').write(b'icns' + struct.pack('>I', len(body) + 8) + body)
 PY
 
-# --- workbench: ícone da barra de título/about e marca d'água do editor vazio
 mkdir -p "${DEST}/src/vs/workbench/browser/media" "${DEST}/src/vs/workbench/browser/parts/editor/media"
 cp "${ICON}" "${DEST}/src/vs/workbench/browser/media/code-icon.svg"
 
-letterpress() { # $1 arquivo, $2 cor, $3 opacidade
+letterpress() {
   sed -e "s/#fff/$2/g" -e "s|<svg |<svg opacity=\"$3\" |" "${MONO}" > "${DEST}/src/vs/workbench/browser/parts/editor/media/$1"
 }
 letterpress letterpress-dark.svg    "#B2B2B2" 0.3

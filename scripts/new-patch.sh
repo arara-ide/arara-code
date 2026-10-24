@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# Gera/atualiza um patch em patches/code/ a partir de arquivos editados em .work/vscodium/vscode.
-#
-# O "antes" de cada arquivo é reconstruído: versão da tag (git HEAD do vscode/)
-# + patches do VSCodium + nossos patches com nome menor que o deste.
-#
-# Uso:
-#   scripts/new-patch.sh 0003-minha-mudanca src/vs/caminho/arquivo.ts [mais arquivos…]
-#
-# Se o patch já existe, o cabeçalho (texto antes do primeiro "--- a/") é mantido.
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -25,7 +16,6 @@ trap 'rm -rf "${TMP}"' EXIT
 BASE="${TMP}/base"
 mkdir -p "${BASE}"
 
-# 1. versão da tag (arquivos que não existem na tag viram "novo arquivo" no patch)
 NEW_FILES=" "
 for f in "${FILES[@]}"; do
   mkdir -p "${BASE}/$( dirname "${f}" )"
@@ -35,7 +25,6 @@ for f in "${FILES[@]}"; do
   fi
 done
 
-# 2. patches na mesma ordem do VSCodium, depois os nossos anteriores a este
 PATCHES=("${WORK}"/patches/*.patch "${WORK}"/patches/linux/*.patch)
 for p in "${ROOT}"/patches/code/*.patch; do
   [[ -f "${p}" && "$( basename "${p}" .patch )" < "${NAME}" ]] && PATCHES+=("${p}")
@@ -44,7 +33,6 @@ done
 INCLUDES=()
 for f in "${FILES[@]}"; do INCLUDES+=(--include="${f}"); done
 
-# variáveis de branding que o VSCodium substitui nos patches (!!APP_NAME!! etc.)
 APP_NAME="Arara Code"; BINARY_NAME="arara-code"; ORG_NAME="Arara"; GLOBAL_DIRNAME="arara-code"
 TUNNEL_APP_NAME="arara-code-tunnel"; GH_REPO_PATH="arara-ide/arara-code"; ASSETS_REPOSITORY="arara-ide/arara-code"
 APP_NAME_LC="arara code"; RELEASE_VERSION="$( sed -n 's/^RELEASE_VERSION="\(.*\)"/\1/p' "${WORK}/dev/build.env" 2>/dev/null || true )"
@@ -60,7 +48,6 @@ for p in "${PATCHES[@]}"; do
     || { echo "falhou ao reconstruir a base com $( basename "${p}" )" >&2; exit 1; }
 done
 
-# 3. cabeçalho
 HEADER=""
 [[ -f "${OUT}" ]] && HEADER="$( sed '/^--- a\//,$d' "${OUT}" )"
 if [[ -z "${HEADER//[[:space:]]/}" ]]; then
@@ -71,7 +58,6 @@ Touches: ${FILES[*]}
 "
 fi
 
-# 4. diff
 {
   printf '%s\n\n' "${HEADER%$'\n'}"
   for f in "${FILES[@]}"; do

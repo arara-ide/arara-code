@@ -12,18 +12,17 @@ Touches: src/vs/workbench/common/arara.defaults.ts,
 
 --- a/src/vs/workbench/common/arara.defaults.ts
 +++ b/src/vs/workbench/common/arara.defaults.ts
-@@ -32,6 +32,8 @@
+@@ -22,6 +22,7 @@
  		'update.showReleaseNotes': false,
  		'extensions.ignoreRecommendations': true,
  		'security.workspace.trust.untrustedFiles': 'open',
-+		// pergunta logo ao abrir uma pasta sem confiança (o VSCodium vem com 'never')
 +		'security.workspace.trust.startupPrompt': 'always',
  
- 		// explorer
  		'explorer.confirmDelete': false,
+ 		'explorer.confirmDragAndDrop': false,
 --- a/src/vs/workbench/contrib/workspace/browser/workspace.contribution.ts
 +++ b/src/vs/workbench/contrib/workspace/browser/workspace.contribution.ts
-@@ -389,13 +389,12 @@
+@@ -389,13 +389,11 @@
  				learnMoreString = this.productService.aiGeneratedWorkspaceTrust.startupTrustRequestLearnMore;
  				trustOption = this.productService.aiGeneratedWorkspaceTrust.trustOption;
  				dontTrustOption = this.productService.aiGeneratedWorkspaceTrust.dontTrustOption;
@@ -31,7 +30,6 @@ Touches: src/vs/workbench/common/arara.defaults.ts,
 -				console.warn('AI generated workspace trust dialog contents not available.');
  			}
  
-+			// Arara Code: diálogo curto (pergunta, caminho e dois botões).
  			const title = titleString ?? (this.useWorkspaceLanguage ?
 -				localize('workspaceTrust', "Do you trust the authors of the files in this workspace?") :
 -				localize('folderTrust', "Do you trust the authors of the files in this folder?"));
@@ -40,7 +38,7 @@ Touches: src/vs/workbench/common/arara.defaults.ts,
  
  			let checkboxText: string | undefined;
  			const workspaceIdentifier = toWorkspaceIdentifier(this.workspaceContextService.getWorkspace());
-@@ -403,26 +402,22 @@
+@@ -403,26 +401,22 @@
  			const isEmptyWindow = isEmptyWorkspaceIdentifier(workspaceIdentifier);
  			if (!isAiGeneratedWorkspace && this.workspaceTrustManagementService.canSetParentFolderTrust()) {
  				const name = basename(uriDirname((workspaceIdentifier as ISingleFolderWorkspaceIdentifier).uri));
@@ -72,7 +70,7 @@ Touches: src/vs/workbench/common/arara.defaults.ts,
  				markdownStrings,
  				checkboxText
  			);
-@@ -472,10 +467,10 @@
+@@ -472,10 +466,10 @@
  				}
  			],
  			custom: {

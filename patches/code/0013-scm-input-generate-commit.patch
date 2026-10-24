@@ -26,23 +26,19 @@ Touches: src/vs/workbench/contrib/scm/browser/scmInput.ts
  import { IAction, ActionRunner, Action } from '../../../../base/common/actions.js';
  import { ActionBar } from '../../../../base/browser/ui/actionbar/actionbar.js';
  import { IConfigurationService, ConfigurationTarget } from '../../../../platform/configuration/common/configuration.js';
-@@ -848,6 +848,8 @@
+@@ -848,6 +848,7 @@
  				id: MenuId.SCMInputBox,
  				when: ContextKeyExpr.and(
  					ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
-+					// Arara Code: o "Generate" do Copilot dá lugar ao do Arara Code (ver fim do arquivo)
 +					ContextKeyExpr.false(),
  					ChatContextKeys.Setup.hidden.negate(),
  					ChatContextKeys.Setup.disabledInWorkspace.negate(),
  					ChatContextKeys.Setup.completed.negate(),
-@@ -875,3 +877,19 @@
+@@ -875,3 +876,16 @@
  });
  
  setupSimpleEditorSelectionStyling('.scm-view .scm-editor-container');
 +
-+// Arara Code: ícone de IA no canto superior direito da caixa de mensagem de commit.
-+// O comando é da extensão arara-ai, que liga a context key ao registrar. A toolbar
-+// passa (rootUri, grupos, CancellationToken) e troca o ícone por "parar" enquanto roda.
 +MenuRegistry.appendMenuItem(MenuId.SCMInputBox, {
 +	command: {
 +		id: 'arara.scm.generateCommitMessage',

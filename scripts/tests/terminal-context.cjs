@@ -1,4 +1,3 @@
-// Local verification of the read-only terminal bridge without a full IDE build.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

@@ -11,11 +11,10 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
 
 --- a/src/vs/base/common/product.ts
 +++ b/src/vs/base/common/product.ts
-@@ -97,6 +97,9 @@
+@@ -97,6 +97,8 @@
  }
  
  export interface IProductConfiguration {
-+	/** Extension-owned startup surface; checked before rendering the workbench. */
 +	readonly startupWebview?: { readonly extensionId: string; readonly viewType: string; readonly completedKey: string; readonly title: string };
 +
  	readonly version: string;
@@ -42,7 +41,7 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
  
 --- /dev/null
 +++ b/src/vs/workbench/browser/startupWebview.ts
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,48 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -56,7 +55,6 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
 +import { IProductService } from '../../platform/product/common/productService.js';
 +import { ILifecycleService, ShutdownReason } from '../services/lifecycle/common/lifecycle.js';
 +
-+/** Decide the first visible surface before rendering any workbench parts. */
 +export class StartupWebview extends Disposable {
 +	constructor(
 +		container: HTMLElement,
@@ -94,8 +92,7 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
 +}
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/startupWebview.css
-@@ -0,0 +1,21 @@
-+/* A blocking webview is the only workbench surface, including the first frame. */
+@@ -0,0 +1,20 @@
 +.monaco-workbench.blocking-webview > :not(.monaco-modal-editor-block):not(.quick-input-widget):not(.monaco-dialog-modal-block):not(.startup-webview-placeholder):not(:has(> .blocking-webview-content)) {
 +	visibility: hidden !important;
 +	pointer-events: none !important;

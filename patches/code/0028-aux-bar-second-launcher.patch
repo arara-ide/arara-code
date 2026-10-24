@@ -12,7 +12,7 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
 
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-@@ -10,7 +10,7 @@ import { IContextMenuService } from '../../../../platform/contextview/browser/co
+@@ -10,7 +10,7 @@
  import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
  import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
  import { INotificationService } from '../../../../platform/notification/common/notification.js';
@@ -21,7 +21,7 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
  import { ActiveAuxiliaryContext, AuxiliaryBarFocusContext } from '../../../common/contextkeys.js';
-@@ -88,7 +88,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -88,7 +88,7 @@
  
  	constructor(
  		@INotificationService private readonly launcherNotificationService: INotificationService,
@@ -30,7 +30,7 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  		@IContextMenuService contextMenuService: IContextMenuService,
  		@IWorkbenchLayoutService layoutService: IWorkbenchLayoutService,
  		@IKeybindingService keybindingService: IKeybindingService,
-@@ -120,7 +120,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -120,7 +120,7 @@
  			Extensions.Auxiliary,
  			MenuId.AuxiliaryBarTitle,
  			launcherNotificationService,
@@ -39,17 +39,7 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  			contextMenuService,
  			layoutService,
  			keybindingService,
-@@ -244,30 +244,55 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
- 		this._onDidChange.fire(undefined); // Signal grid that size constraints changed
- 	}
- 
--	// Arara Code: gancho genérico de lançador no cabeçalho do Secondary Side Bar. A extensão
--	// define o rótulo (context key `arara.ui.auxLauncher`) e o comando `arara.ui.auxLauncher.run`;
--	// vazio = oculto. `arara.ui.auxLauncherAvailable` avisa que o gancho existe nesta build.
-+	// Arara Code: lançadores genéricos no cabeçalho do Secondary Side Bar. A extensão define cada rótulo
-+	// (context keys `arara.ui.auxLauncher` e `arara.ui.auxLauncher2`) e o comando `<key>.run`; vazio = oculto.
-+	// `arara.ui.auxLauncherAvailable` avisa que o gancho existe nesta build. O segundo fica à esquerda do primeiro.
-+	// Sem espaço para os dois textos, o menos clicado vira só ícone (com o rótulo no title).
+@@ -247,24 +247,48 @@
  	protected override createHeaderArea(): HTMLElement {
  		const area = super.createHeaderArea();
  		this.contextKeyService.createKey('arara.ui.auxLauncherAvailable', true);
@@ -117,27 +107,28 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  
 --- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
-@@ -112,11 +112,17 @@
+@@ -112,13 +112,19 @@
  	max-width: 150px;
  }
  
--/* Arara Code: lançador da extensão (botão primário), à direita das plataformas e antes das ações do painel */
 -.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher {
-+/* Arara Code: lançadores da extensão (botões primários), à direita das plataformas e antes das ações do painel */
 +.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launchers {
  	margin-left: auto;
  	margin-right: 6px;
  	align-self: center;
-+	display: inline-flex;
-+	align-items: center;
-+	gap: 4px;
-+	flex-shrink: 0;
-+}
-+.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher {
  	display: inline-flex;
  	align-items: center;
  	gap: 4px;
-@@ -132,10 +138,21 @@
++	flex-shrink: 0;
++}
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher {
++	display: inline-flex;
++	align-items: center;
++	gap: 4px;
+ 	height: 22px;
+ 	padding: 0 8px;
+ 	border: 1px solid var(--vscode-button-border, transparent);
+@@ -131,10 +137,20 @@
  	white-space: nowrap;
  	flex-shrink: 0;
  }
@@ -151,7 +142,6 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
 +.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher[hidden] { display: none; }
 +.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher.icon-only { padding: 0 5px; }
 +.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher.icon-only .label { display: none; }
-+/* a arara do Arara Code, na cor do texto do botão (branca no tema padrão) */
 +.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-icon-arara {
 +	width: 14px;
 +	height: 14px;

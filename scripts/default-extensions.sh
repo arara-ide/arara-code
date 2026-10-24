@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Baixa extensões pré-compiladas do Open VSX e registra no fluxo built-in do Code-OSS.
-# Uso: scripts/default-extensions.sh /caminho/para/vscode
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -32,9 +30,6 @@ while IFS= read -r entry; do
   dest="${VSCODE}/.build/builtInExtensions/${name}"
   if [[ ! -f "${dest}/package.json" ]] || [[ "$(jq -r '.version' "${dest}/package.json")" != "${version}" ]]; then
     temp="$(mktemp -d "${CACHE}/extract.XXXXXX")"
-    # Extrai o VSIX inteiro: filtrar por 'extension/*' não é recursivo no unzip do
-    # Git for Windows nem no 7z (os VSIX não têm entradas de pasta), e as subpastas
-    # (dist/, icons/…) sumiam no build do Windows.
     if command -v unzip >/dev/null 2>&1; then
       unzip -q "${vsix}" -d "${temp}"
     else
@@ -48,7 +43,6 @@ while IFS= read -r entry; do
     rm -rf "${temp}"
   fi
 
-  # O gulp usa a cópia extraída; o VSIX local permite recriá-la caso .build seja limpo.
   relative="$(node -e 'process.stdout.write(require("node:path").relative(process.argv[1], process.argv[2]))' "${VSCODE}" "${vsix}")"
   definition="$(jq --arg vsix "${relative}" 'del(.url) + {vsix: $vsix}' <<< "${entry}")"
   jq --argjson extension "${definition}" \

@@ -31,14 +31,10 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
 
 --- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
-@@ -498,6 +498,20 @@
- 				}
- 			},
- 			{
-+				// Arara Code: comando de terminal com IA, entre o botão de split/matar e o de novo terminal
-+				id: MenuId.ViewTitle,
-+				item: {
-+					command: {
+@@ -501,6 +501,19 @@
+ 				id: MenuId.ViewTitle,
+ 				item: {
+ 					command: {
 +						id: 'arara.terminal.command',
 +						title: localize('arara.terminal.command', "AI command"),
 +						icon: Codicon.sparkle
@@ -49,9 +45,12 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
 +				}
 +			},
 +			{
- 				id: MenuId.ViewTitle,
- 				item: {
- 					command: {
++				id: MenuId.ViewTitle,
++				item: {
++					command: {
+ 						id: TerminalCommandId.New,
+ 						title: terminalStrings.new,
+ 						icon: Codicon.plus
 --- a/src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts
 @@ -52,7 +52,7 @@
@@ -63,12 +62,10 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
  import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
  import { TerminalStorageKeys } from '../common/terminalStorageKeys.js';
  import { isObject } from '../../../../base/common/types.js';
-@@ -531,6 +531,14 @@
+@@ -531,6 +531,12 @@
  				});
  			})),
  		];
-+		// Arara Code: comando de terminal com IA entre o split e a lixeira, no terminal desta linha
-+		// (só se a extensão arara-ai registrou o comando)
 +		if (CommandsRegistry.getCommand('arara.terminal.command')) {
 +			actions.push(template.elementDisposables.add(new Action('arara.terminal.command', localize('arara.terminal.command', "AI command"), ThemeIcon.asClassName(Codicon.sparkle), true, async () => {
 +				this._terminalService.setActiveInstance(instance);
@@ -80,12 +77,10 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
  				actions.push(template.elementDisposables.add(new Action(action.id, action.label, action.icon ? ThemeIcon.asClassName(action.icon) : undefined, true, async () => {
 --- a/src/vs/workbench/contrib/terminal/browser/terminalView.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
-@@ -197,6 +197,17 @@
+@@ -197,6 +197,15 @@
  		domStylesheetsJs.createStyleSheet(this._parentDomElement);
  		this._instantiationService.createInstance(TerminalThemeIconStyle, this._parentDomElement);
  
-+		// Arara Code: enquanto a IA preenche o terminal (context key arara.terminalStreaming),
-+		// escurece com um brilho e trava a execução (o Enter é engolido por keybinding da extensão)
 +		const araraStreamingKey = 'arara.terminalStreaming';
 +		const updateAraraStreaming = () => {
 +			this._parentDomElement?.classList.toggle('arara-streaming', !!this._contextKeyService.getContextKeyValue(araraStreamingKey));
@@ -100,14 +95,11 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
  		}
 --- a/src/vs/workbench/contrib/terminal/browser/media/terminal.css
 +++ b/src/vs/workbench/contrib/terminal/browser/media/terminal.css
-@@ -620,3 +620,43 @@
+@@ -620,3 +620,40 @@
  .monaco-workbench .xterm.terminal.hide {
  	visibility: hidden;
  }
 +
-+/* Arara Code: terminal sendo preenchido pela IA (context key arara.terminalStreaming).
-+   Escurece a tela do terminal e passa um brilho; a execução fica travada (o Enter é
-+   engolido por keybinding da extensão enquanto esta classe está presente). */
 +.monaco-workbench .pane-body.integrated-terminal.arara-streaming .terminal-outer-container {
 +	position: relative;
 +}

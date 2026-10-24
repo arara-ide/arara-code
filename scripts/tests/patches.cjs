@@ -16,7 +16,6 @@ assert.throws(() => validatePatch('--- a/a\n+++ b/a\n@@ -1 +1 @@\n-before\n+afte
 validatePatch('--- a/a\n+++ b/a\n@@ -1 +1 @@\n-before\n+after\n\\ No newline at end of file\n');
 const count = checkDirectory(path.join(root, 'patches'));
 
-// Reproduce how Git actually consumes the launcher patch, rather than parsing all '+' lines.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arara-launcher-patch-'));
 try {
   const file = 'src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts';
