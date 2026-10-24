@@ -55,21 +55,21 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
   const hashes = new Map();
   for (const name of files) hashes.set(name, await digestOf(path.join(dist, name)));
   const endpoint = `repos/${repo}/releases`;
-  const readRelease = () => JSON.parse(gh(['api', `${endpoint}/tags/${version}`]));
-  const assetsFor = release => {
-    const assets = [];
+  const list = resource => {
+    const items = [];
     for (let page = 1; ; page++) {
-      const batch = JSON.parse(gh(['api', `${endpoint}/${release.id}/assets?per_page=100&page=${page}`]));
-      assets.push(...batch);
-      if (batch.length < 100) return assets;
+      const batch = JSON.parse(gh(['api', `${resource}?per_page=100&page=${page}`]));
+      items.push(...batch);
+      if (batch.length < 100) return items;
     }
   };
-  let release;
-  try {
-    release = readRelease();
-  } catch (error) {
-    if (!String(error.stderr || '').includes('(HTTP 404)')) throw error;
-  }
+  const readRelease = () => {
+    const matches = list(endpoint).filter(release => release.tag_name === version);
+    if (matches.length > 1) throw new Error(`Multiple releases found for ${version}; review duplicate drafts before publishing`);
+    return matches[0];
+  };
+  const assetsFor = release => list(`${endpoint}/${release.id}/assets`);
+  let release = readRelease();
   if (release && (release.target_commitish !== sha || release.immutable || release.prerelease !== prerelease)) {
     throw new Error('Existing release has a different commit, immutability or prerelease setting');
   }
