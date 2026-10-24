@@ -38,7 +38,7 @@ try {
   fs.writeFileSync(target, patch);
   generate('--check');
   fs.writeFileSync(target, patch.replace(/\n/g, '\r\n'));
-  generate('--check'); // Existing Windows checkouts remain supported.
+  generate('--check');
   fs.writeFileSync(target, patch.replace('"Update": "Update"', '"Update": "Changed"'));
   rejectStale();
   fs.writeFileSync(target, patch);
@@ -51,7 +51,6 @@ try {
   generate('--check');
   assert.ok(!fs.readFileSync(target, 'utf8').includes('\r'), 'generation always writes LF');
 
-  // Exercise Git's Windows checkout behavior without needing a Windows runner.
   execFileSync('git', ['init', '--quiet', dir]);
   const git = (...args) => execFileSync('git', ['-c', 'core.autocrlf=true', ...args], { cwd: dir, stdio: 'pipe' });
   git('add', '.');

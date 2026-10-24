@@ -27,26 +27,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts
-@@ -0,0 +1,224 @@
-+/*---------------------------------------------------------------------------------------------
-+ *  Arara Code: atualização da IDE.
-+ *
-+ *  1. Botão "Update" na barra de título, à esquerda do Customize Layout
-+ *     (MenuId.LayoutControlMenu). Aparece quando a extensão arara-ai liga a
-+ *     context key `arara.update.available` (ela pergunta ao ac-services a cada
-+ *     5 min) e roda `arara.update.open` (abre a página da release no GitHub).
-+ *  2. Pacote novo no disco: o `apt install ./arara-code_*.deb` troca os arquivos
-+ *     em /usr/share/arara-code com a IDE aberta, mas o processo continua com o
-+ *     código antigo na memória. Aqui o workbench relê `<appRoot>/product.json`
-+ *     a cada 30 s (e ao ganhar foco); se a versão no disco for outra, mostra um
-+ *     aviso com contagem de 10 s e reinicia o app inteiro (relaunch nativo: o
-+ *     main process sai e o binário novo sobe no mesmo caminho). O hot exit
-+ *     guarda arquivos não salvos e as janelas reabrem. No Linux só fecha (o
-+ *     usuário abre o Arara Code de novo).
-+ *     "Later" troca o botão do topo por "Restart to update".
-+ *     Se alguma IA estiver gerando resposta, a contagem espera ela terminar.
-+ *--------------------------------------------------------------------------------------------*/
-+
+@@ -0,0 +1,190 @@
 +import './media/araraUpdate.css';
 +import { reset } from '../../../../base/browser/dom.js';
 +import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
@@ -72,26 +53,21 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +import { INativeWorkbenchEnvironmentService } from '../../../services/environment/electron-browser/environmentService.js';
 +import { IHostService } from '../../../services/host/browser/host.js';
 +
-+/** Ligada pela extensão arara-ai quando o ac-services diz que há versão nova. */
 +const UpdateAvailable = new RawContextKey<boolean>('arara.update.available', false);
-+/** Ligada aqui quando o pacote novo já está instalado no disco (falta reiniciar). */
 +const UpdateInstalled = new RawContextKey<boolean>('arara.update.installed', false, localize('arara.update.installed', "A newer Arara Code is installed and waits for a restart"));
 +
-+const OPEN_COMMAND = 'arara.update.open'; // registrado pela extensão arara-ai
++const OPEN_COMMAND = 'arara.update.open';
 +const RESTART_COMMAND = 'arara.update.restart';
 +const POLL_MS = 30_000;
 +const COUNTDOWN_S = 10;
-+/** Context keys de "IA gerando" (arara-ai: chat e CLIs). */
 +const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running', 'arara.opencode.running'];
 +
 +const notInAuxWindow = IsAuxiliaryWindowContext.negate();
 +
-+/** Aplica a atualização: no Linux só fecha a IDE; nos demais reinicia o app inteiro. */
 +function restart(nativeHostService: INativeHostService): Promise<void> {
 +	return isLinux ? nativeHostService.quit() : nativeHostService.relaunch();
 +}
 +
-+// order -1: fica à esquerda dos botões de layout (Customize Layout tem order 0)
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +	group: 'navigation',
 +	order: -1,
@@ -114,11 +90,6 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +	}
 +});
 +
-+/**
-+ * Botão com texto (os vizinhos são só ícone): "⤓ Atualizar" / "↻ Reiniciar para atualizar".
-+ * Os itens de menu acima não têm `icon`, então o MenuEntryActionViewItem renderiza como
-+ * rótulo e aqui só trocamos o texto puro por ícone + texto.
-+ */
 +class AraraUpdateActionViewItem extends MenuEntryActionViewItem {
 +	override render(container: HTMLElement): void {
 +		super.render(container);
@@ -140,7 +111,6 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +
 +	private readonly installed = UpdateInstalled.bindTo(this.contextKeyService);
 +	private readonly productJson: URI;
-+	/** Versão vista na leitura anterior: só age quando duas leituras seguidas concordam (dpkg terminou). */
 +	private seen: string | undefined;
 +	private handled = false;
 +	private readonly prompt = this._register(new MutableDisposable());
@@ -167,7 +137,6 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +
 +		this.productJson = joinPath(URI.file(environmentService.appRoot), 'product.json');
 +
-+		// modo dev (scripts/dev.sh): appRoot é o código-fonte, não um pacote instalado
 +		if (!environmentService.isBuilt) {
 +			return;
 +		}
@@ -187,7 +156,6 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +			const v = (JSON.parse(raw) as { version?: unknown }).version;
 +			onDisk = typeof v === 'string' ? v : undefined;
 +		} catch {
-+			// no meio do dpkg o arquivo some/fica pela metade; tenta no próximo ciclo
 +			this.seen = undefined;
 +			return;
 +		}
@@ -196,7 +164,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +			return;
 +		}
 +		if (this.seen !== onDisk) {
-+			this.seen = onDisk; // espera a próxima leitura confirmar
++			this.seen = onDisk;
 +			return;
 +		}
 +
@@ -204,7 +172,6 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		this.installed.set(true);
 +		this.logService.info(`[arara] versão ${onDisk} instalada no disco (rodando ${this.productService.version}); reiniciando`);
 +
-+		// várias janelas: só a de menor id pergunta; as outras só mostram o botão "Reiniciar"
 +		const windows = await this.nativeHostService.getWindows({ includeAuxiliaryWindows: false });
 +		if (Math.min(...windows.map(w => w.id)) !== this.nativeHostService.windowId) {
 +			return;
@@ -233,7 +200,6 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		this.prompt.value = toDisposable(() => handle.close());
 +
 +		for (let s = COUNTDOWN_S; s > 0; s--) {
-+			// com a IA gerando, segura o relógio (não perde a resposta no meio)
 +			while (!cancelled && this.aiRunning()) {
 +				handle.updateMessage(message(s));
 +				await timeout(1000);
@@ -254,8 +220,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +registerWorkbenchContribution2(AraraUpdateContribution.ID, AraraUpdateContribution, WorkbenchPhase.Eventually);
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/media/araraUpdate.css
-@@ -0,0 +1,22 @@
-+/* Arara Code: botão "Update" / "Restart to update" na barra de título (ao lado do Customize Layout). */
+@@ -0,0 +1,21 @@
 +.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label {
 +	display: flex;
 +	align-items: center;
@@ -279,11 +244,10 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +}
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
-@@ -197,6 +197,9 @@
+@@ -197,6 +197,8 @@
  // Emergency Alert
  import './contrib/emergencyAlert/electron-browser/emergencyAlert.contribution.js';
  
-+// Arara Code: botão Atualizar + reinício quando o pacote novo é instalado
 +import './contrib/arara/electron-browser/araraUpdate.contribution.js';
 +
  // MCP

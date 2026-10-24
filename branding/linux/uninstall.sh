@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Desinstala o Arara Code (Linux).
-#   arara-code-uninstall          remove o programa, mantém configurações e conversas
-#   arara-code-uninstall --all    remove também configurações, extensões e conversas
 set -euo pipefail
 
 ALL="no"
@@ -11,7 +8,6 @@ if dpkg -s arara-code >/dev/null 2>&1; then
   echo "Removendo o pacote arara-code (pede sua senha)…"
   sudo apt-get remove -y arara-code
 else
-  # instalado pelo .tar.gz: apaga a pasta onde este script está
   DIR="$( cd "$( dirname "$( readlink -f "${BASH_SOURCE[0]}" )" )/.." && pwd )"
   if [[ -x "${DIR}/arara-code" ]]; then
     echo "Removendo ${DIR}…"

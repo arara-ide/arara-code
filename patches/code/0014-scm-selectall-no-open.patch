@@ -19,24 +19,19 @@ Touches: src/vs/platform/list/browser/listService.ts src/vs/workbench/browser/ac
 
 --- a/src/vs/platform/list/browser/listService.ts
 +++ b/src/vs/platform/list/browser/listService.ts
-@@ -662,6 +662,9 @@
+@@ -662,6 +662,7 @@
  	preserveFocus?: boolean;
  	pinned?: boolean;
  	__forceEvent?: boolean;
-+	// Arara Code: marca uma selecao programatica de "selecionar tudo" (list.selectAll),
-+	// para o navigator nao abrir/focar o recurso quando a selecao resulta em 1 elemento.
 +	__selectAll?: boolean;
  }
  
  export function getSelectionKeyboardEvent(typeArg = 'keydown', preserveFocus?: boolean, pinned?: boolean): SelectionKeyboardEvent {
-@@ -708,6 +711,14 @@
+@@ -708,6 +709,11 @@
  		}
  
  		const selectionKeyboardEvent = event.browserEvent as SelectionKeyboardEvent;
 +
-+		// Arara Code: nao abrir/focar o recurso quando a selecao vem de "selecionar tudo"
-+		// (list.selectAll). Em grupos com 1 item (ex.: Changes com 1 arquivo) o select-all
-+		// resultava em 1 elemento e disparava a abertura do arquivo no editor.
 +		if (selectionKeyboardEvent.__selectAll) {
 +			return;
 +		}
@@ -46,21 +41,18 @@ Touches: src/vs/platform/list/browser/listService.ts src/vs/workbench/browser/ac
  		const sideBySide = false;
 --- a/src/vs/workbench/browser/actions/listCommands.ts
 +++ b/src/vs/workbench/browser/actions/listCommands.ts
-@@ -610,6 +610,8 @@
+@@ -610,6 +610,7 @@
  		if (focused instanceof List || focused instanceof PagedList || focused instanceof Table) {
  			const list = focused;
  			const fakeKeyboardEvent = new KeyboardEvent('keydown');
-+			// Arara Code: marca como select-all para o navigator nao abrir/focar o recurso.
 +			(fakeKeyboardEvent as any).__selectAll = true;
  			list.setSelection(range(list.length), fakeKeyboardEvent);
  		}
  
-@@ -661,6 +663,9 @@
+@@ -661,6 +662,7 @@
  			}
  
  			const fakeKeyboardEvent = new KeyboardEvent('keydown');
-+			// Arara Code: marca como select-all para o navigator nao abrir/focar o recurso
-+			// quando a selecao resulta em 1 elemento (ex.: Changes com 1 arquivo).
 +			(fakeKeyboardEvent as any).__selectAll = true;
  			tree.setSelection(newSelection, fakeKeyboardEvent);
  		}

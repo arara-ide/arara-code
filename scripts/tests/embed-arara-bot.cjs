@@ -15,7 +15,6 @@ const write = (file, text, mode) => {
 };
 
 try {
-  // Exercise the release staging function without building the web UI or the IDE.
   const source = fs.readFileSync(path.join(root, 'scripts/build.sh'), 'utf8');
   const embed = source.match(/^embed_arara_bot\(\) \{\n[\s\S]*?^\}/m)?.[0];
   assert.ok(embed, 'arara-bot staging function must exist');

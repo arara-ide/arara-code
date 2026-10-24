@@ -11,10 +11,8 @@ for (const [locale, catalog] of Object.entries(catalogs)) {
   for (const key of keys) if (!catalog[key] || JSON.stringify(parameters(catalog[key])) !== JSON.stringify(parameters(catalogs.en[key]))) throw new Error(`Mismatched parameters: ${locale}: ${key}`);
 }
 const source = `/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
-// Generated from arara-code/locales/*.json. Edit the catalogs, then run scripts/generate-localization.cjs.
 const catalogs: Record<string, Record<string, string>> = ${JSON.stringify(catalogs, null, '\t')};
 
-/** Supplement upstream language packs with messages introduced by downstream patches. */
 export function localizeAraraMessage(message: string): string {
 	const language = (globalThis._VSCODE_NLS_LANGUAGE ?? 'en').toLowerCase().split(/[-_]/)[0];
 	const catalog = catalogs[language];

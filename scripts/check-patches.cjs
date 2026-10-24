@@ -4,7 +4,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-/** Git can silently ignore added lines after an understated hunk. Reject those too. */
 function validatePatch(text, file = 'patch') {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
   let oldLeft = 0, newLeft = 0, inHunk = false, seenHunk = false;

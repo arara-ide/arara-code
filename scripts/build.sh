@@ -1,22 +1,4 @@
 #!/usr/bin/env bash
-# Build do Arara Code.
-#
-# Fluxo (ver ac-docs/docs/03-organizacao-git.md):
-#   1. copia upstream/vscodium (submódulo, tag fixa) para .work/vscodium  — o submódulo nunca é alterado
-#   2. aplica patches/vscodium/*.patch nos scripts do VSCodium
-#   3. copia assets de branding e ícones pré-gerados para .work/vscodium/src/stable
-#   4. faz merge de branding/product.overlay.json no product.json do VSCodium
-#   5. copia patches/code/*.patch para .work/vscodium/patches/user/ (hook oficial do VSCodium p/ downstream)
-#   6. roda get_repo.sh + build.sh do VSCodium com as variáveis de branding exportadas
-#
-# Uso: scripts/build.sh [--skip-source] [--prepare-only] [--no-deb]
-#   --skip-source   reusa o vscode/ já clonado
-#   --prepare-only  para depois de clone + patches + branding + npm ci (sem compilar); usado pelo scripts/dev.sh
-#   --no-deb        só a pasta VSCode-linux-<arch> (sem gerar o .deb)
-#
-# As extensões ../arara-ai (ARARA_AI_DIR), ../arara-bot/extension (ARARA_BOT_DIR) e ../arara-orchestra
-# (ARARA_ORCHESTRA_DIR) são compiladas e entram como built-in.
-# No Linux o resultado vai para dist/: arara-code_<versão>_<arch>.deb e .tar.gz
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -38,7 +20,6 @@ for arg in "$@"; do
   esac
 done
 
-# Release builds default to production; ac-docs/scripts/environment.sh selects a local override.
 ARARA_ENVIRONMENT="production"
 if [[ -f "${ROOT}/.arara-environment" ]]; then
   ARARA_ENVIRONMENT="$(cat "${ROOT}/.arara-environment")"
@@ -47,14 +28,12 @@ node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}"
 
 [[ -f "${UPSTREAM}/build.sh" ]] || git -C "${ROOT}" submodule update --init
 
-# --- 1. cópia de trabalho (preserva vscode/ quando --skip-source)
 mkdir -p "${WORK}"
 if command -v rsync >/dev/null 2>&1; then
   rsync -a --delete \
     --exclude '/vscode/' --exclude '/VSCode-*/' --exclude '/vscode-reh*/' --exclude '/dev/build.env' \
     "${UPSTREAM}/" "${WORK}/"
 else
-  # Windows (Git Bash) não tem rsync: mesma cópia com find + tar.
   mkdir -p "${WORK}/dev"
   [[ -f "${WORK}/dev/build.env" ]] && cp "${WORK}/dev/build.env" "${WORK}/.build.env.keep"
   find "${WORK}" -mindepth 1 -maxdepth 1 ! -name vscode ! -name 'VSCode-*' ! -name 'vscode-reh*' -exec rm -rf {} +
@@ -62,33 +41,26 @@ else
   mkdir -p "${WORK}/dev"
   [[ -f "${WORK}/.build.env.keep" ]] && mv "${WORK}/.build.env.keep" "${WORK}/dev/build.env"
 fi
-rm -f "${WORK}/.git"   # o .git do submódulo é só um ponteiro; não queremos git no work dir
+rm -f "${WORK}/.git"
 
-# --- 2. patches nos scripts do VSCodium
 shopt -s nullglob
 for p in "${ROOT}"/patches/vscodium/*.patch; do
   echo "patch vscodium: $( basename "${p}" )"
   patch -d "${WORK}" -p1 --forward --no-backup-if-mismatch < "${p}"
 done
 
-# --- 3. branding e ícones pré-gerados (sem dependência de ferramentas de imagem no build)
 if [[ ! -d "${ROOT}/branding/src-stable" ]]; then
   echo "» Gerando assets de branding pela primeira vez..."
   "${ROOT}/scripts/build-icons.sh" "${ROOT}/branding/src-stable"
 fi
 cp -rp "${ROOT}/branding/src-stable/"* "${WORK}/src/stable/"
-# Banner e diálogo do instalador MSI (WiX) ficam fora de src/stable no VSCodium.
 cp -p "${ROOT}/branding/msi/stable/"*.bmp "${WORK}/build/windows/msi/resources/stable/"
 
-# --- 4. product.json (o prepare_vscode.sh faz `vscode/product.json * ../product.json`)
 jq -s '.[0] * .[1]' "${WORK}/product.json" "${ROOT}/branding/product.overlay.json" > "${WORK}/product.json.tmp"
 mv "${WORK}/product.json.tmp" "${WORK}/product.json"
 
-# Executado depois do preparo em todas as plataformas, antes do gulp empacotar.
-# A cópia de trabalho é recriada acima; o submódulo permanece intacto.
 printf '\nbash "%s/scripts/default-extensions.sh" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
 
-# --- 5. patches no Code-OSS
 node "${ROOT}/scripts/check-patches.cjs"
 node "${ROOT}/scripts/generate-localization.cjs" --check
 mkdir -p "${WORK}/patches/user"
@@ -97,7 +69,6 @@ for p in "${ROOT}"/patches/code/*.patch; do
 done
 shopt -u nullglob
 
-# --- 6. build
 export APP_NAME="Arara Code"
 export BINARY_NAME="arara-code"
 export ORG_NAME="Arara"
@@ -115,8 +86,7 @@ export CI_BUILD="${CI_BUILD:-no}"
 export VSCODE_QUALITY="stable"
 export VSCODE_LATEST="no"
 export VSCODE_SKIP_NODE_VERSION_CHECK="yes"
-export DISABLE_UPDATE="yes"   # sem servidor de update ainda (updateUrl vazio no overlay)
-# heap do Node nos passos de gulp; o VSCodium usa 8192 por padrão. Baixe se a máquina tiver pouca RAM.
+export DISABLE_UPDATE="yes"
 export MAX_OLD_SPACE_SIZE="${MAX_OLD_SPACE_SIZE:-8192}"
 
 case "${OSTYPE}" in
@@ -130,7 +100,6 @@ case "$( uname -m )" in
 esac
 
 cd "${WORK}"
-# os scripts do VSCodium leem variáveis opcionais não definidas
 set +u
 if [[ "${SKIP_SOURCE}" == "no" ]]; then
   rm -rf vscode VSCode-* vscode-reh*
@@ -140,16 +109,13 @@ if [[ "${SKIP_SOURCE}" == "no" ]]; then
 else
   [[ -d vscode ]] || { echo "--skip-source sem vscode/ existente" >&2; exit 1; }
   . dev/build.env
-  # número novo a cada build (mesma fórmula do get_repo.sh: hora do ano), senão o apt não atualiza
   RELEASE_VERSION="${MS_TAG}$( printf "%04d" $(( $(date +%-j) * 24 + $(date +%-H) )) )"
   { echo "MS_TAG=\"${MS_TAG}\""; echo "MS_COMMIT=\"${MS_COMMIT}\""; echo "RELEASE_VERSION=\"${RELEASE_VERSION}\""; } > dev/build.env
   export MS_TAG MS_COMMIT RELEASE_VERSION
-  # volta o vscode/ ao estado limpo da tag antes de reaplicar os patches
   ( cd vscode && git add -A && git reset -q --hard HEAD && git clean -fdq -e node_modules && rm -rf .build out* )
   rm -rf VSCode-*
 fi
 
-# --- 7. extensão arara-ai embutida (built-in): o gulp empacota tudo em vscode/extensions/*
 embed_arara_ai() {
   [[ -f "${ARARA_AI_DIR}/package.json" ]] || { echo "! ${ARARA_AI_DIR} não encontrado; build sem a extensão de IA" >&2; return 0; }
   echo "» Compilando arara-ai…"
@@ -157,7 +123,6 @@ embed_arara_ai() {
   local dest="${WORK}/vscode/extensions/arara-ai"
   rm -rf "${dest}"
   mkdir -p "${dest}"
-  # mesmo conjunto do .vscodeignore: só o que roda (sem src/, testes, node_modules)
   cp "${ARARA_AI_DIR}/package.json" "${dest}/"
   for catalog in "${ARARA_AI_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
   node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
@@ -168,8 +133,6 @@ embed_arara_ai() {
   cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
 }
 
-# --- 7b. extensão arara-bot embutida (open source, ../arara-bot/extension): servidor empacotado + webview própria
-# A interface é a webview da extensão (dist/webview.js, via esbuild); a antiga web UI React não é mais embarcada.
 embed_arara_bot() {
   [[ -f "${ARARA_BOT_DIR}/extension/package.json" ]] || { echo "! ${ARARA_BOT_DIR} não encontrado; build sem o Arara Bot" >&2; return 0; }
   echo "» Compilando arara-bot…"
@@ -180,15 +143,12 @@ embed_arara_bot() {
   mkdir -p "${dest}/dist"
   cp "${src}/package.json" "${src}/LICENSE" "${src}/NOTICE" "${dest}/"
   for catalog in "${src}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
-  # extension.js (host), hub.js (processo da máquina), bridge.js (MCP do navegador), webview.js (interface)
   local f
   for f in extension hub bridge webview; do cp "${src}/dist/${f}.js" "${dest}/dist/"; done
   cp -r "${src}/media" "${src}/server" "${src}/skills" "${dest}/"
   test -s "${dest}/server/index.js" && test -s "${dest}/dist/webview.js"
 }
 
-# --- 7c. extensão Orquestra embutida (../arara-orchestra): usa a API do arara-ai em tempo de execução
-# (exports.orchestraHost); o build dela precisa do arara-ai ao lado, só para os tipos.
 embed_arara_orchestra() {
   [[ -f "${ARARA_ORCHESTRA_DIR}/package.json" ]] || { echo "! ${ARARA_ORCHESTRA_DIR} não encontrado; build sem a Orquestra" >&2; return 0; }
   echo "» Compilando arara-orchestra…"
@@ -205,7 +165,6 @@ embed_arara_orchestra() {
 }
 
 if [[ "${PREPARE_ONLY}" == "yes" ]]; then
-  # o mesmo que o build.sh do VSCodium faz antes de chamar o gulp
   . version.sh
   . prepare_vscode.sh
   echo
@@ -214,8 +173,6 @@ if [[ "${PREPARE_ONLY}" == "yes" ]]; then
 fi
 
 if [[ "${OS_NAME}" == "linux" ]]; then
-  # Mesmo fluxo do build.sh do VSCodium (Linux, sem CI), em etapas, para a
-  # extensão e os textos do .deb entrarem depois do prepare_vscode.sh.
   . version.sh
   . prepare_vscode.sh
   embed_arara_ai
@@ -233,7 +190,6 @@ if [[ "${OS_NAME}" == "linux" ]]; then
     npm run gulp "vscode-linux-${VSCODE_ARCH}-min-packing"
   )
   find "VSCode-linux-${VSCODE_ARCH}" -print0 | xargs -0 touch -c
-  # desinstalador junto do programa (bin/arara-code-uninstall; no .deb vira /usr/bin/arara-code-uninstall)
   install -m 755 "${ROOT}/branding/linux/uninstall.sh" "VSCode-linux-${VSCODE_ARCH}/bin/arara-code-uninstall"
   for t in postinst prerm; do
     f="vscode/resources/linux/debian/${t}.template"
@@ -245,8 +201,6 @@ if [[ "${OS_NAME}" == "linux" ]]; then
     fi
   done
 elif [[ "${OS_NAME}" == "windows" ]]; then
-  # Mesmo fluxo do build.sh do VSCodium (Windows, CI_BUILD=no), em etapas, para a
-  # extensão entrar depois do prepare_vscode.sh. Sem CLI nem REH (não usamos).
   . version.sh
   . prepare_vscode.sh
   embed_arara_ai
@@ -262,7 +216,6 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
     node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc win32
     npm run gulp "vscode-win32-${VSCODE_ARCH}-min-packing"
   )
-  # zip + instaladores (sistema e usuário). APP_NAME sem espaço só para o nome dos arquivos.
   (
     export SHOULD_BUILD_CLI="no" SHOULD_BUILD_REH="no" SHOULD_BUILD_REH_WEB="no"
     export SHOULD_BUILD_MSI="no" SHOULD_BUILD_MSI_NOUP="no"
@@ -272,9 +225,6 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
   mkdir -p "${OUT}"
   cp assets/* "${OUT}/"
 else
-  # macOS: mesmo fluxo do build.sh do VSCodium, em etapas, para a extensão entrar
-  # depois do prepare_vscode.sh. Sem CLI nem REH. Sem conta Apple Developer: assinatura
-  # ad-hoc (o usuário libera na primeira abertura), sem notarização nem dmg.
   . version.sh
   . prepare_vscode.sh
   embed_arara_ai
@@ -305,12 +255,7 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   mkdir -p "${OUT}"
   tar czf "${OUT}/arara-code-linux-${VSCODE_ARCH}-${RELEASE_VERSION}.tar.gz" -C "${WORK}/VSCode-linux-${VSCODE_ARCH}" .
   if [[ "${BUILD_DEB}" == "yes" ]]; then
-    # O dpkg-shlibdeps.pl do Chromium não funciona com o dpkg ≥ 1.23 (Ubuntu 26.04+).
-    # Nesse caso usa a lista de dependências que o próprio VS Code mantém (dep-lists.ts).
     if ! perl -e 'use Dpkg; exit(($Dpkg::PROGVERSION =~ /^1\.(2[3-9]|[3-9]\d)/) ? 0 : 1)' 2>/dev/null; then
-      # O calculate-deps.ts baixa o script com `curl` sem `-f`, uma vez por binário: um 429 do
-      # raw.githubusercontent.com vira o corpo do .pl e quebra com "syntax error near 429:".
-      # Baixa uma vez aqui, falhando de verdade e com retry, e faz o calculate-deps.ts reutilizá-lo.
       DPKG_SHLIBDEPS_PL="$(cd "${WORK}/vscode" && node -p "require('os').tmpdir()")/dpkg-shlibdeps.pl"
       CHROMIUM_REV="$(cd "${WORK}/vscode" && node -p "require('./cgmanifest.json').registrations.find(r => r.component.type === 'git' && r.component.git.name === 'chromium').version")"
       curl -fsSL --retry 6 --retry-delay 15 --retry-all-errors \

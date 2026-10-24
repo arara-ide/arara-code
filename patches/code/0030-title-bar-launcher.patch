@@ -15,35 +15,24 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
-@@ -0,0 +1,39 @@
-+/*---------------------------------------------------------------------------------------------
-+ *  Arara Code: gancho genérico de lançador (só ícone) na barra de título.
-+ *
-+ *  Botão à esquerda do "Update" e do Customize Layout (MenuId.LayoutControlMenu).
-+ *  Aparece quando a extensão liga a context key `arara.ui.titleLauncher` e o clique
-+ *  roda `arara.ui.titleLauncher.run`. O ícone é `Codicon.sparkle` (estrelinha de IA).
-+ *  O que o botão abre é decisão da extensão.
-+ *--------------------------------------------------------------------------------------------*/
-+
+@@ -0,0 +1,28 @@
 +import { Codicon } from '../../../../base/common/codicons.js';
 +import { localize } from '../../../../nls.js';
 +import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
 +import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
 +
-+// order -2: à esquerda do botão de atualização (-1) e dos botões de layout (0)
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +	group: 'navigation',
 +	order: -2,
 +	command: {
-+		id: 'arara.ui.titleLauncher.run', // registrado pela extensão
++		id: 'arara.ui.titleLauncher.run',
 +		title: localize('arara.ui.titleLauncher', "Arara"),
 +		icon: Codicon.sparkle,
 +	},
 +	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.ui.titleLauncher')),
 +});
 +
-+// File > Preferences (e engrenagem): logo abaixo de Settings (2_configuration, order 2)
 +for (const id of [MenuId.MenubarPreferencesMenu, MenuId.GlobalActivity]) {
 +	MenuRegistry.appendMenuItem(id, {
 +		group: '2_configuration',
@@ -57,11 +46,10 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +}
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
-@@ -200,6 +200,9 @@
- // Arara Code: botão Atualizar + reinício quando o pacote novo é instalado
+@@ -199,6 +199,8 @@
+ 
  import './contrib/arara/electron-browser/araraUpdate.contribution.js';
  
-+// Arara Code: lançador da extensão (ícone) na barra de título
 +import './contrib/arara/electron-browser/araraTitleLauncher.contribution.js';
 +
  // MCP

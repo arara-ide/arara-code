@@ -27,7 +27,6 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  # Depois da primeira publicação, deixe as outras plataformas terminarem.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -57,7 +56,6 @@ jobs:
           node scripts/tests/embed-arara-orchestra.cjs
           node --test scripts/tests/publish-release.cjs
 
-  # Uma versão só para todas as plataformas (mesma fórmula do get_repo.sh do VSCodium).
   version:
     needs: verify
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
@@ -98,7 +96,6 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      # arara-ai é privado; o build.sh espera encontrá-lo em ARARA_AI_DIR.
       - name: Checkout arara-ai
         uses: actions/checkout@v4
         with:
@@ -108,7 +105,6 @@ jobs:
           path: arara-ai
           persist-credentials: false
 
-      # arara-bot é privado; usa a credencial dos componentes irmãos.
       - name: Checkout arara-bot
         uses: actions/checkout@v4
         with:
@@ -118,7 +114,6 @@ jobs:
           path: arara-bot
           persist-credentials: false
 
-      # arara-orchestra é privado; o build dela usa os tipos do arara-ai ao lado.
       - name: Checkout arara-orchestra
         uses: actions/checkout@v4
         with:
@@ -224,7 +219,6 @@ jobs:
           path: arara-ai
           persist-credentials: false
 
-      # arara-bot é privado; usa a credencial dos componentes irmãos.
       - name: Checkout arara-bot
         uses: actions/checkout@v4
         with:
@@ -234,7 +228,6 @@ jobs:
           path: arara-bot
           persist-credentials: false
 
-      # arara-orchestra é privado; o build dela usa os tipos do arara-ai ao lado.
       - name: Checkout arara-orchestra
         uses: actions/checkout@v4
         with:

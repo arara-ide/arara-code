@@ -15,7 +15,6 @@ const write = (file, text, mode) => {
 };
 
 try {
-  // Exercise the release staging function without downloading/building the IDE.
   const source = fs.readFileSync(path.join(root, 'scripts/build.sh'), 'utf8');
   const embed = source.match(/^embed_arara_ai\(\) \{\n[\s\S]*?^\}/m)?.[0];
   assert.ok(embed, 'release staging function must exist');

@@ -22,12 +22,9 @@ Touches: src/vs/workbench/electron-browser/actions/developerActions.ts
  import { INativeWorkbenchEnvironmentService } from '../../services/environment/electron-browser/environmentService.js';
  import { URI } from '../../../base/common/uri.js';
  import { getActiveWindow } from '../../../base/browser/dom.js';
-@@ -27,22 +25,27 @@
- 			id: 'workbench.action.toggleDevTools',
+@@ -28,21 +26,23 @@
  			title: localize2('toggleDevTools', 'Toggle Developer Tools'),
  			category: Categories.Developer,
-+			// Arara Code: sem atalho (Ctrl+Shift+I é "Formatar documento" no Linux) e só
-+			// rodando do código-fonte; no release o comando não aparece em lugar nenhum
  			f1: true,
 -			keybinding: {
 -				weight: KeybindingWeight.WorkbenchContrib + 50,
@@ -52,7 +49,6 @@ Touches: src/vs/workbench/electron-browser/actions/developerActions.ts
  	}
  
  	async run(accessor: ServicesAccessor): Promise<void> {
-+		// Arara Code: precondition não vale para executeCommand (extensões); no release não abre nunca
 +		if (accessor.get(IWorkbenchEnvironmentService).isBuilt) {
 +			return;
 +		}
@@ -61,14 +57,13 @@ Touches: src/vs/workbench/electron-browser/actions/developerActions.ts
  		return nativeHostService.toggleDevTools({ targetWindowId: getActiveWindow().vscodeWindowId });
 --- a/src/vs/code/electron-browser/workbench/workbench.ts
 +++ b/src/vs/code/electron-browser/workbench/workbench.ts
-@@ -471,16 +471,12 @@
+@@ -471,16 +471,11 @@
  				].join('');
  			};
  
 -		// Devtools & reload support
 -		const TOGGLE_DEV_TOOLS_KB = (safeProcess.platform === 'darwin' ? 'meta-alt-73' : 'ctrl-shift-73'); // mac: Cmd-Alt-I, rest: Ctrl-Shift-I
 -		const TOGGLE_DEV_TOOLS_KB_ALT = '123'; // F12
-+		// Arara Code: sem atalho de devtools (Ctrl+Shift+I / F12); só o reload de dev
  		const RELOAD_KB = (safeProcess.platform === 'darwin' ? 'meta-82' : 'ctrl-82'); // mac: Cmd-R, rest: Ctrl-R
  
  		let listener: ((e: KeyboardEvent) => void) | undefined = function (e) {

@@ -14,7 +14,7 @@ Touches: src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.c
  			scope: ConfigurationScope.MACHINE,
  			type: 'boolean',
 -			default: true,
-+			default: false, // Arara Code: não abrir walkthroughs ao instalar extensões
++			default: false,
  			description: localize('workbench.welcomePage.walkthroughs.openOnInstall', "When enabled, an extension's walkthrough will open upon install of the extension.")
  		},
  		'workbench.welcomePage.extraAnnouncements': {
@@ -23,7 +23,7 @@ Touches: src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.c
  				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.agentSessionsWelcomePage' }, "Open the Agent Sessions Welcome page. Will override the workbench secondary side bar visibility settings."),
  			],
 -			'default': 'welcomePage',
-+			'default': 'none', // Arara Code: sem página de boas-vindas; o editor vazio mostra a tela de atalhos
++			'default': 'none',
  			'description': localize('workbench.startupEditor', "Controls which editor is shown at startup, if none are restored from the previous session."),
  			'experiment': { mode: 'auto' },
  			agentsWindow: { default: 'none', readOnly: true },

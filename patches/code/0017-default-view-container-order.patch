@@ -16,11 +16,10 @@ Touches: src/vs/workbench/browser/parts/paneCompositeBar.ts
  import { localize } from '../../../nls.js';
  import { ActionsOrientation } from '../../../base/browser/ui/actionbar/actionbar.js';
  import { IActivityService } from '../../services/activity/common/activity.js';
-@@ -128,6 +129,26 @@
+@@ -128,6 +129,25 @@
  		this.compositeBar = this.createCompositeBar(cachedItems);
  		this.onDidRegisterViewContainers(this.getViewContainers());
  		this.registerListeners();
-+		// Generic hook: the extension supplies the order; no provider logic in the core.
 +		this._register(CommandsRegistry.registerCommand(`_workbench.orderViewContainers.${this.location}`, (_accessor, ids: unknown) => {
 +			if (!Array.isArray(ids) || !ids.every(isString) || new Set(ids).size !== ids.length) {
 +				return;
@@ -28,7 +27,7 @@ Touches: src/vs/workbench/browser/parts/paneCompositeBar.ts
 +			const key = `workbench.viewContainers.defaultOrder.${this.location}`;
 +			const signature = JSON.stringify(ids);
 +			if (this.storageService.get(key, StorageScope.PROFILE) === signature) {
-+				return; // Preserve manual ordering until the supplied default changes.
++				return;
 +			}
 +			const items = this.compositeBar.getCompositeBarItems();
 +			const ordered = ids.map(id => items.find(item => item.id === id)).filter((item): item is ICompositeBarItem => !!item);

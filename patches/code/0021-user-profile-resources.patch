@@ -20,12 +20,11 @@ Touches: userDataProfileManagement.ts (command registration only).
  import { CancellationToken } from '../../../../base/common/cancellation.js';
  import { CancellationError } from '../../../../base/common/errors.js';
  import { Disposable } from '../../../../base/common/lifecycle.js';
-@@ -211,3 +214,14 @@
+@@ -211,3 +214,13 @@
  }
  
  registerSingleton(IUserDataProfileManagementService, UserDataProfileManagementService, InstantiationType.Eager /* Eager because it updates the current window profile by listening to profiles changes */);
 +
-+// Extensions can edit documents, but cannot resolve the active profile's settings/keybindings URIs.
 +CommandsRegistry.registerCommand('_arara.userProfileResources', accessor => {
 +	const profile = accessor.get(IUserDataProfileService).currentProfile;
 +	const properties = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).getConfigurationProperties();

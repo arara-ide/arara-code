@@ -1,19 +1,4 @@
 #!/usr/bin/env bash
-# Abre o Arara Code em modo desenvolvimento, rápido.
-#
-# - Usa o código do VS Code já preparado em .work/vscodium/vscode (patches + branding
-#   aplicados). Se ele não existir, roda o preparo uma vez (clone + npm ci, ~10 min).
-# - Só transpila o TypeScript (~10 s, sem typecheck, sem minificar, sem empacotar).
-# - Carrega as extensões ../arara-ai e ../arara-bot/extension direto da pasta (sem .vsix).
-# - Perfil isolado em .work/dev-profile (não mexe no seu VS Code/VSCodium).
-#
-# Uso:
-#   scripts/dev.sh                 # abre a IDE
-#   scripts/dev.sh ~/meu-projeto   # abre a IDE nessa pasta
-#   scripts/dev.sh --production    # desenvolvimento com APIs de produção
-#   scripts/dev.sh --reset         # apaga o perfil de dev antes de abrir
-#
-# Variáveis: ARARA_AI_DIR (padrão ../arara-ai), ARARA_BOT_DIR (padrão ../arara-bot), ARARA_ORCHESTRA_DIR (padrão ../arara-orchestra), ARARA_BOT_REBUILD=1, ARARA_DEV_PROFILE.
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -62,7 +47,6 @@ PROFILE="${ARARA_DEV_PROFILE:-${PROFILE_DEFAULT}}"
 if [[ "${RESET_PROFILE}" == true ]]; then rm -rf "${PROFILE}"; fi
 node "${ROOT}/scripts/apply-environment.cjs" "${DEV_ENVIRONMENT}"
 
-# 1. código do VS Code preparado (uma vez só)
 if [[ ! -d "${VSCODE}/node_modules" ]]; then
   echo "» Primeira vez: preparando o código do VS Code (clone + patches + npm ci)…"
   echo "  Isso leva ~10 min e ~9 GB. Nas próximas vezes é instantâneo."
@@ -71,10 +55,8 @@ fi
 
 cd "${VSCODE}"
 
-# Atualiza a fonte preparada quando os patches do projeto mudarem.
 bash "${ROOT}/scripts/sync-dev-patches.sh"
 
-# No Windows, uma tentativa interrompida pode deixar node_modules incompleto.
 case "${OSTYPE}" in
   msys*|cygwin*)
     if [[ ! -f node_modules/gulp/bin/gulp.js ]]; then
@@ -85,11 +67,8 @@ case "${OSTYPE}" in
     ;;
 esac
 
-# Extensões padrão também no perfil de desenvolvimento (preLaunch é pulado).
 bash "${ROOT}/scripts/default-extensions.sh" "${VSCODE}"
 
-# 2. prepara a fonte dos ícones antes do transpile copiar os assets para out/.
-# O fluxo rápido pula o preLaunch/build-fast, que normalmente faz esta etapa.
 echo "» Preparando ícones do workbench…"
 npm run --silent gulp copy-codicons >/dev/null
 if [[ ! -s src/vs/base/browser/ui/codicons/codicon/codicon.ttf ]]; then
@@ -97,7 +76,6 @@ if [[ ! -s src/vs/base/browser/ui/codicons/codicon/codicon.ttf ]]; then
   exit 1
 fi
 
-# 2a. transpile rápido (esbuild, sem typecheck)
 echo "» Transpilando o workbench…"
 npm run --silent transpile-client >/dev/null
 if [[ ! -s out/vs/base/browser/ui/codicons/codicon/codicon.ttf ]]; then
@@ -105,13 +83,11 @@ if [[ ! -s out/vs/base/browser/ui/codicons/codicon/codicon.ttf ]]; then
   exit 1
 fi
 
-# 2b. extensões built-in (git, emmet, temas…): só na primeira vez (~10 s)
 if [[ ! -f extensions/git/out/main.js ]]; then
   echo "» Compilando extensões built-in (primeira vez)…"
   npm run --silent gulp compile-extensions >/dev/null
 fi
 
-# 3. Electron (baixa só se a versão mudou)
 ELECTRON_BIN=".build/electron/$( node -p "require('./product.json').applicationName" )"
 case "${OSTYPE}" in
   msys*|cygwin*) ELECTRON_BIN=".build/electron/$( node -p "require('./product.json').nameShort" ).exe" ;;
@@ -121,7 +97,6 @@ if [[ ! -x "${ELECTRON_BIN}" ]]; then
   npm run --silent electron >/dev/null
 fi
 
-# 4. extensão arara-ai
 EXT_ARGS=()
 if [[ -f "${EXT_DIR}/package.json" ]]; then
   if [[ ! -d "${EXT_DIR}/node_modules" ]]; then
@@ -130,8 +105,6 @@ if [[ -f "${EXT_DIR}/package.json" ]]; then
   fi
   echo "» Buildando arara-ai…"
   ( cd "${EXT_DIR}" && npm run --silent build >/dev/null )
-  # Mantenha também a extensão embutida do dev atualizada: recursos/hooks podem
-  # ser resolvidos por essa cópia em janelas abertas sem extensionDevelopmentPath.
   mkdir -p "${VSCODE}/extensions/arara-ai"
   cp "${EXT_DIR}/package.json" "${VSCODE}/extensions/arara-ai/"
   for catalog in "${EXT_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${VSCODE}/extensions/arara-ai/"; done
@@ -139,7 +112,6 @@ if [[ -f "${EXT_DIR}/package.json" ]]; then
   node "${ROOT}/scripts/apply-environment.cjs" "${DEV_ENVIRONMENT}" "${VSCODE}/extensions/arara-ai/package.json"
   DEV_EXT_DIR="${EXT_DIR}"
   if [[ "${DEV_ENVIRONMENT}" == production ]]; then
-    # O manifesto do checkout continua local. A cópia tem padrões de produção.
     DEV_EXT_DIR="${ROOT}/.work/dev-extensions/production/arara-ai"
     mkdir -p "${DEV_EXT_DIR}"
     cp "${EXT_DIR}/package.json" "${DEV_EXT_DIR}/"
@@ -152,7 +124,6 @@ else
   echo "! ${EXT_DIR} não encontrado; abrindo sem a extensão arara-ai." >&2
 fi
 
-# 5. extensão arara-bot (open source). Compila o servidor só na primeira vez ou com ARARA_BOT_REBUILD=1.
 if [[ -f "${BOT_DIR}/extension/package.json" ]]; then
   if [[ ! -s "${BOT_DIR}/extension/server/index.js" || "${ARARA_BOT_REBUILD:-0}" == 1 ]]; then
     echo "» Compilando arara-bot (servidor)…"
@@ -165,7 +136,6 @@ else
   echo "! ${BOT_DIR} não encontrado; abrindo sem o Arara Bot." >&2
 fi
 
-# 6. extensão Orquestra (../arara-orchestra): consome a API do arara-ai em tempo de execução
 if [[ -f "${ORCH_DIR}/package.json" ]]; then
   echo "» Buildando arara-orchestra…"
   ( cd "${ORCH_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund >/dev/null; } && npm run --silent build >/dev/null )
@@ -179,7 +149,6 @@ mkdir -p "${PROFILE}/data" "${PROFILE}/extensions"
 echo "» Abrindo Arara Code (dev, ${DEV_ENVIRONMENT}) — perfil: ${PROFILE}"
 case "${OSTYPE}" in
   msys*|cygwin*)
-    # Equivalente ao scripts/code.bat, sem passar argumentos pelo cmd.exe.
     unset ELECTRON_RUN_AS_NODE
     NODE_ENV=development VSCODE_DEV=1 VSCODE_CLI=1 \
       ELECTRON_ENABLE_LOGGING=1 ELECTRON_ENABLE_STACK_DUMPING=1 \
@@ -189,7 +158,6 @@ case "${OSTYPE}" in
       "${EXT_ARGS[@]}" "${ARGS[@]}"
     ;;
 esac
-# VSCODE_SKIP_PRELAUNCH: pula o preLaunch (que faria npm ci/compile completo se algo faltasse)
 VSCODE_SKIP_PRELAUNCH=1 exec ./scripts/code.sh \
   --user-data-dir "${PROFILE}/data" \
   --extensions-dir "${PROFILE}/extensions" \

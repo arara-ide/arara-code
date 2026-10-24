@@ -12,7 +12,7 @@ Touches: src/vs/workbench/services/themes/browser/workbenchThemeService.ts
 
 --- a/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
 +++ b/src/vs/workbench/services/themes/browser/workbenchThemeService.ts
-@@ -201,11 +201,8 @@
+@@ -201,11 +201,6 @@
  		const extDevLoc = extDevLocs && extDevLocs.length === 1 ? extDevLocs[0] : undefined; // in dev mode, switch to a theme provided by the extension under dev.
  
  		const initializeColorTheme = async () => {
@@ -21,8 +21,6 @@ Touches: src/vs/workbench/services/themes/browser/workbenchThemeService.ts
 -				const matchedColorTheme = devThemes.find(theme => theme.type === this.currentColorTheme.type);
 -				return this.setColorTheme(matchedColorTheme ? matchedColorTheme.id : devThemes[0].id, undefined);
 -			}
-+			// Arara Code: o upstream troca para o tema da extensão em desenvolvimento. No dev.sh essa
-+			// extensão é a arara-ai, que traz o Arara Dark 2027; aqui o modo dev abre no tema normal.
  			let theme = this.colorThemeRegistry.findThemeBySettingsId(this.settings.colorTheme, undefined);
  			if (!theme) {
  				// If the current theme is not available, first make sure setting sync is complete

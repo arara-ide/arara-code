@@ -12,12 +12,11 @@ Touches: src/vs/base/browser/ui/menu/menu.ts
 
 --- a/src/vs/base/browser/ui/menu/menu.ts
 +++ b/src/vs/base/browser/ui/menu/menu.ts
-@@ -551,7 +551,12 @@
+@@ -551,7 +551,11 @@
  			}
  		}
  
 -		this.check = append(this.item, $('span.menu-item-check' + ThemeIcon.asCSSSelector(Codicon.menuSelection)));
-+		// Arara Code: ações de IA (ícone sparkle) mostram a estrelinha no espaço do check, à esquerda
 +		const aiIcon = !!this._action.class?.split(' ').includes(`codicon-${Codicon.sparkle.id}`);
 +		if (aiIcon) {
 +			this.item.classList.add('arara-ai-item');
@@ -26,7 +25,7 @@ Touches: src/vs/base/browser/ui/menu/menu.ts
  		this.check.setAttribute('role', 'none');
  
  		this.label = append(this.item, $('span.action-label'));
-@@ -1041,6 +1046,7 @@
+@@ -1041,6 +1045,7 @@
  
  ${formatRule(Codicon.menuSelection)}
  ${formatRule(Codicon.menuSubmenu)}
@@ -34,7 +33,7 @@ Touches: src/vs/base/browser/ui/menu/menu.ts
  
  .monaco-menu .monaco-action-bar {
  	text-align: right;
-@@ -1240,7 +1246,8 @@
+@@ -1240,7 +1245,8 @@
  	height: 100%;
  }
  

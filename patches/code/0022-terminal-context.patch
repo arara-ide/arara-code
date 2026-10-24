@@ -10,12 +10,10 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalActions.ts
 
 --- a/src/vs/workbench/contrib/terminal/browser/terminalActions.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalActions.ts
-@@ -294,6 +294,36 @@
- }
+@@ -295,6 +295,35 @@
  
  export function registerTerminalActions() {
-+	// Generic read-only bridge: interpretation and attachment policy belong to the extension.
-+	registerTerminalAction({
+ 	registerTerminalAction({
 +		id: 'arara.internal.terminalSnapshot',
 +		title: localize2('arara.terminalSnapshot', 'Read Terminal Buffer'),
 +		f1: false,
@@ -44,6 +42,7 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalActions.ts
 +		run: async (_, accessor, args) => accessor.get(ICommandService).executeCommand('arara.chat.addTerminal', parseActionArgs(args)?.[0]?.instanceId)
 +	});
 +
- 	registerTerminalAction({
++	registerTerminalAction({
  		id: TerminalCommandId.NewInActiveWorkspace,
  		title: localize2('workbench.action.terminal.newInActiveWorkspace', 'Create New Terminal (In Active Workspace)'),
+ 		run: async (c) => {

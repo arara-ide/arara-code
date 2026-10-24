@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Preparo incremental para desenvolvimento. A primeira execução usa prepare.sh;
-# execuções seguintes reaproveitam o checkout e node_modules quando possível.
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -13,8 +11,6 @@ if (( $# > 1 )) || { (( $# == 1 )) && [[ "$1" != --skip-source ]]; }; then
   exit 2
 fi
 
-# O hash inclui tudo que muda o preparo fora dos patches do Code-OSS.
-# Os patches do Code-OSS têm um caminho incremental próprio abaixo.
 fingerprint() {
   printf '%s\n' "$(uname -s)" "$(uname -m)" \
     "${MAX_OLD_SPACE_SIZE:-8192}" "${SHOULD_BUILD_REH:-no}" \

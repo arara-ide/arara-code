@@ -13,11 +13,10 @@ Touches: src/vs/workbench/contrib/scm/browser/scm.contribution.ts
 
 --- a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
 +++ b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
-@@ -62,6 +62,13 @@
+@@ -62,6 +62,12 @@
  	alwaysUseContainerInfo: true,
  	order: 2,
  	hideIfEmpty: true,
-+	// Arara: extension views can pick their slot with `"group": "position@N"` (Changes = 1, Graph = 2)
 +	viewOrderDelegate: {
 +		getOrder: (group?: string) => {
 +			const match = group ? /^position@(\d+(?:\.\d+)?)(?:;|$)/.exec(group) : null;
@@ -29,11 +28,10 @@ Touches: src/vs/workbench/contrib/scm/browser/scm.contribution.ts
  const viewsRegistry = Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry);
 --- a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
 +++ b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
-@@ -102,6 +102,15 @@
+@@ -102,6 +102,14 @@
  		this.updateTreeVisibility();
  	}
  
-+	// Arara: extensions may declare a minimum expanded pane size in their view group.
 +	override get minimumSize(): number {
 +		const group = this.viewDescriptorService.getViewDescriptorById(this.id)?.group;
 +		const match = group ? /(?:^|;)minSize@(\d+)(?:;|$)/.exec(group) : null;

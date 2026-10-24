@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 'use strict';
 
-// Only public endpoints belong in the IDE; server credentials stay on the server.
 const fs = require('node:fs');
 const environments = {
   local: { api: 'http://localhost:7010', web: 'http://localhost:7210' },

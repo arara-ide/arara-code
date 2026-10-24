@@ -19,24 +19,14 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 
 --- /dev/null
 +++ b/src/vs/workbench/common/arara.defaults.ts
-@@ -0,0 +1,124 @@
-+/*---------------------------------------------------------------------------------------------
-+ *  Arara Code: configurações e atalhos padrão do produto.
-+ *  Licensed under the MIT License.
-+ *
-+ *  Só configurações nativas do Code-OSS (core + extensões built-in). Configurações
-+ *  de extensões de terceiros (prettier, python, etc.) não entram aqui.
-+ *  Usuário sempre pode sobrescrever em settings.json / keybindings.json.
-+ *--------------------------------------------------------------------------------------------*/
+@@ -0,0 +1,95 @@
++/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
 +
 +import { Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../platform/configuration/common/configurationRegistry.js';
 +import { Registry } from '../../platform/registry/common/platform.js';
 +
-+// ---------------------------------------------------------------- settings
-+
 +Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerDefaultConfigurations([{
 +	overrides: {
-+		// editor
 +		'editor.wordWrap': 'on',
 +		'editor.maxTokenizationLineLength': 30000,
 +		'editor.multiCursorLimit': 100000,
@@ -47,7 +37,6 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +		'diffEditor.ignoreTrimWhitespace': false,
 +		'diffEditor.codeLens': true,
 +
-+		// workbench
 +		'workbench.startupEditor': 'none',
 +		'workbench.activityBar.location': 'top',
 +		'workbench.editorAssociations': { '*.svg': 'default' },
@@ -56,13 +45,11 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +		'extensions.ignoreRecommendations': true,
 +		'security.workspace.trust.untrustedFiles': 'open',
 +
-+		// explorer
 +		'explorer.confirmDelete': false,
 +		'explorer.confirmDragAndDrop': false,
 +		'explorer.confirmPasteNative': false,
 +		'explorer.compactFolders': false,
 +
-+		// scm / git (extensão built-in)
 +		'scm.repositories.sortOrder': 'name',
 +		'scm.repositories.selectionMode': 'single',
 +		'scm.repositories.visible': 0,
@@ -71,20 +58,12 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +		'git.enableSmartCommit': true,
 +		'git.openRepositoryInParentFolders': 'never',
 +
-+		// typescript/javascript (extensão built-in)
 +		'javascript.updateImportsOnFileMove.enabled': 'always',
 +		'typescript.updateImportsOnFileMove.enabled': 'always',
 +		'[html]': { 'editor.defaultFormatter': 'vscode.html-language-features' },
 +	},
 +}]);
 +
-+// ---------------------------------------------------------------- keybindings
-+
-+/**
-+ * Mesmo formato do keybindings.json. Entradas com "-comando" removem o padrão
-+ * correspondente. Aplicadas como camada entre os padrões do VS Code e os do
-+ * usuário (ver keybindingService._getResolver).
-+ */
 +export interface AraraKeybinding {
 +	key?: string;
 +	command: string;
@@ -97,17 +76,14 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +const inlineChatWhen = 'editorFocus && inlineChatHasEditsAgent && inlineChatPossible && !editorReadonly && !editorSimpleInput || editorFocus && inlineChatHasProvider && inlineChatPossible && !editorReadonly && !editorSimpleInput';
 +
 +export const araraDefaultKeybindings: AraraKeybinding[] = [
-+	// terminal: ambos os atalhos criam um novo terminal
 +	{ key: 'ctrl+shift+`', command: 'workbench.action.terminal.new', when: 'terminalProcessSupported || terminalHasBeenCreated' },
 +	{ key: "ctrl+shift+'", command: 'workbench.action.terminal.new', when: 'terminalProcessSupported || terminalHasBeenCreated' },
 +
-+	// terminal: ctrl+c / ctrl+v copiam e colam (ctrl+c sem seleção continua mandando SIGINT)
 +	{ key: 'ctrl+c', command: 'workbench.action.terminal.copySelection', when: terminalCopyWhen },
 +	{ key: 'ctrl+shift+c', command: '-workbench.action.terminal.copySelection', when: terminalCopyWhen },
 +	{ key: 'ctrl+v', command: 'workbench.action.terminal.paste', when: terminalPasteWhen },
 +	{ key: 'ctrl+shift+v', command: '-workbench.action.terminal.paste', when: terminalPasteWhen },
 +
-+	// editor
 +	{ key: 'shift+alt+down', command: 'editor.action.copyLinesDownAction', when: editable },
 +	{ key: 'ctrl+shift+alt+down', command: '-editor.action.copyLinesDownAction', when: editable },
 +	{ key: 'shift+alt+up', command: 'editor.action.copyLinesUpAction', when: editable },
@@ -116,7 +92,6 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +	{ key: 'ctrl+shift+up', command: '-editor.action.insertCursorAbove', when: 'editorTextFocus' },
 +	{ key: 'ctrl+l', command: '-expandLineSelection', when: 'textInputFocus' },
 +
-+	// abas: ctrl+tab / ctrl+shift+tab trocam de aba na ordem visual
 +	{ key: 'ctrl+tab', command: '-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup', when: '!activeEditorGroupEmpty' },
 +	{ key: 'ctrl+tab', command: 'workbench.action.nextEditor' },
 +	{ key: 'ctrl+pagedown', command: '-workbench.action.nextEditor' },
@@ -124,16 +99,12 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +	{ key: 'ctrl+shift+tab', command: 'workbench.action.previousEditor' },
 +	{ key: 'ctrl+pageup', command: '-workbench.action.previousEditor' },
 +
-+	// ctrl+r abre os projetos recentes. No modo dev o VS Code liga ctrl+r a Reload Window e
-+	// esconde o atalho; o reload continua em Developer: Reload Window (ctrl+shift+p).
 +	{ key: 'ctrl+r', command: '-workbench.action.reloadWindow', when: 'isDevelopment' },
 +
-+	// arquivos / app
 +	{ key: 'ctrl+shift+s', command: '-workbench.action.files.saveAs' },
 +	{ key: 'ctrl+shift+s', command: 'workbench.action.files.saveFiles' },
 +	{ key: 'ctrl+q', command: '-workbench.action.quit' },
 +
-+	// chat nativo do VS Code: ctrl+i abre o painel, ctrl+k chat inline; tira os conflitos
 +	{ key: 'ctrl+i', command: 'workbench.panel.chat', when: 'workbench.panel.chat.view.copilot.active' },
 +	{ key: 'ctrl+alt+i', command: '-workbench.panel.chat', when: 'workbench.panel.chat.view.copilot.active' },
 +	{ key: 'ctrl+k', command: 'inlineChat.start', when: inlineChatWhen },
@@ -146,12 +117,8 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +];
 --- /dev/null
 +++ b/src/vs/workbench/test/common/arara.defaults.test.ts
-@@ -0,0 +1,35 @@
-+/*---------------------------------------------------------------------------------------------
-+ *  Arara Code: os atalhos padrão do produto parseiam e as remoções ("-cmd") batem
-+ *  com atalhos padrão reais do VS Code.
-+ *  Licensed under the MIT License.
-+ *--------------------------------------------------------------------------------------------*/
+@@ -0,0 +1,31 @@
++/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
 +
 +import assert from 'assert';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../base/test/common/utils.js';
@@ -192,11 +159,10 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
  import { IKeyboard, INavigatorWithKeyboard } from './navigatorKeyboard.js';
  import { getAllUnboundCommands } from './unboundCommands.js';
  import { EditorContextKeys } from '../../../../editor/common/editorContextKeys.js';
-@@ -442,6 +443,10 @@
+@@ -442,6 +443,9 @@
  	protected _getResolver(): KeybindingResolver {
  		if (!this._cachedResolver) {
  			const defaults = this._resolveKeybindingItems(KeybindingsRegistry.getDefaultKeybindings(), true);
-+			// Arara Code: atalhos padrão do produto (Windows/Linux), como camada "default"; o usuário pode remover com "-comando"
 +			if (!isMacintosh) {
 +				defaults.push(...this._resolveUserKeybindingItems(araraDefaultKeybindings.map(k => KeybindingIO.readUserKeybindingItem(k)), true));
 +			}
@@ -209,7 +175,7 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
  
  import './api/browser/extensionHost.contribution.js';
  import './browser/workbench.contribution.js';
-+import './common/arara.defaults.js'; // Arara Code: configurações padrão do produto
++import './common/arara.defaults.js';
  import './browser/workbench.zenMode.contribution.js';
  
  // Agent-sessions color tokens — side-effect import so they register in the

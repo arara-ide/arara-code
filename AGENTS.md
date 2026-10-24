@@ -1,3 +1,10 @@
+## Código: sem comentários e sem duplicação (obrigatório)
+
+- Não escreva comentários no código (`//`, `/* */`, `#`, `<!-- -->`, JSDoc, docstrings). Nomes, tipos e estrutura devem explicar o código. Ao editar um trecho, não acrescente comentário.
+- Se uma explicação for necessária (motivo de uma decisão, pegadinha de plataforma, contexto histórico), registre em `ac-docs/docs/36-notas-de-codigo.md`, na seção do repo, citando arquivo e símbolo. Nunca deixe a explicação no repositório.
+- Exceções: avisos de licença e copyright exigidos, o cabeçalho de justificativa dos patches em `patches/code/` e diretivas com efeito técnico (shebang, `@ts-expect-error`, `eslint-disable`, pragmas).
+- Não repita código. Antes de escrever uma função, procure uma equivalente e reutilize; lógica que aparece em mais de um lugar vira uma função compartilhada.
+
 ## Internacionalização e localização — obrigatório
 
 - Toda interface deve oferecer português (`pt-BR`/`pt`), inglês (`en`) e espanhol (`es`), com mensagens em arquivos de tradução estruturados. Toda alteração futura em texto visível exige atualizar os três catálogos na mesma mudança, inclusive títulos, comandos, configurações, validações, notificações, estados vazios e nomes acessíveis.

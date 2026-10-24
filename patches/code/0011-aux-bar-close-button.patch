@@ -22,13 +22,11 @@ Touches: src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
  import { IPaneCompositePartService } from '../../../services/panecomposite/browser/panecomposite.js';
  import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
  import { KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
-@@ -81,7 +81,8 @@
+@@ -81,7 +81,6 @@
  	},
  	group: 'navigation',
  	order: 2,
 -	when: ContextKeyExpr.equals(`config.${LayoutSettings.ACTIVITY_BAR_LOCATION}`, ActivityBarPosition.DEFAULT)
-+	// Arara Code: mostra o X de fechar ao lado do maximizar mesmo com a activity bar
-+	// no topo (nosso padrão). O VS Code só mostrava quando a activity bar era 'default'.
  });
  
  registerAction2(class extends Action2 {
