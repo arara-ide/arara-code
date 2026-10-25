@@ -1,0 +1,35 @@
+Arara Code: encerra os processos da IDE depois das confirmacoes do instalador interativo do Windows, antes da verificacao de AppMutex.
+
+Why a patch: a API de extensoes nao controla a inicializacao do instalador Inno Setup, que tambem precisa funcionar sem a IDE respondendo.
+Touches: build/win32/code.iss
+
+--- a/build/win32/code.iss
++++ b/build/win32/code.iss
+@@ -1377,6 +1377,8 @@ var
+   RegKey: String;
+   ThisArch: String;
+   AltArch: String;
++  TaskKillResult: Integer;
++  WaitCounter: Integer;
+ begin
+   Result := True;
+ 
+@@ -1406,6 +1408,18 @@ begin
+     end;
+   #endif
+ 
++  if Result and not WizardSilent() and IsNotBackgroundUpdate() then begin
++    if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM "{#ExeBasename}.exe"', '', SW_HIDE, ewWaitUntilTerminated, TaskKillResult) then
++      Log('Unable to launch taskkill: ' + IntToStr(TaskKillResult))
++    else
++      Log('taskkill exited with code ' + IntToStr(TaskKillResult));
++
++    WaitCounter := 10;
++    while (WaitCounter > 0) and CheckForMutexes('{#AppMutex}') do begin
++      Sleep(500);
++      WaitCounter := WaitCounter - 1;
++    end;
++  end;
+ end;
+ 
+ function WizardNotSilent(): Boolean;
