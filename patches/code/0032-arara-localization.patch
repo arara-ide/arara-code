@@ -32,7 +32,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Close to update": "Close to update",
 +		"New platform terminal": "New platform terminal",
 +		"Welcome to Arara Code": "Welcome to Arara Code",
-+		"Arara Code settings": "Arara Code settings"
++		"Arara settings": "Arara settings"
 +	},
 +	"pt": {
 +		"Update": "Atualizar",
@@ -55,7 +55,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Close to update": "Fechar para atualizar",
 +		"New platform terminal": "Novo terminal de plataforma",
 +		"Welcome to Arara Code": "Bem-vindo ao Arara Code",
-+		"Arara Code settings": "Configurações do Arara Code"
++		"Arara settings": "Configurações do Arara"
 +	},
 +	"es": {
 +		"Update": "Actualizar",
@@ -78,7 +78,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Close to update": "Cerrar para actualizar",
 +		"New platform terminal": "Nuevo terminal de plataforma",
 +		"Welcome to Arara Code": "Bienvenido a Arara Code",
-+		"Arara Code settings": "Configuración de Arara Code"
++		"Arara settings": "Configuración de Arara"
 +	}
 +};
 +

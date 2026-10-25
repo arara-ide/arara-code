@@ -25,6 +25,6 @@ try {
   const source = fs.readFileSync(path.join(dir, file), 'utf8');
   assert.doesNotThrow(() => stripTypeScriptTypes(source), 'the source applied by Git must parse');
   assert.ok(source.includes("id: 'arara.openSettings'"), 'preserves the settings menu contribution');
-  assert.ok(source.includes('Arara Code settings'), 'preserves the localized English source message');
+  assert.ok(source.includes('Arara settings'), 'preserves the localized English source message');
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 console.log(`PASS: ${count} patches, invalid hunk regressions and actual launcher source applied by Git.`);

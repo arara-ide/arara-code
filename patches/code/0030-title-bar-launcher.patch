@@ -39,7 +39,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +		order: 2.5,
 +		command: {
 +			id: 'arara.openSettings',
-+			title: localize('arara.openSettings', "Arara Code settings"),
++			title: localize('arara.openSettings', "Arara settings"),
 +		},
 +		when: ContextKeyExpr.has('arara.ui.titleLauncher'),
 +	});
