@@ -33,13 +33,13 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
 +	icon: string;
 +	color: string;
 +	active: boolean;
-+	run(): Promise<unknown>;
++	run(): Promise<void>;
 +}
 +
  export interface ICompositeBarItem {
  
  	readonly id: string;
-@@ -238,6 +248,22 @@
+@@ -238,6 +248,25 @@
  	readonly onDidChange = this._onDidChange.event;
  
  	private dimension: Dimension | undefined;
@@ -47,6 +47,9 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
 +	private leadingOptions: ILeadingCompositeAction | undefined;
 +
 +	setLeadingAction(options?: ILeadingCompositeAction): void {
++		if (options && this.leadingOptions && (['id', 'label', 'icon', 'color', 'active'] as const).every(key => options[key] === this.leadingOptions![key])) {
++			return;
++		}
 +		if (this.leadingAction) {
 +			this.compositeSwitcherBar?.pull(0);
 +			this.leadingAction.dispose();
@@ -62,7 +65,19 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  
  	private compositeSwitcherBar: ActionBar | undefined;
  	private compositeOverflowAction = this._register(new MutableDisposable<CompositeOverflowActivityAction>());
-@@ -287,6 +313,22 @@
+@@ -262,6 +291,11 @@
+ 		this.computeSizes(this.model.visibleItems);
+ 	}
+ 
++	override dispose(): void {
++		this.leadingAction?.dispose();
++		super.dispose();
++	}
++
+ 	getCompositeBarItems(): ICompositeBarItem[] {
+ 		return [...this.model.items];
+ 	}
+@@ -287,6 +321,22 @@
  		const actionBarDiv = parent.appendChild($('.composite-bar'));
  		this.compositeSwitcherBar = this._register(new ActionBar(actionBarDiv, {
  			actionViewItemProvider: (action, options) => {
@@ -85,7 +100,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  				if (action instanceof CompositeOverflowActivityAction) {
  					return this.compositeOverflowActionViewItem.value;
  				}
-@@ -310,6 +352,10 @@
+@@ -310,6 +360,10 @@
  			triggerKeys: { keyDown: true }
  		}));
  
@@ -96,7 +111,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  		// Contextmenu for composites
  		this._register(addDisposableListener(parent, EventType.CONTEXT_MENU, e => this.showContextMenu(getWindow(parent), e)));
  		this._register(Gesture.addTarget(parent));
-@@ -524,16 +570,16 @@
+@@ -524,16 +578,16 @@
  			return; // We have not been rendered yet so there is nothing to update.
  		}
  
@@ -118,7 +133,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  
  		// Add composites while they fit
  		for (let i = 0; i < compositesToShow.length; i++) {
-@@ -553,7 +599,7 @@
+@@ -553,7 +607,7 @@
  		}
  
  		// We always try show the active composite, so re-add it if it was sliced out
@@ -127,7 +142,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  			size += this.compositeSizeInBar.get(this.model.activeItem.id)!;
  			compositesToShow.push(this.model.activeItem.id);
  		}
-@@ -594,7 +640,7 @@
+@@ -594,7 +648,7 @@
  			}
  		});
  		compositesToRemove.reverse().forEach(index => {
@@ -136,7 +151,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  			this.visibleComposites.splice(index, 1);
  		});
  
-@@ -603,11 +649,11 @@
+@@ -603,11 +657,11 @@
  			const currentIndex = this.visibleComposites.indexOf(compositeId);
  			if (newIndex !== currentIndex) {
  				if (currentIndex !== -1) {
@@ -150,7 +165,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  				this.visibleComposites.splice(newIndex, 0, compositeId);
  			}
  		});
-@@ -647,7 +693,7 @@
+@@ -647,7 +701,7 @@
  			overflowingIds.push(this.model.activeItem.id);
  		}
  
@@ -159,6 +174,15 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  		return this.model.visibleItems.filter(c => overflowingIds.includes(c.id)).map(item => { return { id: item.id, name: this.getAction(item.id)?.label || item.name }; });
  	}
  
+@@ -662,7 +716,7 @@
+ 	}
+ 
+ 	getContextMenuActions(e?: MouseEvent | GestureEvent): IAction[] {
+-		const actions: IAction[] = this.model.visibleItems
++		const actions: IAction[] = this.model.visibleItems.filter(item => item.id !== this.leadingOptions?.id)
+ 			.map(({ id, name, activityAction }) => {
+ 				const isPinned = this.isPinned(id);
+ 				return toAction({
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
 @@ -3,7 +3,7 @@
@@ -187,7 +211,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
 +				|| typeof data.color !== 'string' || !/^[a-zA-Z][a-zA-Z0-9.]+$/.test(data.color)) { return; }
 +			const command = data.command;
 +			this.compositeBar.setLeadingAction({ id: data.id, label: data.label, icon: data.icon, color: data.color, active: data.active,
-+				run: () => accessor.get(ICommandService).executeCommand(command) });
++				run: async () => { await accessor.get(ICommandService).executeCommand(command); } });
 +		}));
  	}
  
