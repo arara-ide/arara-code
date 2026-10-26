@@ -25,6 +25,7 @@ fingerprint() {
     "${ROOT}/scripts/prepare.sh" \
     "${ROOT}/scripts/build-icons.sh" \
     "${ROOT}/scripts/default-extensions.sh" \
+    "${ROOT}/scripts/prepare-language-detection.cjs" \
     "${ROOT}/scripts/apply-environment.cjs" \
     "${ROOT}/.arara-environment"; do
     if [[ -f "${file}" ]]; then
@@ -41,6 +42,7 @@ if [[ -f "${CACHE}" && -d "${VSCODE}/node_modules" && -f "${WORK}/dev/build.env"
   previous_names="$(tail -n +2 "${CACHE}")"
   if [[ "${current}" == "${previous}" && "${patch_names}" == "${previous_names}" ]]; then
     "${ROOT}/scripts/sync-dev-patches.sh"
+    node "${ROOT}/scripts/prepare-language-detection.cjs" "${VSCODE}"
     echo "pronto (preparo incremental): ${VSCODE}"
     exit 0
   fi

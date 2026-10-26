@@ -1,0 +1,22 @@
+Arara Code: browser-compatible language detection entry point.
+
+Why a patch: the built-in language detection worker is outside extension APIs.
+Its dependency ships a Node-targeted Webpack chunk loader that calls require in
+workers. The prepare script emits an AMD-compatible entry with the shipped local
+chunks in a scoped loader, preserving source and license notices. This patch
+selects that entry for browser workers; no global Node API is exposed.
+Touches: src/vs/workbench/services/languageDetection/browser/languageDetectionWorkerServiceImpl.ts
+
+--- a/src/vs/workbench/services/languageDetection/browser/languageDetectionWorkerServiceImpl.ts
++++ b/src/vs/workbench/services/languageDetection/browser/languageDetectionWorkerServiceImpl.ts
+@@ -75,8 +75,8 @@
+ 			webWorkerService,
+ 			// TODO See if it's possible to bundle vscode-languagedetection
+ 			useAsar
+-				? FileAccess.asBrowserUri(`${moduleLocationAsar}/dist/lib/index.js`).toString(true)
+-				: FileAccess.asBrowserUri(`${moduleLocation}/dist/lib/index.js`).toString(true),
++				? FileAccess.asBrowserUri(`${moduleLocationAsar}/dist/lib/index.browser.js`).toString(true)
++				: FileAccess.asBrowserUri(`${moduleLocation}/dist/lib/index.browser.js`).toString(true),
+ 			useAsar
+ 				? FileAccess.asBrowserUri(`${moduleLocationAsar}/model/model.json`).toString(true)
+ 				: FileAccess.asBrowserUri(`${moduleLocation}/model/model.json`).toString(true),

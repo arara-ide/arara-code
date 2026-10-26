@@ -56,6 +56,7 @@ fi
 cd "${VSCODE}"
 
 bash "${ROOT}/scripts/sync-dev-patches.sh"
+node "${ROOT}/scripts/prepare-language-detection.cjs" "${VSCODE}"
 
 case "${OSTYPE}" in
   msys*|cygwin*)

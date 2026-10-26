@@ -60,6 +60,7 @@ jq -s '.[0] * .[1]' "${WORK}/product.json" "${ROOT}/branding/product.overlay.jso
 mv "${WORK}/product.json.tmp" "${WORK}/product.json"
 
 printf '\nbash "%s/scripts/default-extensions.sh" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
+printf 'node "%s/scripts/prepare-language-detection.cjs" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
 
 node "${ROOT}/scripts/check-patches.cjs"
 node "${ROOT}/scripts/generate-localization.cjs" --check
