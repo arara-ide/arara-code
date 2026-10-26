@@ -4,7 +4,7 @@ Generaliza o gancho do 0023 para dois botões: `arara.ui.auxLauncher` (ícone wa
 `arara.ui.auxLauncher2`, à esquerda dele, com a arara do Arara Code como ícone (máscara CSS na cor do texto
 do botão). Cada um mostra o rótulo da sua context key (vazio = oculto) e executa `<key>.run`. Quando não há
 espaço para os dois textos ao lado das plataformas, o lançador menos clicado (contagem guardada no perfil)
-mostra só o ícone, com o rótulo no title. A extensão decide rótulos e comandos (hoje: Bots e Orquestra).
+mostra só o ícone, com o rótulo no title; persistindo a falta de espaço, o outro também perde o texto. A extensão decide rótulos e comandos (hoje: Bots e Orquestra).
 
 Why a patch: o mesmo do 0023 (o título do AuxiliaryBarPart não aceita contribuições com texto); aqui só se
 generaliza o gancho para dois botões e a regra de espaço, sem lógica de produto no core.
@@ -39,7 +39,7 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  			contextMenuService,
  			layoutService,
  			keybindingService,
-@@ -247,24 +247,48 @@
+@@ -247,24 +247,50 @@
  	protected override createHeaderArea(): HTMLElement {
  		const area = super.createHeaderArea();
  		this.contextKeyService.createKey('arara.ui.auxLauncherAvailable', true);
@@ -93,10 +93,12 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
 +			for (const b of [first, second]) b.button.classList.remove('icon-only');
 +			const bar = area.querySelector<HTMLElement>('.composite-bar-container');
 +			const tight = () => area.scrollWidth > area.clientWidth + 1 || (!!bar && bar.scrollWidth > bar.clientWidth + 1);
-+			if (first.button.hidden || second.button.hidden || !tight()) { return; }
 +			const count = clicks();
-+			const rare = (count[second.key] ?? 0) > (count[first.key] ?? 0) ? first : second;
-+			rare.button.classList.add('icon-only');
++			const ranked = [first, second].filter(item => !item.button.hidden).sort((a, b) => (count[a.key] ?? 0) - (count[b.key] ?? 0));
++			for (const item of ranked) {
++				if (!tight()) { break; }
++				item.button.classList.add('icon-only');
++			}
 +		};
 +		const observer = new ResizeObserver(() => fit());
 +		observer.observe(area);
@@ -107,7 +109,7 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  
 --- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
-@@ -112,13 +112,19 @@
+@@ -112,10 +112,16 @@
  	max-width: 150px;
  }
  
@@ -116,18 +118,15 @@ Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.c
  	margin-left: auto;
  	margin-right: 6px;
  	align-self: center;
- 	display: inline-flex;
- 	align-items: center;
- 	gap: 4px;
-+	flex-shrink: 0;
-+}
-+.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher {
 +	display: inline-flex;
 +	align-items: center;
 +	gap: 4px;
- 	height: 22px;
- 	padding: 0 8px;
- 	border: 1px solid var(--vscode-button-border, transparent);
++	flex-shrink: 0;
++}
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher {
+ 	display: inline-flex;
+ 	align-items: center;
+ 	gap: 4px;
 @@ -131,10 +137,20 @@
  	white-space: nowrap;
  	flex-shrink: 0;

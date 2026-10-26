@@ -87,12 +87,12 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
 +					return new class extends ActionViewItem {
 +						override render(container: HTMLElement): void {
 +							super.render(container);
-+							container.classList.add('composite-bar-leading-action');
++							container.classList.add('icon', 'composite-bar-leading-action');
++							Object.assign(container.style, { width: `${size}px`, height: `${size}px`, padding: '0', boxSizing: 'border-box' });
 +							if (this.label) {
 +								this.label.style.color = leading.active ? 'var(--vscode-activityBarTop-activeForeground, var(--vscode-activityBar-activeForeground))'
 +									: `var(--vscode-${leading.color.replace(/\./g, '-')})`;
-+								this.label.style.width = `${size}px`;
-+								this.label.style.height = `${size}px`;
++								Object.assign(this.label.style, { width: '100%', height: '100%', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' });
 +							}
 +						}
 +					}(undefined, action, { ...options, icon: true, label: false, isTabList: true });
@@ -194,7 +194,7 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
  import { localize } from '../../../nls.js';
  import { ActionsOrientation } from '../../../base/browser/ui/actionbar/actionbar.js';
  import { IActivityService } from '../../services/activity/common/activity.js';
-@@ -149,6 +149,21 @@
+@@ -148,6 +148,22 @@
  			this.saveCachedViewContainers();
  			this.storageService.store(key, signature, StorageScope.PROFILE, StorageTarget.USER);
  		}));
@@ -210,8 +210,9 @@ Touches: src/vs/workbench/browser/parts/compositeBar.ts, paneCompositeBar.ts
 +				|| typeof data.icon !== 'string' || !/^[a-z0-9-]+$/.test(data.icon)
 +				|| typeof data.color !== 'string' || !/^[a-zA-Z][a-zA-Z0-9.]+$/.test(data.color)) { return; }
 +			const command = data.command;
++			const commandService = accessor.get(ICommandService);
 +			this.compositeBar.setLeadingAction({ id: data.id, label: data.label, icon: data.icon, color: data.color, active: data.active,
-+				run: async () => { await accessor.get(ICommandService).executeCommand(command); } });
++				run: async () => { await commandService.executeCommand(command); } });
 +		}));
  	}
  
