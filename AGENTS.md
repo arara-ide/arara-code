@@ -65,6 +65,12 @@ scripts/new-patch.sh 0003-xyz src/vs/…/arquivo.ts   # gera/atualiza patch a pa
 
 Fluxo para mudar o core: edite em `.work/vscodium/vscode`, teste com `scripts/dev.sh`, rode `scripts/new-patch.sh`, confira o cabeçalho do patch e depois `scripts/prepare.sh --skip-source` para provar que ele aplica do zero. `bump-upstream.sh` ainda não existe (trocar a tag do submódulo à mão numa branch `upstream/<versão>`).
 
+## "Buildar": sempre no GitHub Actions (regra do usuário, 25/10/2026)
+
+- **Nunca rode o build do Arara Code na máquina local** (`arara-code/scripts/build.sh`) para atender um pedido de build. Build é o workflow `Build` (`arara-code/.github/workflows/build.yml`) no GitHub Actions. `scripts/dev.sh` continua sendo o jeito de testar localmente durante o desenvolvimento.
+- **"Buildar em development"**: só disparar o workflow na branch `development`, sem commit nem push que o usuário não tenha pedido: `gh workflow run build.yml -R arara-ide/arara-code --ref development`. O workflow pega `arara-ai`, `arara-bot` e `arara-orchestra` das branches `development` no GitHub, então mudanças locais não commitadas **não entram** no build: avise o usuário. O resultado é um **Artifact** do Actions (SHA-256, retenção de 14 dias), que o usuário baixa na máquina dele (`gh run download <RUN_ID> -R arara-ide/arara-code`). Informe o link ou o ID da execução.
+- **"Buildar em produção"**: commitar e subir tudo o que foi alterado em cada repositório (seguindo o fluxo de cada um até a `main`), por último commitar e subir o `arara-code`, e então disparar o workflow de release na `main`: `gh workflow run build.yml -R arara-ide/arara-code --ref main`. Esse pedido vale como autorização explícita de commit e push para essa entrega; força e reescrita de histórico continuam proibidas.
+
 ## Pronto quando
 
 - `scripts/build.sh` termina sem `.rej` e o binário abre com nome/ícone do Arara, chat no painel direito e Open VSX funcionando.
