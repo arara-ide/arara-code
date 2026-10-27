@@ -1,0 +1,59 @@
+name: Publish platform
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      artifact:
+        type: string
+        required: true
+      prerelease:
+        type: boolean
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ inputs.version }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: dist
+      - name: Conferir workflows da main
+        env:
+          V: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+          git fetch --no-tags --depth=1 origin main
+          if ! git diff --quiet "${GITHUB_SHA}" FETCH_HEAD -- .github/workflows; then
+            echo "::error::A main mudou workflows depois deste build começar. Rode novamente na main atual para criar a tag ${V}."
+            exit 1
+          fi
+      - name: Criar release ou acrescentar plataforma
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: node scripts/publish-release.cjs
