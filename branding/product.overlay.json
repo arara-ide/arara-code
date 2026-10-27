@@ -40,7 +40,6 @@
       "quickPickSortByLabel"
     ]
   },
-  "writableBuiltInExtensions": ["vscode-icons-team.vscode-icons"],
   "startupWebview": {
     "extensionId": "arara.arara-ai",
     "viewType": "arara.setup",
