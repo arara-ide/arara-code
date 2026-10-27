@@ -148,43 +148,6 @@ fi
 
 mkdir -p "${PROFILE}/data" "${PROFILE}/extensions"
 
-# Proteção opcional no dev (bytecode V8). Desligada por padrão porque torna o código
-# ilegível e sem sourcemap — ruim para depurar no dia a dia. Com ARARA_PROTECT=1, cada
-# extensão carregada é copiada para .work/dev-extensions/protected/<nome> e tem seus bundles
-# CommonJS convertidos em bytecode com o Electron do dev; os repositórios não são tocados.
-# (O release — scripts/build.sh — já protege sempre, a menos que ARARA_PROTECT=no.)
-if [[ "${ARARA_PROTECT:-0}" == 1 && ${#EXT_ARGS[@]} -gt 0 ]]; then
-  echo "» ARARA_PROTECT=1 — gerando cópias protegidas (bytecode) das extensões de dev…"
-  PROTECT_ROOT="${ROOT}/.work/dev-extensions/protected"
-  rm -rf "${PROTECT_ROOT}"; mkdir -p "${PROTECT_ROOT}"
-  protect_dev_dir() {
-    local src="$1" dst="$2"
-    rm -rf "${dst}"; mkdir -p "${dst}"
-    if command -v rsync >/dev/null 2>&1; then rsync -a --exclude node_modules "${src}/" "${dst}/"; else cp -R "${src}/." "${dst}/"; fi
-    local candidates=(dist/extension.js dist/hub.js dist/bridge.js dist/webview/webview.js media/lazy-mcp.cjs media/browser-core.cjs media/cli-core.cjs media/cli-mcp-proxy.cjs)
-    local files=() rel
-    # webview.js é browser (IIFE) e não pode virar bytecode CommonJS — fica só minificado.
-    for rel in dist/extension.js dist/hub.js dist/bridge.js media/lazy-mcp.cjs media/browser-core.cjs media/cli-core.cjs media/cli-mcp-proxy.cjs; do
-      [[ -f "${dst}/${rel}" ]] && files+=("${dst}/${rel}")
-    done
-    [[ ${#files[@]} -gt 0 ]] && bash "${ROOT}/scripts/bytecode/protect.sh" "${VSCODE}/${ELECTRON_BIN}" "${files[@]}"
-  }
-  NEW_EXT_ARGS=()
-  for a in "${EXT_ARGS[@]}"; do
-    case "${a}" in
-      --extensionDevelopmentPath=*)
-        src="${a#--extensionDevelopmentPath=}"
-        name="$( basename "${src}" )"; [[ "${name}" == extension ]] && name="arara-bot"
-        dst="${PROTECT_ROOT}/${name}"
-        protect_dev_dir "${src}" "${dst}"
-        NEW_EXT_ARGS+=("--extensionDevelopmentPath=${dst}")
-        ;;
-      *) NEW_EXT_ARGS+=("${a}") ;;
-    esac
-  done
-  EXT_ARGS=("${NEW_EXT_ARGS[@]}")
-fi
-
 echo "» Abrindo Arara Code (dev, ${DEV_ENVIRONMENT}) — perfil: ${PROFILE}"
 case "${OSTYPE}" in
   msys*|cygwin*)

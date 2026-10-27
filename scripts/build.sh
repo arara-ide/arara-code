@@ -165,26 +165,6 @@ embed_arara_orchestra() {
   test -s "${dest}/dist/extension.js" && test -s "${dest}/dist/webview/webview.js"
 }
 
-# Protege (bytecode V8) os bundles CommonJS das três extensões, usando o Electron embarcado
-# desta build (mesma V8 que vai executá-las). Desative com ARARA_PROTECT=no. As extensões
-# browser/webview (IIFE) e o servidor do bot (dist-server/*.js, ESM) NÃO entram: só minify.
-protect_arara_extensions() {
-  [[ "${ARARA_PROTECT:-yes}" == "yes" ]] || { echo "» ARARA_PROTECT=no — pulando bytecode (apenas minify)"; return 0; }
-  echo "» Garantindo Electron para gerar o bytecode…"
-  ( cd vscode && npm run --silent electron >/dev/null )
-  local elec="vscode/.build/electron/$( node -p "require('./vscode/product.json').applicationName" )"
-  case "${OS_NAME}" in
-    windows) elec="vscode/.build/electron/$( node -p "require('./vscode/product.json').nameShort" ).exe" ;;
-    osx) elec="vscode/.build/electron/$( node -p "require('./vscode/product.json').nameLong" ).app/Contents/MacOS/$( node -p "require('./vscode/product.json').nameShort" )" ;;
-  esac
-  local ai="vscode/extensions/arara-ai" bot="vscode/extensions/arara-bot" orch="vscode/extensions/arara-orchestra"
-  bash "${ROOT}/scripts/bytecode/protect.sh" "${elec}" \
-    "${ai}/dist/extension.js" \
-    "${ai}/media/lazy-mcp.cjs" "${ai}/media/browser-core.cjs" "${ai}/media/cli-core.cjs" "${ai}/media/cli-mcp-proxy.cjs" \
-    "${orch}/dist/extension.js" \
-    "${bot}/dist/extension.js" "${bot}/dist/hub.js" "${bot}/dist/bridge.js"
-}
-
 if [[ "${PREPARE_ONLY}" == "yes" ]]; then
   . version.sh
   . prepare_vscode.sh
@@ -199,7 +179,6 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   embed_arara_ai
   embed_arara_bot
   embed_arara_orchestra
-  protect_arara_extensions
   cp "${ROOT}/branding/linux/control.template" vscode/resources/linux/debian/control.template
   (
     cd vscode
@@ -228,7 +207,6 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
   embed_arara_ai
   embed_arara_bot
   embed_arara_orchestra
-  protect_arara_extensions
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
@@ -253,7 +231,6 @@ else
   embed_arara_ai
   embed_arara_bot
   embed_arara_orchestra
-  protect_arara_extensions
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
