@@ -92,6 +92,7 @@ fi
 ELECTRON_BIN=".build/electron/$( node -p "require('./product.json').applicationName" )"
 case "${OSTYPE}" in
   msys*|cygwin*) ELECTRON_BIN=".build/electron/$( node -p "require('./product.json').nameShort" ).exe" ;;
+  darwin*) ELECTRON_BIN=".build/electron/$( node -p "require('./product.json').nameLong" ).app/Contents/MacOS/$( node -p "require('./product.json').nameShort" )" ;;
 esac
 if [[ ! -x "${ELECTRON_BIN}" ]]; then
   echo "» Baixando Electron…"
