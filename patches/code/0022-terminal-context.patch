@@ -1,0 +1,48 @@
+Arara Code: ponto de menu para anexar terminal e leitura genérica do buffer.
+
+Why a patch: a API de extensão, inclusive terminalDataWriteEvent, não fornece a
+seleção atual, o scrollback anterior à ativação nem os marcadores de comandos.
+O menu nativo TerminalInstanceContext também não é um ponto de contribuição de
+extensões. Este patch apenas expõe uma leitura local e delega o menu a arara.*.
+Limites de contexto, snapshots, atualização no envio e regras de produto ficam
+na extensão. A leitura não executa comandos, não usa clipboard, arquivos ou rede.
+Touches: src/vs/workbench/contrib/terminal/browser/terminalActions.ts
+
+--- a/src/vs/workbench/contrib/terminal/browser/terminalActions.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalActions.ts
+@@ -295,6 +295,35 @@
+ 
+ export function registerTerminalActions() {
+ 	registerTerminalAction({
++		id: 'arara.internal.terminalSnapshot',
++		title: localize2('arara.terminalSnapshot', 'Read Terminal Buffer'),
++		f1: false,
++		run: async (c, _, id) => {
++			const instance = typeof id === 'number' ? c.service.instances.find(item => item.instanceId === id) : c.service.activeInstance;
++			const raw = instance?.xterm?.raw;
++			if (!instance || !raw) { return undefined; }
++			const buffer = raw.buffer.active;
++			const end = Math.min(buffer.length, buffer.baseY + buffer.cursorY + 1);
++			const firstLine = Math.max(0, end - 1000);
++			const lines: string[] = [];
++			for (let i = firstLine; i < end; i++) { lines.push(buffer.getLine(i)?.translateToString(true) ?? ''); }
++			const detection = instance.capabilities.get(TerminalCapability.CommandDetection);
++			const commands = [...(detection?.commands ?? [])];
++			if (detection?.executingCommandObject) { commands.push(detection.executingCommandObject); }
++			return { id: instance.instanceId, name: instance.title, selection: raw.getSelection(), lines, firstLine,
++				commandLines: commands.map(command => command.marker?.line ?? -1).filter(line => line >= 0) };
++		}
++	});
++	registerTerminalAction({
++		id: 'arara.internal.addTerminalToChat',
++		title: localize2('arara.addTerminalToChat', 'Adicionar ao chat'),
++		icon: Codicon.sparkle,
++		f1: false,
++		menu: { id: MenuId.TerminalInstanceContext, group: 'navigation', order: 100 },
++		run: async (_, accessor, args) => accessor.get(ICommandService).executeCommand('arara.chat.addTerminal', parseActionArgs(args)?.[0]?.instanceId)
++	});
++
++	registerTerminalAction({
+ 		id: TerminalCommandId.NewInActiveWorkspace,
+ 		title: localize2('workbench.action.terminal.newInActiveWorkspace', 'Create New Terminal (In Active Workspace)'),
+ 		run: async (c) => {

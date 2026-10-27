@@ -1,0 +1,36 @@
+Arara Code: expose active user profile resource URIs to extensions.
+
+Why a patch: stable/proposed extension APIs do not expose the active profile's
+settings.json and keybindings.json locations. globalStorageUri belongs to the
+default profile and cannot safely locate named profiles, portable or remote
+user-data. ProfileContentHandler only transports whole profile exports. This
+read-only hook returns the native resources, including useDefaultFlags handling;
+all discovery, filtering, merging and backup logic stays in the extension.
+Touches: userDataProfileManagement.ts (command registration only).
+
+--- a/src/vs/workbench/services/userDataProfile/browser/userDataProfileManagement.ts
++++ b/src/vs/workbench/services/userDataProfile/browser/userDataProfileManagement.ts
+@@ -3,6 +3,9 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
++import { Registry } from '../../../../platform/registry/common/platform.js';
++import { ConfigurationScope, Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../../../platform/configuration/common/configurationRegistry.js';
++import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
+ import { CancellationToken } from '../../../../base/common/cancellation.js';
+ import { CancellationError } from '../../../../base/common/errors.js';
+ import { Disposable } from '../../../../base/common/lifecycle.js';
+@@ -211,3 +214,13 @@
+ }
+ 
+ registerSingleton(IUserDataProfileManagementService, UserDataProfileManagementService, InstantiationType.Eager /* Eager because it updates the current window profile by listening to profiles changes */);
++
++CommandsRegistry.registerCommand('_arara.userProfileResources', accessor => {
++	const profile = accessor.get(IUserDataProfileService).currentProfile;
++	const properties = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).getConfigurationProperties();
++	return {
++		settings: profile.settingsResource.toString(), keybindings: profile.keybindingsResource.toString(),
++		applicationSettings: accessor.get(IUserDataProfilesService).defaultProfile.settingsResource.toString(),
++		applicationKeys: Object.keys(properties).filter(key => properties[key].scope === ConfigurationScope.APPLICATION || properties[key].scope === ConfigurationScope.APPLICATION_MACHINE),
++	};
++});

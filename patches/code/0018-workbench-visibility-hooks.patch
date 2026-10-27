@@ -1,0 +1,236 @@
+Arara Code: extension-controlled visibility and direct panel launcher menu.
+
+Why a patch: stable and proposed extension APIs cannot change built-in view
+when clauses, remove native menubar submenus or insert a selector beside panel
+tabs. The extension owns onboarding, mode persistence, platform labels and process
+execution. This patch only adds the arara.ui.hideAdvanced context gate and a
+menu calling arara.terminal.platforms / arara.terminal.openPlatform,
+anchored 5 px from the launcher button using the standard workbench theme.
+No process, filesystem or network execution occurs in the core hook.
+Touches: outline/output/markers/debug contributions, tunnel view descriptor,
+menubar contribution, panel part and panel CSS.
+
+--- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
++++ b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
+@@ -3,6 +3,7 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
++import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+ import { localize, localize2 } from '../../../../nls.js';
+ import { IViewsRegistry, Extensions as ViewExtensions } from '../../../common/views.js';
+ import { OutlinePane } from './outlinePane.js';
+@@ -25,6 +26,7 @@
+ 
+ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
+ 	id: IOutlinePane.Id,
++	when: ContextKeyExpr.not('arara.ui.hideAdvanced'),
+ 	name: localize2('name', "Outline"),
+ 	containerIcon: outlineViewIcon,
+ 	ctorDescriptor: new SyncDescriptor(OutlinePane),
+--- a/src/vs/workbench/contrib/output/browser/output.contribution.ts
++++ b/src/vs/workbench/contrib/output/browser/output.contribution.ts
+@@ -86,6 +86,7 @@
+ 	name: nls.localize2('output', "Output"),
+ 	containerIcon: outputViewIcon,
+ 	canMoveView: true,
++	when: ContextKeyExpr.not('arara.ui.hideAdvanced'),
+ 	canToggleVisibility: true,
+ 	ctorDescriptor: new SyncDescriptor(OutputViewPane),
+ 	openCommandActionDescriptor: {
+--- a/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
++++ b/src/vs/workbench/contrib/markers/browser/markers.contribution.ts
+@@ -146,6 +146,7 @@
+ 	name: Messages.MARKERS_PANEL_TITLE_PROBLEMS,
+ 	canToggleVisibility: true,
+ 	canMoveView: true,
++	when: ContextKeyExpr.not('arara.ui.hideAdvanced'),
+ 	ctorDescriptor: new SyncDescriptor(MarkersView),
+ 	openCommandActionDescriptor: {
+ 		id: 'workbench.actions.view.problems',
+--- a/src/vs/workbench/contrib/remote/browser/tunnelView.ts
++++ b/src/vs/workbench/contrib/remote/browser/tunnelView.ts
+@@ -1095,6 +1095,7 @@
+ }
+ 
+ export class TunnelPanelDescriptor implements IViewDescriptor {
++	readonly when = ContextKeyExpr.not('arara.ui.hideAdvanced');
+ 	readonly id = TunnelPanel.ID;
+ 	readonly name: ILocalizedString = TunnelPanel.TITLE;
+ 	readonly ctorDescriptor: SyncDescriptor<TunnelPanel>;
+--- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
++++ b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
+@@ -265,7 +265,7 @@
+ 		mnemonicTitle: nls.localize({ key: 'mRun', comment: ['&& denotes a mnemonic'] }, "&&Run")
+ 	},
+ 	order: 6,
+-	when: IsSessionsWindowContext.negate()
++	when: ContextKeyExpr.and(IsSessionsWindowContext.negate(), ContextKeyExpr.not('arara.ui.hideAdvanced'))
+ });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarDebugMenu, {
+@@ -439,7 +439,7 @@
+ 	containerIcon: icons.debugConsoleViewIcon,
+ 	canToggleVisibility: true,
+ 	canMoveView: true,
+-	when: CONTEXT_DEBUGGERS_AVAILABLE,
++	when: ContextKeyExpr.and(CONTEXT_DEBUGGERS_AVAILABLE, ContextKeyExpr.not('arara.ui.hideAdvanced')),
+ 	ctorDescriptor: new SyncDescriptor(Repl),
+ 	openCommandActionDescriptor: {
+ 		id: 'workbench.debug.action.toggleRepl',
+@@ -460,6 +460,7 @@
+ 		order: 3
+ 	},
+ 	ctorDescriptor: new SyncDescriptor(DebugViewPaneContainer),
++	hideIfEmpty: true,
+ 	icon: icons.runViewIcon,
+ 	alwaysUseContainerInfo: true,
+ 	order: 3,
+@@ -467,12 +468,12 @@
+ 
+ // Register default debug views
+ const viewsRegistry = Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry);
+-viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('variables', "Variables"), containerIcon: icons.variablesViewIcon, ctorDescriptor: new SyncDescriptor(VariablesView), order: 10, weight: 40, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusVariablesView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
+-viewsRegistry.registerViews([{ id: WATCH_VIEW_ID, name: nls.localize2('watch', "Watch"), containerIcon: icons.watchViewIcon, ctorDescriptor: new SyncDescriptor(WatchExpressionsView), order: 20, weight: 10, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusWatchView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
+-viewsRegistry.registerViews([{ id: CALLSTACK_VIEW_ID, name: nls.localize2('callStack', "Call Stack"), containerIcon: icons.callStackViewIcon, ctorDescriptor: new SyncDescriptor(CallStackView), order: 30, weight: 30, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusCallStackView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
+-viewsRegistry.registerViews([{ id: BREAKPOINTS_VIEW_ID, name: nls.localize2('breakpoints', "Breakpoints"), containerIcon: icons.breakpointsViewIcon, ctorDescriptor: new SyncDescriptor(BreakpointsView), order: 40, weight: 20, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusBreakpointsView' }, when: ContextKeyExpr.or(CONTEXT_BREAKPOINTS_EXIST, CONTEXT_DEBUG_UX.isEqualTo('default'), CONTEXT_HAS_DEBUGGED) }], viewContainer);
+-viewsRegistry.registerViews([{ id: WelcomeView.ID, name: WelcomeView.LABEL, containerIcon: icons.runViewIcon, ctorDescriptor: new SyncDescriptor(WelcomeView), order: 1, weight: 40, canToggleVisibility: true, when: CONTEXT_DEBUG_UX.isEqualTo('simple') }], viewContainer);
+-viewsRegistry.registerViews([{ id: LOADED_SCRIPTS_VIEW_ID, name: nls.localize2('loadedScripts', "Loaded Scripts"), containerIcon: icons.loadedScriptsViewIcon, ctorDescriptor: new SyncDescriptor(LoadedScriptsView), order: 35, weight: 5, canToggleVisibility: true, canMoveView: true, collapsed: true, when: ContextKeyExpr.and(CONTEXT_LOADED_SCRIPTS_SUPPORTED, CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
++viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('variables', "Variables"), containerIcon: icons.variablesViewIcon, ctorDescriptor: new SyncDescriptor(VariablesView), order: 10, weight: 40, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusVariablesView' }, when: ContextKeyExpr.and(ContextKeyExpr.not('arara.ui.hideAdvanced'), CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
++viewsRegistry.registerViews([{ id: WATCH_VIEW_ID, name: nls.localize2('watch', "Watch"), containerIcon: icons.watchViewIcon, ctorDescriptor: new SyncDescriptor(WatchExpressionsView), order: 20, weight: 10, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusWatchView' }, when: ContextKeyExpr.and(ContextKeyExpr.not('arara.ui.hideAdvanced'), CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
++viewsRegistry.registerViews([{ id: CALLSTACK_VIEW_ID, name: nls.localize2('callStack', "Call Stack"), containerIcon: icons.callStackViewIcon, ctorDescriptor: new SyncDescriptor(CallStackView), order: 30, weight: 30, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusCallStackView' }, when: ContextKeyExpr.and(ContextKeyExpr.not('arara.ui.hideAdvanced'), CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
++viewsRegistry.registerViews([{ id: BREAKPOINTS_VIEW_ID, name: nls.localize2('breakpoints', "Breakpoints"), containerIcon: icons.breakpointsViewIcon, ctorDescriptor: new SyncDescriptor(BreakpointsView), order: 40, weight: 20, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusBreakpointsView' }, when: ContextKeyExpr.and(ContextKeyExpr.not('arara.ui.hideAdvanced'), ContextKeyExpr.or(CONTEXT_BREAKPOINTS_EXIST, CONTEXT_DEBUG_UX.isEqualTo('default'), CONTEXT_HAS_DEBUGGED)) }], viewContainer);
++viewsRegistry.registerViews([{ id: WelcomeView.ID, name: WelcomeView.LABEL, containerIcon: icons.runViewIcon, ctorDescriptor: new SyncDescriptor(WelcomeView), order: 1, weight: 40, canToggleVisibility: true, when: ContextKeyExpr.and(ContextKeyExpr.not('arara.ui.hideAdvanced'), CONTEXT_DEBUG_UX.isEqualTo('simple')) }], viewContainer);
++viewsRegistry.registerViews([{ id: LOADED_SCRIPTS_VIEW_ID, name: nls.localize2('loadedScripts', "Loaded Scripts"), containerIcon: icons.loadedScriptsViewIcon, ctorDescriptor: new SyncDescriptor(LoadedScriptsView), order: 35, weight: 5, canToggleVisibility: true, canMoveView: true, collapsed: true, when: ContextKeyExpr.and(ContextKeyExpr.not('arara.ui.hideAdvanced'), CONTEXT_LOADED_SCRIPTS_SUPPORTED, CONTEXT_DEBUG_UX.isEqualTo('default')) }], viewContainer);
+ 
+ // Register disassembly view
+ 
+--- a/src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts
++++ b/src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts
+@@ -3,6 +3,7 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
++import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+ import { localize } from '../../../../nls.js';
+ import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
+ import { IsMacNativeContext } from '../../../../platform/contextkey/common/contextkeys.js';
+@@ -34,7 +35,8 @@
+ 		original: 'Selection',
+ 		mnemonicTitle: localize({ key: 'mSelection', comment: ['&& denotes a mnemonic'] }, "&&Selection")
+ 	},
+-	order: 3
++	order: 3,
++	when: ContextKeyExpr.not('arara.ui.hideAdvanced')
+ });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+@@ -54,7 +56,8 @@
+ 		original: 'Go',
+ 		mnemonicTitle: localize({ key: 'mGoto', comment: ['&& denotes a mnemonic'] }, "&&Go")
+ 	},
+-	order: 5
++	order: 5,
++	when: ContextKeyExpr.not('arara.ui.hideAdvanced')
+ });
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+--- a/src/vs/workbench/browser/parts/panel/panelPart.ts
++++ b/src/vs/workbench/browser/parts/panel/panelPart.ts
+@@ -18,7 +18,7 @@
+ import { PANEL_BACKGROUND, PANEL_BORDER, PANEL_TITLE_BORDER, PANEL_ACTIVE_TITLE_FOREGROUND, PANEL_INACTIVE_TITLE_FOREGROUND, PANEL_ACTIVE_TITLE_BORDER, PANEL_DRAG_AND_DROP_BORDER, PANEL_TITLE_BADGE_BACKGROUND, PANEL_TITLE_BADGE_FOREGROUND } from '../../../common/theme.js';
+ import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
+ import { INotificationService } from '../../../../platform/notification/common/notification.js';
+-import { Dimension } from '../../../../base/browser/dom.js';
++import { Dimension, addDisposableListener, getDomNodePagePosition } from '../../../../base/browser/dom.js';
+ import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+ import { assertReturnsDefined } from '../../../../base/common/types.js';
+ import { IExtensionService } from '../../../services/extensions/common/extensions.js';
+@@ -69,7 +69,7 @@
+ 	static readonly activePanelSettingsKey = 'workbench.panelpart.activepanelid';
+ 
+ 	constructor(
+-		@INotificationService notificationService: INotificationService,
++		@INotificationService private readonly launcherNotificationService: INotificationService,
+ 		@IStorageService storageService: IStorageService,
+ 		@IContextMenuService contextMenuService: IContextMenuService,
+ 		@IWorkbenchLayoutService layoutService: IWorkbenchLayoutService,
+@@ -97,7 +97,7 @@
+ 			ViewContainerLocation.Panel,
+ 			Extensions.Panels,
+ 			MenuId.PanelTitle,
+-			notificationService,
++			launcherNotificationService,
+ 			storageService,
+ 			contextMenuService,
+ 			layoutService,
+@@ -125,6 +125,53 @@
+ 		}));
+ 	}
+ 
++	protected override createTitleArea(parent: HTMLElement): HTMLElement | undefined {
++		const area = super.createTitleArea(parent);
++		if (!area) { return area; }
++		const controls = document.createElement('div');
++		controls.className = 'arara-panel-launcher';
++		const button = document.createElement('button');
++		button.textContent = '+';
++		button.setAttribute('aria-label', localize('arara.newTerminal', "New platform terminal"));
++		button.setAttribute('aria-expanded', 'false');
++		button.setAttribute('aria-haspopup', 'menu');
++		controls.append(button);
++		area.insertBefore(controls, area.querySelector('.title-actions'));
++		const update = () => {
++			controls.hidden = !this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced');
++			if (controls.hidden) { button.setAttribute('aria-expanded', 'false'); }
++		};
++		update();
++		this._register(this.contextKeyService.onDidChangeContext(e => {
++			if (e.affectsSome(new Set(['arara.ui.hideAdvanced']))) { update(); }
++		}));
++		this._register(addDisposableListener(button, 'click', async () => {
++			button.disabled = true;
++			try {
++				const items = await this.commandService.executeCommand<{ id: string; label: string }[]>('arara.terminal.platforms');
++				if (!items?.length || controls.hidden) { return; }
++				button.setAttribute('aria-expanded', 'true');
++				this.contextMenuService.showContextMenu({
++					getAnchor: () => {
++						const position = getDomNodePagePosition(button);
++						return { x: position.left, y: position.top - 5, width: position.width, height: position.height + 10 };
++					},
++					getActions: () => items.map(item => toAction({
++						id: item.id, label: item.label,
++						run: async () => {
++							try { await this.commandService.executeCommand('arara.terminal.openPlatform', item.id); }
++							catch (error) { this.launcherNotificationService.error(error); }
++						}
++					})),
++					onHide: () => { button.setAttribute('aria-expanded', 'false'); button.focus(); },
++					skipTelemetry: true
++				});
++			} catch (error) { this.launcherNotificationService.error(error); }
++			finally { button.disabled = false; }
++		}));
++		return area;
++	}
++
+ 	override updateStyles(): void {
+ 		super.updateStyles();
+ 
+--- a/src/vs/workbench/browser/parts/panel/media/panelpart.css
++++ b/src/vs/workbench/browser/parts/panel/media/panelpart.css
+@@ -152,4 +152,11 @@
+ 
+ .monaco-workbench .part.panel > .content {
+     font-size: calc(var(--vscode-workbench-bottompane-font-size) * 1)
+-}
+\ No newline at end of file
++}
++.monaco-workbench .part.panel .arara-panel-launcher { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
++.monaco-workbench .part.panel .arara-panel-launcher[hidden],
++.monaco-workbench .part.panel .arara-panel-launcher [hidden] { display: none !important; }
++.monaco-workbench .part.panel .arara-panel-launcher button { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; color: var(--vscode-icon-foreground); background: transparent; border: none; border-radius: 5px; cursor: pointer; font-size: 18px; }
++.monaco-workbench .part.panel .arara-panel-launcher button:hover,
++.monaco-workbench .part.panel .arara-panel-launcher button[aria-expanded="true"] { background: var(--vscode-toolbar-hoverBackground); }
++.monaco-workbench .part.panel .arara-panel-launcher button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }

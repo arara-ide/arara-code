@@ -1,0 +1,330 @@
+Arara Code: render extension-provided sections in the empty editor.
+
+The extension owns labels, recent-project presentation, standard folders and
+access-mode behavior. Core only renders sections and invokes their commands.
+Refreshes when configuration or recent workspaces change.
+
+Why a patch: the native editor watermark has no extension API for custom content.
+Touches: src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts,
+         src/vs/workbench/browser/parts/editor/media/editorgroupview.css
+
+--- a/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
++++ b/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
+@@ -1,80 +1,43 @@
+ /*---------------------------------------------------------------------------------------------
+  *  Copyright (c) Microsoft Corporation. All rights reserved.
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *  Modified by Arara Code: empty editor area becomes a start screen with clickable shortcuts.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import { $, append, clearNode, h } from '../../../../base/browser/dom.js';
++import { $, addDisposableListener, append, clearNode, EventType, h } from '../../../../base/browser/dom.js';
+ import { KeybindingLabel } from '../../../../base/browser/ui/keybindingLabel/keybindingLabel.js';
+-import { coalesce, shuffle } from '../../../../base/common/arrays.js';
+ import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
+-import { isMacintosh, isWeb, OS } from '../../../../base/common/platform.js';
+-import { localize } from '../../../../nls.js';
++import { OS } from '../../../../base/common/platform.js';
+ import { MenuId } from '../../../../platform/actions/common/actions.js';
+ import { HiddenItemStrategy, MenuWorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
+-import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+-import { ContextKeyExpr, ContextKeyExpression, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+-import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
+ import { defaultKeybindingLabelStyles } from '../../../../platform/theme/browser/defaultStyles.js';
+ import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
++import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
++import { onUnexpectedError } from '../../../../base/common/errors.js';
++import { IProductService } from '../../../../platform/product/common/productService.js';
+ 
+-interface WatermarkEntry {
++interface StartEntry {
+ 	readonly id: string;
+ 	readonly text: string;
+-	readonly when?: {
+-		native?: ContextKeyExpression;
+-		web?: ContextKeyExpression;
+-	};
++	readonly description?: string;
++	readonly args?: unknown[];
++	readonly pressed?: boolean;
+ }
+ 
+-const showChatContextKey = ContextKeyExpr.and(ContextKeyExpr.equals('chatSetupHidden', false), ContextKeyExpr.equals('chatSetupDisabledInWorkspace', false));
+-
+-const openChat: WatermarkEntry = { text: localize('watermark.openChat', "Open Chat"), id: 'workbench.action.chat.open', when: { native: showChatContextKey, web: showChatContextKey } };
+-const showCommands: WatermarkEntry = { text: localize('watermark.showCommands', "Show All Commands"), id: 'workbench.action.showCommands' };
+-const gotoFile: WatermarkEntry = { text: localize('watermark.quickAccess', "Go to File"), id: 'workbench.action.quickOpen' };
+-const openFile: WatermarkEntry = { text: localize('watermark.openFile', "Open File"), id: 'workbench.action.files.openFile' };
+-const openFolder: WatermarkEntry = { text: localize('watermark.openFolder', "Open Folder"), id: 'workbench.action.files.openFolder' };
+-const openFileOrFolder: WatermarkEntry = { text: localize('watermark.openFileFolder', "Open File or Folder"), id: 'workbench.action.files.openFileFolder' };
+-const openRecent: WatermarkEntry = { text: localize('watermark.openRecent', "Open Recent"), id: 'workbench.action.openRecent' };
+-const newUntitledFile: WatermarkEntry = { text: localize('watermark.newUntitledFile', "New Untitled Text File"), id: 'workbench.action.files.newUntitledFile' };
+-const findInFiles: WatermarkEntry = { text: localize('watermark.findInFiles', "Find in Files"), id: 'workbench.action.findInFiles' };
+-const toggleTerminal: WatermarkEntry = { text: localize({ key: 'watermark.toggleTerminal', comment: ['toggle is a verb here'] }, "Toggle Terminal"), id: 'workbench.action.terminal.toggleTerminal', when: { web: ContextKeyExpr.equals('terminalProcessSupported', true) } };
+-const startDebugging: WatermarkEntry = { text: localize('watermark.startDebugging', "Start Debugging"), id: 'workbench.action.debug.start', when: { web: ContextKeyExpr.equals('terminalProcessSupported', true) } };
+-const openSettings: WatermarkEntry = { text: localize('watermark.openSettings', "Open Settings"), id: 'workbench.action.openSettings' };
+-
+-const baseEntries: WatermarkEntry[] = [
+-	openChat,
+-	showCommands,
+-];
+-
+-const emptyWindowEntries: WatermarkEntry[] = coalesce([
+-	...baseEntries,
+-	openRecent,
+-	...(isMacintosh && !isWeb ? [openFileOrFolder] : [openFile, openFolder]),
+-	isMacintosh && !isWeb ? newUntitledFile : undefined, // fill in one more on macOS to get to 5 entries
+-]);
+-
+-const workspaceEntries: WatermarkEntry[] = [
+-	...baseEntries,
+-];
+-
+-const otherEntries: WatermarkEntry[] = [
+-	gotoFile,
+-	findInFiles,
+-	startDebugging,
+-	toggleTerminal,
+-	openSettings,
+-];
++interface StartSection {
++	readonly action?: StartEntry;
++	readonly title: string;
++	readonly inline?: boolean;
++	readonly entries: StartEntry[];
++}
+ 
+ export class EditorGroupWatermark extends Disposable {
+ 
+-	private static readonly CACHED_WHEN = 'editorGroupWatermark.whenConditions';
+ 	private static readonly SETTINGS_KEY = 'workbench.tips.enabled';
+-	private static readonly MINIMUM_ENTRIES = 3;
+-
+-	private readonly cachedWhen: { [when: string]: boolean };
+ 
+ 	private readonly shortcuts: HTMLElement;
+ 	private readonly toolbarContainer: HTMLElement;
+@@ -82,25 +45,26 @@
+ 	private readonly keybindingLabels = this._register(new DisposableStore());
+ 
+ 	private enabled = false;
++	private renderVersion = 0;
+ 	private workbenchState: WorkbenchState;
+ 
+ 	constructor(
+ 		container: HTMLElement,
+ 		@IKeybindingService private readonly keybindingService: IKeybindingService,
+ 		@IWorkspaceContextService private readonly contextService: IWorkspaceContextService,
+-		@IContextKeyService private readonly contextKeyService: IContextKeyService,
+ 		@IConfigurationService private readonly configurationService: IConfigurationService,
+-		@IStorageService private readonly storageService: IStorageService,
+-		@IInstantiationService private readonly instantiationService: IInstantiationService
++		@IInstantiationService private readonly instantiationService: IInstantiationService,
++		@ICommandService private readonly commandService: ICommandService,
++		@IProductService private readonly productService: IProductService,
++		@IWorkspacesService private readonly workspacesService: IWorkspacesService,
+ 	) {
+ 		super();
+ 
+-		this.cachedWhen = this.storageService.getObject(EditorGroupWatermark.CACHED_WHEN, StorageScope.PROFILE, Object.create(null));
+ 		this.workbenchState = this.contextService.getWorkbenchState();
+ 
+ 		const elements = h('.editor-group-watermark-wrapper', [
+ 			h('.editor-group-watermark-toolbar-container@toolbarContainer'),
+-			h('.editor-group-watermark', [
++			h('.editor-group-watermark.arara-start', [
+ 				h('.watermark-container', [
+ 					h('.letterpress'),
+ 					h('.shortcuts@shortcuts'),
+@@ -119,19 +83,12 @@
+ 		}));
+ 
+ 		this.registerListeners();
+-
+ 		this.render();
+ 	}
+ 
+ 	private registerListeners(): void {
+-		this._register(this.configurationService.onDidChangeConfiguration(e => {
+-			if (
+-				e.affectsConfiguration(EditorGroupWatermark.SETTINGS_KEY) &&
+-				this.enabled !== this.configurationService.getValue<boolean>(EditorGroupWatermark.SETTINGS_KEY)
+-			) {
+-				this.render();
+-			}
+-		}));
++		this._register(this.configurationService.onDidChangeConfiguration(() => this.render()));
++		this._register(this.workspacesService.onDidChangeRecentlyOpened(() => this.render()));
+ 
+ 		this._register(this.contextService.onDidChangeWorkbenchState(workbenchState => {
+ 			if (this.workbenchState !== workbenchState) {
+@@ -140,78 +97,81 @@
+ 			}
+ 		}));
+ 
+-		this._register(this.storageService.onWillSaveState(e => {
+-			if (e.reason === WillSaveStateReason.SHUTDOWN) {
+-				const entries = [...emptyWindowEntries, ...workspaceEntries, ...otherEntries];
+-				for (const entry of entries) {
+-					const when = isWeb ? entry.when?.web : entry.when?.native;
+-					if (when) {
+-						this.cachedWhen[entry.id] = this.contextKeyService.contextMatchesRules(when);
+-					}
+-				}
+-
+-				this.storageService.store(EditorGroupWatermark.CACHED_WHEN, JSON.stringify(this.cachedWhen), StorageScope.PROFILE, StorageTarget.MACHINE);
+-			}
+-		}));
++		this._register(CommandsRegistry.onDidRegisterCommand(() => this.render()));
+ 	}
+ 
+ 	private render(): void {
++		void this.renderContent().catch(onUnexpectedError);
++	}
++
++	private async renderContent(): Promise<void> {
++		const version = ++this.renderVersion;
+ 		this.enabled = this.configurationService.getValue<boolean>(EditorGroupWatermark.SETTINGS_KEY);
+ 
+ 		clearNode(this.shortcuts);
+ 		this.transientDisposables.clear();
++		this.keybindingLabels.clear();
+ 
+ 		if (!this.enabled) {
+ 			return;
+ 		}
+ 
+-		const entries = this.filterEntries(this.workbenchState !== WorkbenchState.EMPTY ? workspaceEntries : emptyWindowEntries);
+-		if (entries.length < EditorGroupWatermark.MINIMUM_ENTRIES) {
+-			const additionalEntries = this.filterEntries(otherEntries);
+-			shuffle(additionalEntries);
+-			entries.push(...additionalEntries.slice(0, EditorGroupWatermark.MINIMUM_ENTRIES - entries.length));
+-		}
+-
+-		const box = append(this.shortcuts, $('.watermark-box'));
++		if (!CommandsRegistry.getCommand('arara.startScreen')) { return; }
++		const sections = await this.commandService.executeCommand<StartSection[]>('arara.startScreen');
++		if (!sections || version !== this.renderVersion || this._store.isDisposed) { return; }
++
++		const root = append(this.shortcuts, $('.arara-start-box'));
++		const title = append(root, $('.arara-start-title'));
++		title.setAttribute('role', 'img');
++		title.setAttribute('aria-label', this.productService.nameLong);
++
++		const grid = append(root, $('.arara-start-grid'));
++
++		for (const section of sections) {
++			const entries = section.entries;
++			if (!entries.length) {
++				continue;
++			}
+ 
+-		const update = () => {
+-			clearNode(box);
+-			this.keybindingLabels.clear();
++			const col = append(grid, $('section.arara-start-section'));
++			const header = append(col, $('.arara-start-header'));
++			append(header, $('h2')).textContent = section.title;
++			if (section.action) {
++				const action = section.action;
++				const button = append(header, $('button.arara-start-primary', { type: 'button' })) as HTMLButtonElement;
++				button.textContent = action.text;
++				this.transientDisposables.add(addDisposableListener(button, EventType.CLICK, () => {
++					void this.commandService.executeCommand(action.id, ...(action.args ?? [])).catch(onUnexpectedError);
++				}));
++			}
++			col.classList.toggle('arara-start-inline', !!section.inline);
++			const list = append(col, $('ul'));
+ 
+ 			for (const entry of entries) {
+-				const keys = this.keybindingService.lookupKeybinding(entry.id);
+-				if (!keys) {
+-					continue;
++				const li = append(list, $('li'));
++				const button = append(li, $('button.arara-start-item', { type: 'button' })) as HTMLButtonElement;
++				append(button, $('span.arara-start-label')).textContent = entry.text;
++				if (entry.description) {
++					append(append(button, $('span.arara-start-description')), $('bdi', { dir: 'ltr' })).textContent = entry.description;
++					button.title = entry.description;
+ 				}
++				if (entry.pressed !== undefined) { button.setAttribute('aria-pressed', String(entry.pressed)); }
+ 
+-				const dl = append(box, $('dl'));
+-				const dt = append(dl, $('dt'));
+-				dt.textContent = entry.text;
+-
+-				const dd = append(dl, $('dd'));
+-
+-				const label = this.keybindingLabels.add(new KeybindingLabel(dd, OS, { renderUnboundKeybindings: true, ...defaultKeybindingLabelStyles }));
+-				label.set(keys);
+-			}
+-		};
+-
+-		update();
+-		this.transientDisposables.add(this.keybindingService.onDidUpdateKeybindings(update));
+-	}
+-
+-	private filterEntries(entries: WatermarkEntry[]): WatermarkEntry[] {
+-		const filteredEntries = entries
+-			.filter(entry => {
+-				if (this.cachedWhen[entry.id]) {
+-					return true; // cached from previous session
++				const keys = this.keybindingService.lookupKeybinding(entry.id);
++				if (keys && !section.inline && !entry.description) {
++					const kb = append(button, $('span.arara-start-keys'));
++					const label = this.keybindingLabels.add(new KeybindingLabel(kb, OS, { renderUnboundKeybindings: true, ...defaultKeybindingLabelStyles }));
++					label.set(keys);
++					button.setAttribute('aria-label', `${entry.text} (${keys.getAriaLabel() ?? ''})`);
+ 				}
+ 
+-				const contextKey = isWeb ? entry.when?.web : entry.when?.native;
+-				return !contextKey /* works without context */ || this.contextKeyService.contextMatchesRules(contextKey);
+-			})
+-			.filter(entry => !!CommandsRegistry.getCommand(entry.id))
+-			.filter(entry => !!this.keybindingService.lookupKeybinding(entry.id));
++				this.transientDisposables.add(addDisposableListener(button, EventType.CLICK, () => {
++					button.disabled = true;
++					void this.commandService.executeCommand(entry.id, ...(entry.args ?? [])).then(() => this.render(), onUnexpectedError).finally(() => { button.disabled = false; });
++				}));
++			}
++		}
+ 
+-		return filteredEntries;
++		this.transientDisposables.add(this.keybindingService.onDidUpdateKeybindings(() => this.render()));
+ 	}
+ }
+--- a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
++++ b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
+@@ -320,3 +320,28 @@
+ 	width: 100%;
+ 	height: 100%;
+ }
++
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark-wrapper > .editor-group-watermark.arara-start {
++ max-width: 760px; width: 100%; padding: 24px; box-sizing: border-box; overflow-x: hidden; overflow-y: auto;
++}
++.monaco-workbench .editor-group-watermark.arara-start .letterpress { display: none; }
++.monaco-workbench .editor-group-watermark.arara-start .shortcuts { width: 100%; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-title { margin: 0 0 24px; width: 48px; height: 48px; background-color: var(--vscode-foreground); mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22a%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%20%3Cstop%20stop-color%3D%22%23fff%22%2F%3E%20%3Cstop%20offset%3D%22.42%22%20stop-color%3D%22%23fff%22%2F%3E%20%3Cstop%20offset%3D%22.72%22%20stop-color%3D%22%23fff%22%2F%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23fff%22%2F%3E%20%3C%2FlinearGradient%3E%20%3ClinearGradient%20id%3D%22b%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%221%22%20y2%3D%220%22%3E%20%3Cstop%20stop-color%3D%22%23fff%22%2F%3E%20%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23fff%22%2F%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23fff%22%2F%3E%20%3C%2FlinearGradient%3E%20%3ClinearGradient%20id%3D%22c%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%20%3Cstop%20stop-color%3D%22%23fff%22%2F%3E%20%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%2F%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23fff%22%2F%3E%20%3C%2FlinearGradient%3E%20%3Cmask%20id%3D%22body-cutout%22%20maskUnits%3D%22userSpaceOnUse%22%20x%3D%220%22%20y%3D%220%22%20width%3D%225120%22%20height%3D%225120%22%20%3E%20%3Crect%20width%3D%225120%22%20height%3D%225120%22%20fill%3D%22%23fff%22%2F%3E%20%3Cellipse%20cx%3D%222570%22%20cy%3D%223870%22%20rx%3D%22145%22%20ry%3D%22160%22%20fill%3D%22%23000%22%2F%3E%20%3C%2Fmask%3E%20%3C%2Fdefs%3E%20%3Cg%20transform%3D%22translate%280%20512%29%20scale%28.1%20-.1%29%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20%3E%20%3Cpath%20mask%3D%22url%28%23body-cutout%29%22%20fill%3D%22url%28%23a%29%22%20stroke%3D%22url%28%23a%29%22%20stroke-width%3D%2218%22%20d%3D%22M3025%205113C1752%204999%20863%204259%20607%203100c-40-180-74-416-112-785-19-187-42-396-50-465-69-566-181-1015-371-1489C33%20260%200%20164%200%20148%200%2097%2037%2041%2083%2019%20124%201%20176%200%201864%200h1738l39%2022c26%2014%2046%2037%2060%2066%2021%2042%2021%2053%2016%20285-3%20133-13%20290-21%20349-55%20385-160%20693-314%20924-104%20154-117%20165-267%20213-170%2053-252%2095-277%20141-18%2032-19%2049-14%20180%2020%20521%20199%201048%20485%201430%2080%20107%20240%20271%20352%20360%20168%20134%20339%20231%20584%20330%2072%2029%20131%2053%20132%2054%206%205-29%20109-58%20172-173%20386-579%20600-1127%20592-70-1-145-3-167-5Z%22%20%2F%3E%20%3Cpath%20fill%3D%22url%28%23b%29%22%20stroke%3D%22url%28%23b%29%22%20stroke-width%3D%2216%22%20d%3D%22M4380%204031c-191-78-297-131-415-210-188-126-347-286-477-480-57-86-148-248-148-265%200-3%2026-10%2058-16%20358-74%20673-307%20918-680%20118-181%20221-396%20304-635%2045-133%2070-168%20131-183%2056-14%20108%200%20145%2040%2051%2056%20146%20340%20183%20547%20103%20571-3%201155-299%201641-55%2091-217%20310-228%20309-4%200-81-31-172-68Z%22%20%2F%3E%20%3Cpath%20fill%3D%22url%28%23c%29%22%20stroke%3D%22url%28%23c%29%22%20stroke-width%3D%2214%22%20d%3D%22M3220%202756c-35-108-78-342-95-517l-6-66%2053-20c29-11%2094-31%20143-43%2087-23%2092-26%20152-88%2034-35%2092-107%20129-159l68-96%20110%206c173%208%20466%2079%20466%20113%200%2025-117%20242-184%20343-133%20197-287%20346-454%20438-89%2050-163%2076-284%20101l-87%2019-11-31Z%22%20%2F%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E") center / contain no-repeat; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-section h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--vscode-foreground); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-section ul { list-style: none; margin: 0; padding: 12px; border: 1px solid var(--vscode-panel-border, #8886); border-radius: 6px; background: var(--vscode-textCodeBlock-background, var(--vscode-editor-background)); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 8px; border: 0; border-radius: 4px; background: none; color: var(--vscode-foreground); font: inherit; text-align: left; cursor: pointer; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item:hover { background: var(--vscode-list-hoverBackground); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-description { color: var(--vscode-descriptionForeground); direction: rtl; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-label { flex-shrink: 0; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-inline ul { display: flex; justify-content: space-between; align-items: center; gap: 8px; overflow-x: auto; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-inline li { flex-shrink: 0; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item[aria-pressed]::before { content: ''; width: 24px; height: 14px; border-radius: 10px; background: var(--vscode-input-background); border: 1px solid var(--vscode-focusBorder); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item[aria-pressed]::after { content: ''; position: absolute; margin-left: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--vscode-foreground); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item[aria-pressed=true]::after { margin-left: 13px; background: var(--vscode-button-foreground); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-item[aria-pressed=true]::before { background: var(--vscode-button-background); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 10px; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-primary { padding: 6px 12px; border: 0; border-radius: 4px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font: inherit; cursor: pointer; }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-primary:hover { background: var(--vscode-button-hoverBackground); }
++.monaco-workbench .editor-group-watermark.arara-start .arara-start-primary:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }

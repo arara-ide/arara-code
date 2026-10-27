@@ -1,0 +1,45 @@
+Arara Code: let extension views choose their Source Control position and minimum pane size.
+
+Why a patch: extension views contributed to `scm` get no order and always land below
+Graph. The container gains a viewOrderDelegate that reads `"group": "position@N"`
+(Changes = 1, Graph = 2) so an extension view can sit between them. No product
+logic, view ids or texts live in this public patch.
+Webview views can also declare `minSize@N` in the group, separated by a semicolon.
+Neither stable nor proposed WebviewView APIs expose the enclosing SplitView
+minimum size; CSS inside a webview cannot constrain its parent pane. The minimum
+includes the header and applies only while expanded, preserving collapse.
+Touches: src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+         src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
+
+--- a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
++++ b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+@@ -62,6 +62,12 @@
+ 	alwaysUseContainerInfo: true,
+ 	order: 2,
+ 	hideIfEmpty: true,
++	viewOrderDelegate: {
++		getOrder: (group?: string) => {
++			const match = group ? /^position@(\d+(?:\.\d+)?)(?:;|$)/.exec(group) : null;
++			return match ? Number(match[1]) : undefined;
++		}
++	},
+ }, ViewContainerLocation.Sidebar, { doNotRegisterOpenCommand: true });
+ 
+ const viewsRegistry = Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry);
+--- a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
++++ b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
+@@ -102,6 +102,14 @@
+ 		this.updateTreeVisibility();
+ 	}
+ 
++	override get minimumSize(): number {
++		const group = this.viewDescriptorService.getViewDescriptorById(this.id)?.group;
++		const match = group ? /(?:^|;)minSize@(\d+)(?:;|$)/.exec(group) : null;
++		return match && (!this.headerVisible || this.isExpanded())
++			? Math.max(super.minimumSize, Number(match[1]))
++			: super.minimumSize;
++	}
++
+ 	private readonly _onDidChangeVisibility = this._register(new Emitter<boolean>());
+ 	readonly onDidChangeVisibility = this._onDidChangeVisibility.event;
+ 

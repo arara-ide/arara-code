@@ -1,0 +1,154 @@
+Arara Code: segundo lançador no cabeçalho do Secondary Side Bar (aplicado depois do 0023).
+
+Generaliza o gancho do 0023 para dois botões: `arara.ui.auxLauncher` (ícone wand, o de antes) e
+`arara.ui.auxLauncher2`, à esquerda dele, com a arara do Arara Code como ícone (máscara CSS na cor do texto
+do botão). Cada um mostra o rótulo da sua context key (vazio = oculto) e executa `<key>.run`. Quando não há
+espaço para os dois textos ao lado das plataformas, o lançador menos clicado (contagem guardada no perfil)
+mostra só o ícone, com o rótulo no title; persistindo a falta de espaço, o outro também perde o texto. A extensão decide rótulos e comandos (hoje: Bots e Orquestra).
+
+Why a patch: o mesmo do 0023 (o título do AuxiliaryBarPart não aceita contribuições com texto); aqui só se
+generaliza o gancho para dois botões e a regra de espaço, sem lógica de produto no core.
+Touches: auxiliarybar/auxiliaryBarPart.ts, auxiliarybar/media/auxiliaryBarPart.css
+
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+@@ -10,7 +10,7 @@
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+ import { INotificationService } from '../../../../platform/notification/common/notification.js';
+-import { IStorageService } from '../../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+ import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
+ import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+ import { ActiveAuxiliaryContext, AuxiliaryBarFocusContext } from '../../../common/contextkeys.js';
+@@ -88,7 +88,7 @@
+ 
+ 	constructor(
+ 		@INotificationService private readonly launcherNotificationService: INotificationService,
+-		@IStorageService storageService: IStorageService,
++		@IStorageService private readonly launcherStorageService: IStorageService,
+ 		@IContextMenuService contextMenuService: IContextMenuService,
+ 		@IWorkbenchLayoutService layoutService: IWorkbenchLayoutService,
+ 		@IKeybindingService keybindingService: IKeybindingService,
+@@ -120,7 +120,7 @@
+ 			Extensions.Auxiliary,
+ 			MenuId.AuxiliaryBarTitle,
+ 			launcherNotificationService,
+-			storageService,
++			launcherStorageService,
+ 			contextMenuService,
+ 			layoutService,
+ 			keybindingService,
+@@ -247,24 +247,50 @@
+ 	protected override createHeaderArea(): HTMLElement {
+ 		const area = super.createHeaderArea();
+ 		this.contextKeyService.createKey('arara.ui.auxLauncherAvailable', true);
+-		const button = $('button.arara-aux-launcher', { type: 'button' });
+-		const iconEl = append(button, $('span'));
+-		iconEl.className = ThemeIcon.asClassName(Codicon.wand);
+-		const label = append(button, $('span.label'));
+-		area.appendChild(button);
+-		const update = () => {
+-			const text = this.contextKeyService.getContextKeyValue<string>('arara.ui.auxLauncher');
+-			button.hidden = typeof text !== 'string' || !text;
+-			label.textContent = text || '';
+-			button.title = text || '';
++		const group = append(area, $('span.arara-aux-launchers'));
++		const clicksKey = 'arara.ui.auxLauncher.clicks';
++		const clicks = (): Record<string, number> => { try { return JSON.parse(this.launcherStorageService.get(clicksKey, StorageScope.PROFILE, '{}')); } catch { return {}; } };
++		const make = (key: string, iconClass: string) => {
++			const button = append(group, $('button.arara-aux-launcher', { type: 'button' }));
++			const iconEl = append(button, $('span'));
++			iconEl.className = iconClass;
++			const label = append(button, $('span.label'));
++			const update = () => {
++				const text = this.contextKeyService.getContextKeyValue<string>(key);
++				button.hidden = typeof text !== 'string' || !text;
++				label.textContent = text || '';
++				button.title = text || '';
++				button.setAttribute('aria-label', text || '');
++			};
++			update();
++			this.headerFooterCompositeBarDispoables.add(this.contextKeyService.onDidChangeContext(e => {
++				if (e.affectsSome(new Set([key]))) { update(); fit(); }
++			}));
++			this.headerFooterCompositeBarDispoables.add(addDisposableListener(button, 'click', () => {
++				const count = clicks();
++				count[key] = (count[key] ?? 0) + 1;
++				this.launcherStorageService.store(clicksKey, JSON.stringify(count), StorageScope.PROFILE, StorageTarget.USER);
++				this.commandService.executeCommand(`${key}.run`).catch(error => this.launcherNotificationService.error(error));
++			}));
++			return { key, button };
+ 		};
+-		update();
+-		this.headerFooterCompositeBarDispoables.add(this.contextKeyService.onDidChangeContext(e => {
+-			if (e.affectsSome(new Set(['arara.ui.auxLauncher']))) { update(); }
+-		}));
+-		this.headerFooterCompositeBarDispoables.add(addDisposableListener(button, 'click', () => {
+-			this.commandService.executeCommand('arara.ui.auxLauncher.run').catch(error => this.launcherNotificationService.error(error));
+-		}));
++		const second = make('arara.ui.auxLauncher2', 'arara-aux-icon-arara');
++		const first = make('arara.ui.auxLauncher', ThemeIcon.asClassName(Codicon.wand));
++		const fit = () => {
++			for (const b of [first, second]) b.button.classList.remove('icon-only');
++			const bar = area.querySelector<HTMLElement>('.composite-bar-container');
++			const tight = () => area.scrollWidth > area.clientWidth + 1 || (!!bar && bar.scrollWidth > bar.clientWidth + 1);
++			const count = clicks();
++			const ranked = [first, second].filter(item => !item.button.hidden).sort((a, b) => (count[a.key] ?? 0) - (count[b.key] ?? 0));
++			for (const item of ranked) {
++				if (!tight()) { break; }
++				item.button.classList.add('icon-only');
++			}
++		};
++		const observer = new ResizeObserver(() => fit());
++		observer.observe(area);
++		this.headerFooterCompositeBarDispoables.add({ dispose: () => observer.disconnect() });
++		fit();
+ 		return area;
+ 	}
+ 
+--- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
++++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
+@@ -112,10 +112,16 @@
+ 	max-width: 150px;
+ }
+ 
+-.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher {
++.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launchers {
+ 	margin-left: auto;
+ 	margin-right: 6px;
+ 	align-self: center;
++	display: inline-flex;
++	align-items: center;
++	gap: 4px;
++	flex-shrink: 0;
++}
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher {
+ 	display: inline-flex;
+ 	align-items: center;
+ 	gap: 4px;
+@@ -131,10 +137,20 @@
+ 	white-space: nowrap;
+ 	flex-shrink: 0;
+ }
+-.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher .codicon { color: inherit; }
+-.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:hover { background: var(--vscode-button-hoverBackground); }
+-.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+-.monaco-workbench .part.auxiliarybar > .header-or-footer > .arara-aux-launcher[hidden] { display: none; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher .codicon { color: inherit; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher:hover { background: var(--vscode-button-hoverBackground); }
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher[hidden] { display: none; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher.icon-only { padding: 0 5px; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-launcher.icon-only .label { display: none; }
++.monaco-workbench .part.auxiliarybar > .header-or-footer .arara-aux-icon-arara {
++	width: 14px;
++	height: 14px;
++	flex-shrink: 0;
++	background: currentColor;
++	-webkit-mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3Cmask id='m' maskUnits='userSpaceOnUse' x='0' y='0' width='5120' height='5120'%3E%3Crect width='5120' height='5120' fill='white'/%3E%3Cellipse cx='2570' cy='3870' rx='145' ry='160' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Cg transform='translate(0 512) scale(.1 -.1)' fill='black'%3E%3Cpath mask='url(%23m)' d='M3025 5113C1752 4999 863 4259 607 3100c-40-180-74-416-112-785-19-187-42-396-50-465-69-566-181-1015-371-1489C33 260 0 164 0 148 0 97 37 41 83 19 124 1 176 0 1864 0h1738l39 22c26 14 46 37 60 66 21 42 21 53 16 285-3 133-13 290-21 349-55 385-160 693-314 924-104 154-117 165-267 213-170 53-252 95-277 141-18 32-19 49-14 180 20 521 199 1048 485 1430 80 107 240 271 352 360 168 134 339 231 584 330 72 29 131 53 132 54 6 5-29 109-58 172-173 386-579 600-1127 592-70-1-145-3-167-5Z'/%3E%3Cpath d='M4380 4031c-191-78-297-131-415-210-188-126-347-286-477-480-57-86-148-248-148-265 0-3 26-10 58-16 358-74 673-307 918-680 118-181 221-396 304-635 45-133 70-168 131-183 56-14 108 0 145 40 51 56 146 340 183 547 103 571-3 1155-299 1641-55 91-217 310-228 309-4 0-81-31-172-68Z'/%3E%3Cpath d='M3220 2756c-35-108-78-342-95-517l-6-66 53-20c29-11 94-31 143-43 87-23 92-26 152-88 34-35 92-107 129-159l68-96 110 6c173 8 466 79 466 113 0 25-117 242-184 343-133 197-287 346-454 438-89 50-163 76-284 101l-87 19-11-31Z'/%3E%3C/g%3E%3C/svg%3E");
++	mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3Cmask id='m' maskUnits='userSpaceOnUse' x='0' y='0' width='5120' height='5120'%3E%3Crect width='5120' height='5120' fill='white'/%3E%3Cellipse cx='2570' cy='3870' rx='145' ry='160' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Cg transform='translate(0 512) scale(.1 -.1)' fill='black'%3E%3Cpath mask='url(%23m)' d='M3025 5113C1752 4999 863 4259 607 3100c-40-180-74-416-112-785-19-187-42-396-50-465-69-566-181-1015-371-1489C33 260 0 164 0 148 0 97 37 41 83 19 124 1 176 0 1864 0h1738l39 22c26 14 46 37 60 66 21 42 21 53 16 285-3 133-13 290-21 349-55 385-160 693-314 924-104 154-117 165-267 213-170 53-252 95-277 141-18 32-19 49-14 180 20 521 199 1048 485 1430 80 107 240 271 352 360 168 134 339 231 584 330 72 29 131 53 132 54 6 5-29 109-58 172-173 386-579 600-1127 592-70-1-145-3-167-5Z'/%3E%3Cpath d='M4380 4031c-191-78-297-131-415-210-188-126-347-286-477-480-57-86-148-248-148-265 0-3 26-10 58-16 358-74 673-307 918-680 118-181 221-396 304-635 45-133 70-168 131-183 56-14 108 0 145 40 51 56 146 340 183 547 103 571-3 1155-299 1641-55 91-217 310-228 309-4 0-81-31-172-68Z'/%3E%3Cpath d='M3220 2756c-35-108-78-342-95-517l-6-66 53-20c29-11 94-31 143-43 87-23 92-26 152-88 34-35 92-107 129-159l68-96 110 6c173 8 466 79 466 113 0 25-117 242-184 343-133 197-287 346-454 438-89 50-163 76-284 101l-87 19-11-31Z'/%3E%3C/g%3E%3C/svg%3E");
++}
+ 
+ 
+ .monaco-workbench .part.auxiliarybar > .header-or-footer { justify-content: space-between; }

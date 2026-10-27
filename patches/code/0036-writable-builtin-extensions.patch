@@ -1,0 +1,79 @@
+Arara Code: run selected built-in extensions from a writable per-user copy.
+
+Why a patch: icon themes declare resource paths relative to their extension
+location, and vscode-icons regenerates manifests in that location. Extension APIs
+cannot relocate a built-in before scanning or register icon themes dynamically.
+Only product-listed built-ins are copied, preserving their manifest, builtin flag,
+identity and version. Atomic publication prevents incomplete concurrent copies;
+failures retain the original extension. Copies are isolated by extension and build.
+Touches: product.ts, extensionsScannerService.ts, writableBuiltinExtensions.ts.
+
+--- a/src/vs/base/common/product.ts
++++ b/src/vs/base/common/product.ts
+@@ -255,6 +255,7 @@
+ 		readonly excludeVersionRange?: string;
+ 	}>;
+ 	readonly extensionsForceVersionByQuality?: readonly string[];
++	readonly writableBuiltInExtensions?: readonly string[];
+ 	readonly builtInExtensionsEnabledWithAutoUpdates: readonly string[];
+ 	readonly sessionsWindowAllowedExtensions?: readonly string[];
+ 
+--- a/src/vs/platform/extensionManagement/common/extensionsScannerService.ts
++++ b/src/vs/platform/extensionManagement/common/extensionsScannerService.ts
+@@ -34,6 +34,7 @@
+ import { IUserDataProfile, IUserDataProfilesService } from '../../userDataProfile/common/userDataProfile.js';
+ import { IUriIdentityService } from '../../uriIdentity/common/uriIdentity.js';
+ import { localizeManifest } from './extensionNls.js';
++import { prepareWritableBuiltinExtension } from './writableBuiltinExtensions.js';
+ 
+ export type ManifestMetadata = Partial<{
+ 	targetPlatform: TargetPlatform;
+@@ -224,7 +225,11 @@
+ 			allSystemExtensions = allSystemExtensions.filter(ext => !skipSet.has(ext.identifier.id.toLowerCase()));
+ 		}
+ 
+-		return this.applyScanOptions(allSystemExtensions, ExtensionType.System, { pickLatest: false });
++		const extensions = await this.applyScanOptions(allSystemExtensions, ExtensionType.System, { pickLatest: false });
++		const writable = new Set(this.productService.writableBuiltInExtensions?.map(id => id.toLowerCase()));
++		return Promise.all(extensions.map(extension => writable.has(extension.identifier.id.toLowerCase())
++			? prepareWritableBuiltinExtension(extension, this.userDataProfilesService.defaultProfile.globalStorageHome, this.productService.commit ?? this.productService.version, this.fileService, this.logService)
++			: extension));
+ 	}
+ 
+ 	async scanUserExtensions(scanOptions: UserExtensionsScanOptions): Promise<IScannedExtension[]> {
+--- /dev/null
++++ b/src/vs/platform/extensionManagement/common/writableBuiltinExtensions.ts
+@@ -0,0 +1,33 @@
++import { joinPath } from '../../../base/common/resources.js';
++import { URI } from '../../../base/common/uri.js';
++import { generateUuid } from '../../../base/common/uuid.js';
++import { IFileService } from '../../files/common/files.js';
++import { ILogService } from '../../log/common/log.js';
++import { IScannedExtension } from './extensionsScannerService.js';
++
++export async function prepareWritableBuiltinExtension(extension: IScannedExtension, storageHome: URI, build: string, fileService: IFileService, logService: ILogService): Promise<IScannedExtension> {
++	const parent = joinPath(storageHome, 'builtin-extensions', encodeURIComponent(extension.identifier.id.toLowerCase()));
++	const location = joinPath(parent, encodeURIComponent(`${extension.manifest.version}-${build}`));
++	const staging = joinPath(parent, `.staging-${generateUuid()}`);
++	try {
++		if (!await fileService.exists(joinPath(location, 'package.json'))) {
++			await fileService.createFolder(parent);
++			await fileService.copy(extension.location, staging, false);
++			try {
++				await fileService.move(staging, location, false);
++			} catch (error) {
++				if (!await fileService.exists(joinPath(location, 'package.json'))) {
++					throw error;
++				}
++			}
++		}
++		return { ...extension, location };
++	} catch (error) {
++		logService.error(`Unable to prepare writable builtin extension ${extension.identifier.id}`, error);
++		return extension;
++	} finally {
++		if (await fileService.exists(staging)) {
++			await fileService.del(staging, { recursive: true }).catch(error => logService.error(error));
++		}
++	}
++}

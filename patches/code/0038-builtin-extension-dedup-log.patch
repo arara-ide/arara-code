@@ -1,0 +1,18 @@
+Arara Code: log expected builtin/user extension deduplication at debug level.
+
+Why a patch: extension scanning runs before activation and extension APIs cannot
+change its diagnostic level. The existing selection and version comparison are
+unchanged; the redundant same-or-older user installation stays on disk.
+Touches: extensionsUtil.ts.
+
+--- a/src/vs/workbench/services/extensions/common/extensionsUtil.ts
++++ b/src/vs/workbench/services/extensions/common/extensionsUtil.ts
+@@ -24,7 +24,7 @@
+ 		if (extension) {
+ 			if (extension.isBuiltin) {
+ 				if (semver.gte(extension.version, userExtension.version)) {
+-					logService.warn(`Skipping extension ${userExtension.extensionLocation.path} in favour of the builtin extension ${extension.extensionLocation.path}.`);
++					logService.debug(`Skipping extension ${userExtension.extensionLocation.path} in favour of the builtin extension ${extension.extensionLocation.path}.`);
+ 					return;
+ 				}
+ 				// Overwriting a builtin extension inherits the `isBuiltin` property and it doesn't show a warning

@@ -1,0 +1,57 @@
+Arara Code: gancho genérico de lançador (só ícone) na barra de título.
+
+- contrib/arara/electron-browser/araraTitleLauncher.contribution.ts (novo): item em
+  MenuId.LayoutControlMenu (order -2, à esquerda do "Atualizar" do 0015 e do Customize
+  Layout) com o ícone `sparkle` (estrelinha de IA).
+  Só aparece com a context key `arara.ui.titleLauncher` ligada pela extensão; o clique
+  roda `arara.ui.titleLauncher.run`. O que abre (hoje: a seção lateral do Arara AI) é
+  decisão da extensão arara-ai.
+- workbench.desktop.main.ts: importa a contribution.
+
+Why a patch: extensões não contribuem itens para o LayoutControlMenu nem para a barra
+de título (MenuId.TitleBar/LayoutControlMenu não estão no menusExtensionPoint).
+Sem lógica de produto, rede ou processo no core.
+Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts src/vs/workbench/workbench.desktop.main.ts
+
+--- /dev/null
++++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
+@@ -0,0 +1,28 @@
++import { Codicon } from '../../../../base/common/codicons.js';
++import { localize } from '../../../../nls.js';
++import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
++import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
++import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++
++MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++	group: 'navigation',
++	order: -2,
++	command: {
++		id: 'arara.ui.titleLauncher.run',
++		title: localize('arara.ui.titleLauncher', "Arara"),
++		icon: Codicon.sparkle,
++	},
++	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.ui.titleLauncher')),
++});
++
++for (const id of [MenuId.MenubarPreferencesMenu, MenuId.GlobalActivity]) {
++	MenuRegistry.appendMenuItem(id, {
++		group: '2_configuration',
++		order: 2.5,
++		command: {
++			id: 'arara.openSettings',
++			title: localize('arara.openSettings', "Arara settings"),
++		},
++		when: ContextKeyExpr.has('arara.ui.titleLauncher'),
++	});
++}
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -199,6 +199,8 @@
+ 
+ import './contrib/arara/electron-browser/araraUpdate.contribution.js';
+ 
++import './contrib/arara/electron-browser/araraTitleLauncher.contribution.js';
++
+ // MCP
+ import './contrib/mcp/electron-browser/mcp.contribution.js';
+ 

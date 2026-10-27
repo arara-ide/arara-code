@@ -1,0 +1,307 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+UPSTREAM="${ROOT}/upstream/vscodium"
+WORK="${ROOT}/.work/vscodium"
+SKIP_SOURCE="no"
+PREPARE_ONLY="no"
+BUILD_DEB="yes"
+ARARA_AI_DIR="${ARARA_AI_DIR:-$( cd "${ROOT}/.." && pwd )/arara-ai}"
+ARARA_BOT_DIR="${ARARA_BOT_DIR:-$( cd "${ROOT}/.." && pwd )/arara-bot}"
+ARARA_ORCHESTRA_DIR="${ARARA_ORCHESTRA_DIR:-$( cd "${ROOT}/.." && pwd )/arara-orchestra}"
+
+for arg in "$@"; do
+  case "${arg}" in
+    --skip-source) SKIP_SOURCE="yes" ;;
+    --prepare-only) PREPARE_ONLY="yes" ;;
+    --no-deb) BUILD_DEB="no" ;;
+    *) echo "opção desconhecida: ${arg}" >&2; exit 1 ;;
+  esac
+done
+
+ARARA_ENVIRONMENT="production"
+if [[ -f "${ROOT}/.arara-environment" ]]; then
+  ARARA_ENVIRONMENT="$(cat "${ROOT}/.arara-environment")"
+fi
+node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}"
+
+[[ -f "${UPSTREAM}/build.sh" ]] || git -C "${ROOT}" submodule update --init
+
+mkdir -p "${WORK}"
+if command -v rsync >/dev/null 2>&1; then
+  rsync -a --delete \
+    --exclude '/vscode/' --exclude '/VSCode-*/' --exclude '/vscode-reh*/' --exclude '/dev/build.env' \
+    "${UPSTREAM}/" "${WORK}/"
+else
+  mkdir -p "${WORK}/dev"
+  [[ -f "${WORK}/dev/build.env" ]] && cp "${WORK}/dev/build.env" "${WORK}/.build.env.keep"
+  find "${WORK}" -mindepth 1 -maxdepth 1 ! -name vscode ! -name 'VSCode-*' ! -name 'vscode-reh*' -exec rm -rf {} +
+  ( cd "${UPSTREAM}" && tar cf - --exclude=./vscode --exclude='./VSCode-*' --exclude='./vscode-reh*' . ) | tar xf - -C "${WORK}"
+  mkdir -p "${WORK}/dev"
+  [[ -f "${WORK}/.build.env.keep" ]] && mv "${WORK}/.build.env.keep" "${WORK}/dev/build.env"
+fi
+rm -f "${WORK}/.git"
+
+shopt -s nullglob
+for p in "${ROOT}"/patches/vscodium/*.patch; do
+  echo "patch vscodium: $( basename "${p}" )"
+  patch -d "${WORK}" -p1 --forward --no-backup-if-mismatch < "${p}"
+done
+
+if [[ ! -d "${ROOT}/branding/src-stable" ]]; then
+  echo "» Gerando assets de branding pela primeira vez..."
+  "${ROOT}/scripts/build-icons.sh" "${ROOT}/branding/src-stable"
+fi
+cp -rp "${ROOT}/branding/src-stable/"* "${WORK}/src/stable/"
+cp -p "${ROOT}/branding/msi/stable/"*.bmp "${WORK}/build/windows/msi/resources/stable/"
+
+jq -s '.[0] * .[1]' "${WORK}/product.json" "${ROOT}/branding/product.overlay.json" > "${WORK}/product.json.tmp"
+mv "${WORK}/product.json.tmp" "${WORK}/product.json"
+
+printf '\nbash "%s/scripts/default-extensions.sh" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
+printf 'node "%s/scripts/prepare-language-detection.cjs" "%s/vscode"\n' "${ROOT}" "${WORK}" >> "${WORK}/prepare_vscode.sh"
+
+node "${ROOT}/scripts/check-patches.cjs"
+node "${ROOT}/scripts/generate-localization.cjs" --check
+mkdir -p "${WORK}/patches/user"
+for p in "${ROOT}"/patches/code/*.patch; do
+  cp "${p}" "${WORK}/patches/user/"
+done
+shopt -u nullglob
+
+export APP_NAME="Arara Code"
+export BINARY_NAME="arara-code"
+export ORG_NAME="Arara"
+export GLOBAL_DIRNAME="arara-code"
+export TUNNEL_APP_NAME="arara-code-tunnel"
+export GH_REPO_PATH="arara-ide/arara-code"
+export ASSETS_REPOSITORY="arara-ide/arara-code"
+export GITHUB_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+
+export SHOULD_BUILD="yes"
+export SHOULD_BUILD_REH="${SHOULD_BUILD_REH:-no}"
+export SHOULD_BUILD_REH_WEB="${SHOULD_BUILD_REH_WEB:-no}"
+export CI_BUILD="${CI_BUILD:-no}"
+export VSCODE_QUALITY="stable"
+export VSCODE_LATEST="no"
+export VSCODE_SKIP_NODE_VERSION_CHECK="yes"
+export DISABLE_UPDATE="yes"
+export MAX_OLD_SPACE_SIZE="${MAX_OLD_SPACE_SIZE:-8192}"
+
+case "${OSTYPE}" in
+  darwin*) export OS_NAME="osx" ;;
+  msys*|cygwin*) export OS_NAME="windows" ;;
+  *) export OS_NAME="linux" ;;
+esac
+case "$( uname -m )" in
+  aarch64|arm64) export VSCODE_ARCH="arm64" ;;
+  *) export VSCODE_ARCH="x64" ;;
+esac
+
+cd "${WORK}"
+set +u
+if [[ "${SKIP_SOURCE}" == "no" ]]; then
+  rm -rf vscode VSCode-* vscode-reh*
+  . get_repo.sh
+  . version.sh
+  { echo "MS_TAG=\"${MS_TAG}\""; echo "MS_COMMIT=\"${MS_COMMIT}\""; echo "RELEASE_VERSION=\"${RELEASE_VERSION}\""; } > dev/build.env
+else
+  [[ -d vscode ]] || { echo "--skip-source sem vscode/ existente" >&2; exit 1; }
+  . dev/build.env
+  RELEASE_VERSION="${MS_TAG}$( printf "%04d" $(( $(date +%-j) * 24 + $(date +%-H) )) )"
+  { echo "MS_TAG=\"${MS_TAG}\""; echo "MS_COMMIT=\"${MS_COMMIT}\""; echo "RELEASE_VERSION=\"${RELEASE_VERSION}\""; } > dev/build.env
+  export MS_TAG MS_COMMIT RELEASE_VERSION
+  ( cd vscode && git add -A && git reset -q --hard HEAD && git clean -fdq -e node_modules && rm -rf .build out* )
+  rm -rf VSCode-*
+fi
+
+embed_arara_ai() {
+  [[ -f "${ARARA_AI_DIR}/package.json" ]] || { echo "! ${ARARA_AI_DIR} não encontrado; build sem a extensão de IA" >&2; return 0; }
+  echo "» Compilando arara-ai…"
+  ( cd "${ARARA_AI_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build )
+  local dest="${WORK}/vscode/extensions/arara-ai"
+  rm -rf "${dest}"
+  mkdir -p "${dest}"
+  cp "${ARARA_AI_DIR}/package.json" "${dest}/"
+  for catalog in "${ARARA_AI_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
+  node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
+  [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"
+  [[ -f "${ARARA_AI_DIR}/.vscodeignore" ]] && cp "${ARARA_AI_DIR}/.vscodeignore" "${dest}/"
+  mkdir -p "${dest}/dist"
+  cp "${ARARA_AI_DIR}/dist/extension.js" "${dest}/dist/"
+  cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
+}
+
+embed_arara_bot() {
+  [[ -f "${ARARA_BOT_DIR}/extension/package.json" ]] || { echo "! ${ARARA_BOT_DIR} não encontrado; build sem o Arara Bot" >&2; return 0; }
+  echo "» Compilando arara-bot…"
+  ( cd "${ARARA_BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile; } && pnpm build:server )
+  ( cd "${ARARA_BOT_DIR}/extension" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build && npm run --silent stage )
+  local src="${ARARA_BOT_DIR}/extension" dest="${WORK}/vscode/extensions/arara-bot"
+  rm -rf "${dest}"
+  mkdir -p "${dest}/dist"
+  cp "${src}/package.json" "${src}/LICENSE" "${src}/NOTICE" "${dest}/"
+  for catalog in "${src}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
+  local f
+  for f in extension hub bridge webview; do cp "${src}/dist/${f}.js" "${dest}/dist/"; done
+  cp -r "${src}/media" "${src}/server" "${src}/skills" "${dest}/"
+  test -s "${dest}/server/index.js" && test -s "${dest}/dist/webview.js"
+}
+
+embed_arara_orchestra() {
+  [[ -f "${ARARA_ORCHESTRA_DIR}/package.json" ]] || { echo "! ${ARARA_ORCHESTRA_DIR} não encontrado; build sem a Orquestra" >&2; return 0; }
+  echo "» Compilando arara-orchestra…"
+  ( cd "${ARARA_ORCHESTRA_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build )
+  local src="${ARARA_ORCHESTRA_DIR}" dest="${WORK}/vscode/extensions/arara-orchestra"
+  rm -rf "${dest}"
+  mkdir -p "${dest}/dist/webview"
+  cp "${src}/package.json" "${dest}/"
+  for catalog in "${src}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
+  cp "${src}/dist/extension.js" "${dest}/dist/"
+  cp "${src}/dist/webview/webview.js" "${dest}/dist/webview/"
+  cp -r "${src}/media" "${dest}/"
+  test -s "${dest}/dist/extension.js" && test -s "${dest}/dist/webview/webview.js"
+}
+
+# Protege (bytecode V8) os bundles CommonJS das três extensões, usando o Electron embarcado
+# desta build (mesma V8 que vai executá-las). Desative com ARARA_PROTECT=no. As extensões
+# browser/webview (IIFE) e o servidor do bot (dist-server/*.js, ESM) NÃO entram: só minify.
+protect_arara_extensions() {
+  [[ "${ARARA_PROTECT:-yes}" == "yes" ]] || { echo "» ARARA_PROTECT=no — pulando bytecode (apenas minify)"; return 0; }
+  echo "» Garantindo Electron para gerar o bytecode…"
+  ( cd vscode && npm run --silent electron >/dev/null )
+  local elec="vscode/.build/electron/$( node -p "require('./vscode/product.json').applicationName" )"
+  case "${OS_NAME}" in
+    windows) elec="vscode/.build/electron/$( node -p "require('./vscode/product.json').nameShort" ).exe" ;;
+    osx) elec="vscode/.build/electron/$( node -p "require('./vscode/product.json').nameLong" ).app/Contents/MacOS/$( node -p "require('./vscode/product.json').nameShort" )" ;;
+  esac
+  local ai="vscode/extensions/arara-ai" bot="vscode/extensions/arara-bot" orch="vscode/extensions/arara-orchestra"
+  bash "${ROOT}/scripts/bytecode/protect.sh" "${elec}" \
+    "${ai}/dist/extension.js" \
+    "${ai}/media/lazy-mcp.cjs" "${ai}/media/browser-core.cjs" "${ai}/media/cli-core.cjs" "${ai}/media/cli-mcp-proxy.cjs" \
+    "${orch}/dist/extension.js" \
+    "${bot}/dist/extension.js" "${bot}/dist/hub.js" "${bot}/dist/bridge.js"
+}
+
+if [[ "${PREPARE_ONLY}" == "yes" ]]; then
+  . version.sh
+  . prepare_vscode.sh
+  echo
+  echo "pronto (preparado, sem compilar): ${WORK}/vscode"
+  exit 0
+fi
+
+if [[ "${OS_NAME}" == "linux" ]]; then
+  . version.sh
+  . prepare_vscode.sh
+  embed_arara_ai
+  embed_arara_bot
+  embed_arara_orchestra
+  protect_arara_extensions
+  cp "${ROOT}/branding/linux/control.template" vscode/resources/linux/debian/control.template
+  (
+    cd vscode
+    export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
+    export VSCODE_PUBLISH_COUNTER=1
+    npm run gulp vscode-min-prepack
+    rm -f .build/extensions/ms-vscode.js-debug/src/win32-app-container-tokens.*.node
+    npm run copy-policy-dto --prefix build
+    node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc linux
+    npm run gulp "vscode-linux-${VSCODE_ARCH}-min-packing"
+  )
+  find "VSCode-linux-${VSCODE_ARCH}" -print0 | xargs -0 touch -c
+  install -m 755 "${ROOT}/branding/linux/uninstall.sh" "VSCode-linux-${VSCODE_ARCH}/bin/arara-code-uninstall"
+  for t in postinst prerm; do
+    f="vscode/resources/linux/debian/${t}.template"
+    grep -q arara-code-uninstall "${f}" && continue
+    if [[ "${t}" == "postinst" ]]; then
+      sed -i '0,/^ln -s .*$/s||&\nln -sf /usr/share/@@NAME@@/bin/@@NAME@@-uninstall /usr/bin/@@NAME@@-uninstall|' "${f}"
+    else
+      printf '\nrm -f /usr/bin/@@NAME@@-uninstall\n' >> "${f}"
+    fi
+  done
+elif [[ "${OS_NAME}" == "windows" ]]; then
+  . version.sh
+  . prepare_vscode.sh
+  embed_arara_ai
+  embed_arara_bot
+  embed_arara_orchestra
+  protect_arara_extensions
+  (
+    cd vscode
+    export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
+    export VSCODE_PUBLISH_COUNTER=1
+    npm run gulp vscode-min-prepack
+    . ../build/windows/rtf/make.sh
+    npm run copy-policy-dto --prefix build
+    node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc win32
+    npm run gulp "vscode-win32-${VSCODE_ARCH}-min-packing"
+  )
+  (
+    export SHOULD_BUILD_CLI="no" SHOULD_BUILD_REH="no" SHOULD_BUILD_REH_WEB="no"
+    export SHOULD_BUILD_MSI="no" SHOULD_BUILD_MSI_NOUP="no"
+    APP_NAME="AraraCode" ./prepare_assets.sh
+  )
+  OUT="${ROOT}/dist"
+  mkdir -p "${OUT}"
+  cp assets/* "${OUT}/"
+else
+  . version.sh
+  . prepare_vscode.sh
+  embed_arara_ai
+  embed_arara_bot
+  embed_arara_orchestra
+  protect_arara_extensions
+  (
+    cd vscode
+    export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
+    export VSCODE_PUBLISH_COUNTER=1
+    npm run gulp vscode-min-prepack
+    rm -f .build/extensions/ms-vscode.js-debug/src/win32-app-container-tokens.*.node
+    npm run copy-policy-dto --prefix build
+    node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc darwin
+    npm run gulp "vscode-darwin-${VSCODE_ARCH}-min-packing"
+  )
+  find "VSCode-darwin-${VSCODE_ARCH}" -print0 | xargs -0 touch -c
+  APP=""
+  for APP in "VSCode-darwin-${VSCODE_ARCH}"/*.app; do break; done
+  [[ -d "${APP}" ]] || { echo "! .app não encontrado em VSCode-darwin-${VSCODE_ARCH}" >&2; exit 1; }
+  codesign --force --deep --sign - "${APP}"
+  OUT="${ROOT}/dist"
+  mkdir -p "${OUT}"
+  ditto -c -k --sequesterRsrc --keepParent "${APP}" "${OUT}/AraraCode-darwin-${VSCODE_ARCH}-${RELEASE_VERSION}.zip"
+fi
+
+if [[ "${OS_NAME}" == "linux" ]]; then
+  OUT="${ROOT}/dist"
+  mkdir -p "${OUT}"
+  tar czf "${OUT}/arara-code-linux-${VSCODE_ARCH}-${RELEASE_VERSION}.tar.gz" -C "${WORK}/VSCode-linux-${VSCODE_ARCH}" .
+  if [[ "${BUILD_DEB}" == "yes" ]]; then
+    if ! perl -e 'use Dpkg; exit(($Dpkg::PROGVERSION =~ /^1\.(2[3-9]|[3-9]\d)/) ? 0 : 1)' 2>/dev/null; then
+      DPKG_SHLIBDEPS_PL="$(cd "${WORK}/vscode" && node -p "require('os').tmpdir()")/dpkg-shlibdeps.pl"
+      CHROMIUM_REV="$(cd "${WORK}/vscode" && node -p "require('./cgmanifest.json').registrations.find(r => r.component.type === 'git' && r.component.git.name === 'chromium').version")"
+      curl -fsSL --retry 6 --retry-delay 15 --retry-all-errors \
+        "https://raw.githubusercontent.com/chromium/chromium/${CHROMIUM_REV}/third_party/dpkg-shlibdeps/dpkg-shlibdeps.pl" \
+        -o "${DPKG_SHLIBDEPS_PL}"
+      perl -c "${DPKG_SHLIBDEPS_PL}"
+      sed -i "s|\tconst result = spawnSync('curl', \[dpkgShlibdepsUrl, '-o', dpkgShlibdepsScriptLocation\]);|\tconst result = { status: 0, stderr: '' }; // Arara: baixado e validado em scripts/build.sh|" "${WORK}/vscode/build/linux/debian/calculate-deps.ts"
+      grep -q "Arara: baixado e validado" "${WORK}/vscode/build/linux/debian/calculate-deps.ts" \
+        || { echo "! calculate-deps.ts mudou; ajuste o sed do dpkg-shlibdeps em scripts/build.sh" >&2; exit 1; }
+    else
+      sed -i 's|\tconst dpkgShlibdepsResult = spawnSync(.perl., cmd, { cwd: chromiumSysroot });|\tconst dpkgShlibdepsResult = { status: 0, stdout: Buffer.from(""), stderr: "" }; // Arara: dpkg novo, usa dep-lists.ts|' "${WORK}/vscode/build/linux/debian/calculate-deps.ts"
+      sed -i 's|\tconst sortedDependencies: string\[\] = Array.from(mergedDependencies)|\tif (packageType === "deb" \&\& !mergedDependencies.size) { return [...debianGeneratedDeps[arch as DebianArchString]]; }\n\tconst sortedDependencies: string[] = Array.from(mergedDependencies)|' "${WORK}/vscode/build/linux/dependencies-generator.ts"
+    fi
+    ( cd "${WORK}/vscode" \
+      && npm run gulp "vscode-linux-${VSCODE_ARCH}-prepare-deb" \
+      && npm run gulp "vscode-linux-${VSCODE_ARCH}-build-deb" )
+    cp "${WORK}"/vscode/.build/linux/deb/*/deb/*.deb "${OUT}/"
+  fi
+  echo
+  echo "pronto:"
+  ls -lh "${OUT}"
+else
+  echo
+  echo "pronto: ${WORK}/VSCode-${OS_NAME}-${VSCODE_ARCH}"
+fi

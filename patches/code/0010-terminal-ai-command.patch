@@ -1,0 +1,138 @@
+Arara Code: botão de comando de terminal com IA + estado "preenchendo" do terminal.
+
+- terminalMenus.ts: adiciona uma ação (ícone sparkle, comando
+  arara.terminal.command da extensão arara-ai) no MenuId.ViewTitle do terminal
+  (grupo navigation, order 4, mesmo gate shouldShowViewInlineActions dos botões
+  split/kill). Fica inline na barra do painel, entre split/matar e o botão de
+  novo terminal. Só ícone, como os vizinhos.
+- terminalTabsList.ts: o mesmo comando (sparkle) nas ações inline de cada linha
+  da lista de terminais (aparece com 2+ terminais), entre split e lixeira. Ativa
+  o terminal da linha antes de rodar, para o comando ir para ele. Só aparece se
+  o comando estiver registrado.
+- terminalView.ts + terminal.css: enquanto a context key arara.terminalStreaming
+  está ligada (a extensão liga enquanto a IA preenche o terminal via stream),
+  a tela do terminal escurece com um brilho animado. A execução fica travada
+  nesse período porque a extensão engole o Enter por keybinding
+  (arara.terminal.streamingNoop com when terminalFocus && arara.terminalStreaming);
+  o escurecimento é só o sinal visual disso.
+
+Se a extensão de IA não estiver carregada, o comando não resolve (ação some) e a
+context key nunca liga (sem efeito visual).
+
+Why a patch: a barra inline do painel de terminal (MenuId.ViewTitle do
+TERMINAL_VIEW_ID) e o escurecimento/brilho da tela do terminal são UI do core;
+o `menus` de extensão não contribui ações inline ali nem nas linhas da lista de
+terminais (só no menu de contexto das abas) e não há API para alterar a
+aparência do terminal.
+Touches: src/vs/workbench/contrib/terminal/browser/terminalMenus.ts,
+         src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts,
+         src/vs/workbench/contrib/terminal/browser/terminalView.ts,
+         src/vs/workbench/contrib/terminal/browser/media/terminal.css
+
+--- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+@@ -501,6 +501,19 @@
+ 				id: MenuId.ViewTitle,
+ 				item: {
+ 					command: {
++						id: 'arara.terminal.command',
++						title: localize('arara.terminal.command', "AI command"),
++						icon: Codicon.sparkle
++					},
++					group: 'navigation',
++					order: 4,
++					when: TerminalContextKeys.shouldShowViewInlineActions
++				}
++			},
++			{
++				id: MenuId.ViewTitle,
++				item: {
++					command: {
+ 						id: TerminalCommandId.New,
+ 						title: terminalStrings.new,
+ 						icon: Codicon.plus
+--- a/src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalTabsList.ts
+@@ -52,7 +52,7 @@
+ import { TerminalContextActionRunner } from './terminalContextMenu.js';
+ import type { IHoverAction } from '../../../../base/browser/ui/hover/hover.js';
+ import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
+-import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
+ import { TerminalStorageKeys } from '../common/terminalStorageKeys.js';
+ import { isObject } from '../../../../base/common/types.js';
+@@ -531,6 +531,12 @@
+ 				});
+ 			})),
+ 		];
++		if (CommandsRegistry.getCommand('arara.terminal.command')) {
++			actions.push(template.elementDisposables.add(new Action('arara.terminal.command', localize('arara.terminal.command', "AI command"), ThemeIcon.asClassName(Codicon.sparkle), true, async () => {
++				this._terminalService.setActiveInstance(instance);
++				await this._commandService.executeCommand('arara.terminal.command');
++			})));
++		}
+ 		if (instance.shellLaunchConfig.tabActions) {
+ 			for (const action of instance.shellLaunchConfig.tabActions) {
+ 				actions.push(template.elementDisposables.add(new Action(action.id, action.label, action.icon ? ThemeIcon.asClassName(action.icon) : undefined, true, async () => {
+--- a/src/vs/workbench/contrib/terminal/browser/terminalView.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
+@@ -197,6 +197,15 @@
+ 		domStylesheetsJs.createStyleSheet(this._parentDomElement);
+ 		this._instantiationService.createInstance(TerminalThemeIconStyle, this._parentDomElement);
+ 
++		const araraStreamingKey = 'arara.terminalStreaming';
++		const updateAraraStreaming = () => {
++			this._parentDomElement?.classList.toggle('arara-streaming', !!this._contextKeyService.getContextKeyValue(araraStreamingKey));
++		};
++		this._register(this._contextKeyService.onDidChangeContext(e => {
++			if (e.affectsSome(new Set([araraStreamingKey]))) { updateAraraStreaming(); }
++		}));
++		updateAraraStreaming();
++
+ 		if (!this.shouldShowWelcome()) {
+ 			this._createTabsView();
+ 		}
+--- a/src/vs/workbench/contrib/terminal/browser/media/terminal.css
++++ b/src/vs/workbench/contrib/terminal/browser/media/terminal.css
+@@ -620,3 +620,40 @@
+ .monaco-workbench .xterm.terminal.hide {
+ 	visibility: hidden;
+ }
++
++.monaco-workbench .pane-body.integrated-terminal.arara-streaming .terminal-outer-container {
++	position: relative;
++}
++
++.monaco-workbench .pane-body.integrated-terminal.arara-streaming .xterm .xterm-screen {
++	opacity: 0.55;
++	transition: opacity 120ms ease;
++}
++
++.monaco-workbench .pane-body.integrated-terminal.arara-streaming .terminal-outer-container::after {
++	content: "";
++	position: absolute;
++	inset: 0;
++	pointer-events: none;
++	z-index: 10;
++	background: linear-gradient(
++		100deg,
++		transparent 30%,
++		var(--vscode-terminal-foreground, rgba(255, 255, 255, 0.12)) 50%,
++		transparent 70%
++	);
++	opacity: 0.12;
++	background-size: 300% 100%;
++	animation: arara-terminal-shine 1.4s linear infinite;
++}
++
++@keyframes arara-terminal-shine {
++	from { background-position: 180% 0; }
++	to { background-position: -80% 0; }
++}
++
++@media (prefers-reduced-motion: reduce) {
++	.monaco-workbench .pane-body.integrated-terminal.arara-streaming .terminal-outer-container::after {
++		animation: none;
++	}
++}

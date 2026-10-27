@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+WORK="${ROOT}/.work/vscodium"
+VSCODE="${WORK}/vscode"
+NAME="${1:?uso: new-patch.sh NNNN-nome arquivo [arquivo…]}"
+NAME="${NAME%.patch}"
+shift
+[[ $# -gt 0 ]] || { echo "informe os arquivos alterados (relativos a vscode/)" >&2; exit 1; }
+FILES=("$@")
+OUT="${ROOT}/patches/code/${NAME}.patch"
+
+TMP="$( mktemp -d )"
+trap 'rm -rf "${TMP}"' EXIT
+BASE="${TMP}/base"
+mkdir -p "${BASE}"
+
+NEW_FILES=" "
+for f in "${FILES[@]}"; do
+  mkdir -p "${BASE}/$( dirname "${f}" )"
+  if ! git -C "${VSCODE}" show "HEAD:${f}" > "${BASE}/${f}" 2>/dev/null; then
+    rm -f "${BASE}/${f}"
+    NEW_FILES+="${f} "
+  fi
+done
+
+PATCHES=("${WORK}"/patches/*.patch "${WORK}"/patches/linux/*.patch)
+for p in "${ROOT}"/patches/code/*.patch; do
+  [[ -f "${p}" && "$( basename "${p}" .patch )" < "${NAME}" ]] && PATCHES+=("${p}")
+done
+
+INCLUDES=()
+for f in "${FILES[@]}"; do INCLUDES+=(--include="${f}"); done
+
+APP_NAME="Arara Code"; BINARY_NAME="arara-code"; ORG_NAME="Arara"; GLOBAL_DIRNAME="arara-code"
+TUNNEL_APP_NAME="arara-code-tunnel"; GH_REPO_PATH="arara-ide/arara-code"; ASSETS_REPOSITORY="arara-ide/arara-code"
+APP_NAME_LC="arara code"; RELEASE_VERSION="$( sed -n 's/^RELEASE_VERSION="\(.*\)"/\1/p' "${WORK}/dev/build.env" 2>/dev/null || true )"
+
+for p in "${PATCHES[@]}"; do
+  [[ -f "${p}" ]] || continue
+  sed -e "s|!!APP_NAME!!|${APP_NAME}|g" -e "s|!!APP_NAME_LC!!|${APP_NAME_LC}|g" \
+      -e "s|!!BINARY_NAME!!|${BINARY_NAME}|g" -e "s|!!ORG_NAME!!|${ORG_NAME}|g" \
+      -e "s|!!GLOBAL_DIRNAME!!|${GLOBAL_DIRNAME}|g" -e "s|!!TUNNEL_APP_NAME!!|${TUNNEL_APP_NAME}|g" \
+      -e "s|!!GH_REPO_PATH!!|${GH_REPO_PATH}|g" -e "s|!!ASSETS_REPOSITORY!!|${ASSETS_REPOSITORY}|g" \
+      -e "s|!!RELEASE_VERSION!!|${RELEASE_VERSION}|g" "${p}" > "${TMP}/p.patch"
+  ( cd "${BASE}" && git apply --ignore-whitespace "${INCLUDES[@]}" "${TMP}/p.patch" ) \
+    || { echo "falhou ao reconstruir a base com $( basename "${p}" )" >&2; exit 1; }
+done
+
+HEADER=""
+[[ -f "${OUT}" ]] && HEADER="$( sed '/^--- a\//,$d' "${OUT}" )"
+if [[ -z "${HEADER//[[:space:]]/}" ]]; then
+  HEADER="Arara Code: TODO o que este patch faz.
+
+Why a patch: TODO por que não dá pela API de extensão.
+Touches: ${FILES[*]}
+"
+fi
+
+{
+  printf '%s\n\n' "${HEADER%$'\n'}"
+  for f in "${FILES[@]}"; do
+    if [[ "${NEW_FILES}" == *" ${f} "* && ! -e "${BASE}/${f}" ]]; then
+      diff -u --label /dev/null --label "b/${f}" /dev/null "${VSCODE}/${f}" || true
+    else
+      diff -u --label "a/${f}" --label "b/${f}" "${BASE}/${f}" "${VSCODE}/${f}" || true
+    fi
+  done
+} > "${OUT}"
+
+echo "gerado: ${OUT}"
