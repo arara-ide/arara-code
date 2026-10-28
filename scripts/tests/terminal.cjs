@@ -14,7 +14,8 @@ const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: t
   const arch = process.arch;
   const native = path.join(directory, 'baseline.node');
   const source = path.join(directory, 'baseline.c');
-  write(source, '#include <termios.h>\nint terminal_speed(struct termios *t) { return cfsetospeed(t, B9600); }\n');
+  const glibc = arch === 'x64' ? '2.2.5' : '2.17';
+  write(source, `#include <termios.h>\n__asm__(".symver cfsetospeed,cfsetospeed@GLIBC_${glibc}");\nint terminal_speed(struct termios *t) { return cfsetospeed(t, B9600); }\n`);
   execFileSync('cc', ['-shared', '-fPIC', source, '-o', native]);
   const hash = validateNative(native, arch);
   assert.match(hash, /^[a-f0-9]{64}$/);
