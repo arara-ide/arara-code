@@ -54,6 +54,7 @@ jobs:
           node scripts/tests/embed-arara-ai.cjs
           node scripts/tests/embed-arara-bot.cjs
           node scripts/tests/embed-arara-orchestra.cjs
+          node scripts/tests/terminal-fallback.cjs
           node --test scripts/tests/publish-release.cjs
 
   version:
@@ -171,6 +172,7 @@ jobs:
         run: |
           d=.work/vscodium/VSCode-linux-x64
           timeout 120 "$d/bin/arara-code" --version
+          ELECTRON_RUN_AS_NODE=1 "$d/arara-code" "$PWD/scripts/test-terminal.cjs" "$PWD/$d/resources/app"
           test -f "$d/resources/app/extensions/arara-ai/package.json"
           test -s "$d/resources/app/extensions/arara-ai/dist/extension.js"
           test -s "$d/resources/app/extensions/arara-orchestra/dist/extension.js"

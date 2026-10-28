@@ -176,6 +176,7 @@ fi
 if [[ "${OS_NAME}" == "linux" ]]; then
   . version.sh
   . prepare_vscode.sh
+  node "${ROOT}/scripts/prepare-terminal-fallback.cjs" "${WORK}/vscode" "${VSCODE_ARCH}"
   embed_arara_ai
   embed_arara_bot
   embed_arara_orchestra
@@ -191,6 +192,7 @@ if [[ "${OS_NAME}" == "linux" ]]; then
     npm run gulp "vscode-linux-${VSCODE_ARCH}-min-packing"
   )
   find "VSCode-linux-${VSCODE_ARCH}" -print0 | xargs -0 touch -c
+  ELECTRON_RUN_AS_NODE=1 "VSCode-linux-${VSCODE_ARCH}/arara-code" "${ROOT}/scripts/test-terminal.cjs" "${WORK}/VSCode-linux-${VSCODE_ARCH}/resources/app"
   install -m 755 "${ROOT}/branding/linux/uninstall.sh" "VSCode-linux-${VSCODE_ARCH}/bin/arara-code-uninstall"
   for t in postinst prerm; do
     f="vscode/resources/linux/debian/${t}.template"
