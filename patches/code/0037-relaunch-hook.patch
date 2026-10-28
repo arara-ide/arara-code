@@ -1,0 +1,25 @@
+Arara Code: expose a full application relaunch to the bundled extension.
+
+Why a patch: the extension API can reload a window, but the display language is
+resolved once by the main process, so applying the bundled language pack on the
+first launch needs a real relaunch. The hook only restarts; deciding when stays
+in the extension.
+Touches: src/vs/workbench/contrib/localization/electron-browser/localization.contribution.ts
+
+--- a/src/vs/workbench/contrib/localization/electron-browser/localization.contribution.ts
++++ b/src/vs/workbench/contrib/localization/electron-browser/localization.contribution.ts
+@@ -19,6 +19,8 @@
+ import { ILocaleService } from '../../../services/localization/common/locale.js';
+ import { IProductService } from '../../../../platform/product/common/productService.js';
+ import { BaseLocalizationWorkbenchContribution } from '../common/localization.contribution.js';
++import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
++import { IHostService } from '../../../services/host/browser/host.js';
+ 
+ class NativeLocalizationWorkbenchContribution extends BaseLocalizationWorkbenchContribution {
+ 	private static LANGUAGEPACK_SUGGESTION_IGNORE_STORAGE_KEY = 'extensionsAssistant/languagePackSuggestionIgnore';
+@@ -223,3 +225,5 @@
+ 
+ const workbenchRegistry = Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench);
+ workbenchRegistry.registerWorkbenchContribution(NativeLocalizationWorkbenchContribution, LifecyclePhase.Eventually);
++
++CommandsRegistry.registerCommand('_arara.relaunch', accessor => accessor.get(IHostService).restart());
