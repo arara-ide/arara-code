@@ -72,7 +72,10 @@ async function prepareTerminal(vscode, { arch = process.arch, run = execFileSync
     fs.rmSync(path.join(library, 'build/Debug'), { recursive: true, force: true });
     const output = path.join(vscode, '.build/arara-terminal');
     fs.mkdirSync(output, { recursive: true });
-    fs.copyFileSync(native, path.join(output, 'pty.node'));
+    const repairLibrary = path.join(output, 'node-pty');
+    fs.mkdirSync(path.join(repairLibrary, 'build/Release'), { recursive: true });
+    fs.copyFileSync(native, path.join(repairLibrary, 'build/Release/pty.node'));
+    for (const file of ['package.json', 'lib']) fs.cpSync(path.join(library, file), path.join(repairLibrary, file), { recursive: true });
     fs.copyFileSync(path.join(__dirname, 'terminal-probe.cjs'), path.join(output, 'probe.cjs'));
     fs.writeFileSync(path.join(output, 'manifest.json'), JSON.stringify({ version, platform: 'linux', arch, glibc: '2.28', sha256 }) + '\n');
     return output;

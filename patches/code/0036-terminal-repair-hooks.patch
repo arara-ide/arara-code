@@ -1,0 +1,63 @@
+Arara Code: expose local PTY Host recovery hooks to extensions.
+
+Why a patch: extension APIs do not expose PTY Host heartbeat failures, a local-only
+restart, or a host round-trip check. The patch delegates the local failure and
+status action to an extension command and exposes restart/latency commands.
+Diagnosis, consent, file repair and user messages remain in the extension.
+Remote backends and non-Linux status actions retain their existing behavior.
+Touches: src/vs/workbench/contrib/terminal/browser/baseTerminalBackend.ts
+src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts
+
+--- a/src/vs/workbench/contrib/terminal/browser/baseTerminalBackend.ts
++++ b/src/vs/workbench/contrib/terminal/browser/baseTerminalBackend.ts
+@@ -35,7 +35,8 @@
+ 		historyService: IHistoryService,
+ 		configurationResolverService: IConfigurationResolverService,
+ 		statusBarService: IStatusbarService,
+-		protected readonly _workspaceContextService: IWorkspaceContextService
++		protected readonly _workspaceContextService: IWorkspaceContextService,
++		unresponsiveCommand?: string
+ 	) {
+ 		super();
+ 
+@@ -66,7 +67,7 @@
+ 					text: `$(debug-disconnect) ${localize('ptyHostStatus.short', 'Pty Host')}`,
+ 					tooltip: localize('nonResponsivePtyHost', "The connection to the terminal's pty host process is unresponsive, terminals may stop working. Click to manually restart the pty host."),
+ 					ariaLabel: localize('ptyHostStatus.ariaLabel', 'Pty Host is unresponsive'),
+-					command: TerminalContribCommandId.DeveloperRestartPtyHost,
++					command: unresponsiveCommand ?? TerminalContribCommandId.DeveloperRestartPtyHost,
+ 					kind: 'warning'
+ 				};
+ 			}
+--- a/src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts
++++ b/src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts
+@@ -3,8 +3,9 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { Emitter } from '../../../../base/common/event.js';
+-import { IProcessEnvironment, isMacintosh, isWindows, OperatingSystem } from '../../../../base/common/platform.js';
++import { IProcessEnvironment, isLinux, isMacintosh, isWindows, OperatingSystem } from '../../../../base/common/platform.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+@@ -97,8 +98,17 @@
+ 		@IStatusbarService statusBarService: IStatusbarService,
+ 		@IRemoteAgentService private readonly _remoteAgentService: IRemoteAgentService,
+ 		@INativeWorkbenchEnvironmentService private readonly _environmentService: INativeWorkbenchEnvironmentService,
++		@ICommandService commandService: ICommandService,
+ 	) {
+-		super(_localPtyService, logService, historyService, _configurationResolverService, statusBarService, workspaceContextService);
++		super(_localPtyService, logService, historyService, _configurationResolverService, statusBarService, workspaceContextService, isLinux ? 'arara.terminal.repair' : undefined);
++
++		this._register(CommandsRegistry.registerCommand('arara.internal.restartLocalPtyHost', () => this.restartPtyHost()));
++		this._register(CommandsRegistry.registerCommand('arara.internal.terminalHostLatency', () => this.getLatency()));
++		if (isLinux) {
++			this._register(this.onPtyHostUnresponsive(() => {
++				void commandService.executeCommand('arara.terminal.repair', { automatic: true }).catch(error => this._logService.warn('Terminal repair command failed', error));
++			}));
++		}
+ 
+ 		this._register(this.onPtyHostRestart(() => {
+ 			this._directProxy = undefined;

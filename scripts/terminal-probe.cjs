@@ -1,8 +1,9 @@
 const path = require('node:path');
 const os = require('node:os');
 const app = path.resolve(process.argv[2]);
-require(path.join(app, 'node_modules.asar/node-pty/build/Release/pty.node'));
-const pty = require(path.join(app, 'node_modules.asar/node-pty'));
+const library = process.argv[3] ? path.resolve(process.argv[3]) : path.join(app, 'node_modules.asar/node-pty');
+require(path.join(library, 'build/Release/pty.node'));
+const pty = require(library);
 const terminal = pty.spawn('/bin/bash', ['--noprofile', '--norc', '-c', 'test -t 0 && test -t 1 && read -r value && stty size && printf "\\036%s\\037" "$value"'], {
   cwd: os.tmpdir(), env: { PATH: '/usr/bin:/bin', TERM: 'xterm-256color' }, cols: 80, rows: 24,
 });
