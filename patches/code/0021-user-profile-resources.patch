@@ -1,8 +1,8 @@
 Arara Code: expose active user profile resource URIs to extensions.
 
 Why a patch: stable/proposed extension APIs do not expose the active profile's
-settings.json and keybindings.json locations. globalStorageUri belongs to the
-default profile and cannot safely locate named profiles, portable or remote
+settings.json, keybindings.json and global state storage locations.
+globalStorageUri belongs to the default profile and cannot safely locate named profiles, portable or remote
 user-data. ProfileContentHandler only transports whole profile exports. This
 read-only hook returns the native resources, including useDefaultFlags handling;
 all discovery, filtering, merging and backup logic stays in the extension.
@@ -20,7 +20,7 @@ Touches: userDataProfileManagement.ts (command registration only).
  import { CancellationToken } from '../../../../base/common/cancellation.js';
  import { CancellationError } from '../../../../base/common/errors.js';
  import { Disposable } from '../../../../base/common/lifecycle.js';
-@@ -211,3 +214,13 @@
+@@ -211,3 +214,14 @@
  }
  
  registerSingleton(IUserDataProfileManagementService, UserDataProfileManagementService, InstantiationType.Eager /* Eager because it updates the current window profile by listening to profiles changes */);
@@ -30,6 +30,7 @@ Touches: userDataProfileManagement.ts (command registration only).
 +	const properties = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).getConfigurationProperties();
 +	return {
 +		settings: profile.settingsResource.toString(), keybindings: profile.keybindingsResource.toString(),
++		globalStorage: profile.globalStorageHome.toString(),
 +		applicationSettings: accessor.get(IUserDataProfilesService).defaultProfile.settingsResource.toString(),
 +		applicationKeys: Object.keys(properties).filter(key => properties[key].scope === ConfigurationScope.APPLICATION || properties[key].scope === ConfigurationScope.APPLICATION_MACHINE),
 +	};
