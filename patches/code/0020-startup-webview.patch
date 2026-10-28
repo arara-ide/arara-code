@@ -7,6 +7,7 @@ IExtensionStorageService, using the product's generic startupWebview descriptor.
 Keep all workbench chrome hidden while the extension-owned modal is active;
 reuse its context gate and native modal, without changing saved user layout.
 The extension owns the steps, choices and completion. No timers/reopening tabs.
+Window close and quit stay allowed; an unfinished setup reopens on next launch.
 Touches: product type, workbench startup, startupWebview and its scoped CSS.
 
 --- a/src/vs/base/common/product.ts
@@ -41,7 +42,7 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
  
 --- /dev/null
 +++ b/src/vs/workbench/browser/startupWebview.ts
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,41 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -53,7 +54,6 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
 +import { IContextKeyService } from '../../platform/contextkey/common/contextkey.js';
 +import { IExtensionStorageService } from '../../platform/extensionManagement/common/extensionStorage.js';
 +import { IProductService } from '../../platform/product/common/productService.js';
-+import { ILifecycleService, ShutdownReason } from '../services/lifecycle/common/lifecycle.js';
 +
 +export class StartupWebview extends Disposable {
 +	constructor(
@@ -61,12 +61,11 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
 +		@IProductService product: IProductService,
 +		@IExtensionStorageService extensionStorage: IExtensionStorageService,
 +		@IContextKeyService contextKeys: IContextKeyService,
-+		@ILifecycleService lifecycle: ILifecycleService,
 +	) {
 +		super();
 +		const startup = product.startupWebview;
 +		if (startup && extensionStorage.getExtensionState(startup.extensionId, true)?.[startup.completedKey] !== true) {
-+			contextKeys.createKey('arara.modal.allowedCommands', ['workbench.action.reloadWindow']);
++			contextKeys.createKey('arara.modal.allowedCommands', ['workbench.action.reloadWindow', 'workbench.action.closeWindow', 'workbench.action.quit']);
 +			contextKeys.createKey('arara.modal.viewType', startup.viewType);
 +		}
 +		const placeholder = document.createElement('div');
@@ -82,11 +81,6 @@ Touches: product type, workbench startup, startupWebview and its scoped CSS.
 +		update();
 +		this._register(contextKeys.onDidChangeContext(event => {
 +			if (event.affectsSome(new Set(['arara.modal.viewType']))) { update(); }
-+		}));
-+		this._register(lifecycle.onBeforeShutdown(event => {
-+			if (contextKeys.getContextKeyValue('arara.modal.viewType') && event.reason !== ShutdownReason.RELOAD) {
-+				event.veto(true, 'arara.modal');
-+			}
 +		}));
 +	}
 +}
