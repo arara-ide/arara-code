@@ -4,7 +4,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
-const packageName = name => /^[\w.+-]+\.(?:deb|tar\.gz|exe|zip)$/.test(name);
+const packageName = name => /^[\w.+-]+\.(?:deb|tar\.gz|exe|zip|AppImage)$/.test(name);
 const digestOf = file => new Promise((resolve, reject) => {
   const hash = createHash('sha256');
   const stream = fs.createReadStream(file);
@@ -26,9 +26,17 @@ function releaseNotes(version, names, changelog, prerelease) {
     'Para atualizar, é o mesmo comando com o arquivo novo. Suas configurações ficam.', '',
     '### Desinstalar', '', '    arara-code-uninstall          # mantém configurações',
     '    arara-code-uninstall --all    # apaga tudo', '');
+  if (names.some(n => n.endsWith('.AppImage'))) lines.push(
+    '### Linux (AppImage, opcional)',
+    'Você pode escolher o AppImage em vez do `.deb`. Marque o arquivo como executável e abra:', '',
+    `    chmod +x AraraCode-linux-x64-${version}.AppImage`,
+    `    ./AraraCode-linux-x64-${version}.AppImage`, '',
+    'Para atualizar, feche o Arara Code e substitua o AppImage anterior pelo novo, mantendo o local e o nome usados no seu atalho. As configurações ficam.',
+    'Use uma distribuição compatível com o Electron incluído. Se faltar FUSE, execute com `APPIMAGE_EXTRACT_AND_RUN=1`.', '');
   if (names.some(n => n.endsWith('.exe'))) lines.push(
     '### Windows (teste)',
-    `Baixe \`AraraCodeUserSetup-x64-${version}.exe\` (só para o seu usuário) ou \`AraraCodeSetup-x64-${version}.exe\` (todos os usuários) e execute.`,
+    `Baixe \`AraraCodeSetup-x64-${version}.exe\` (todos os usuários) e execute.`,
+    'Se você usava o UserSetup, feche o Arara Code e desinstale a instalação antiga nas Configurações do Windows, preservando os dados, antes de executar este instalador.',
     'Também há o `.zip`, sem instalar. O instalador ainda não é assinado: o Windows pode avisar.', '');
   const mac = names.filter(n => n.includes('-darwin-'));
   if (mac.length) lines.push('### macOS (teste)',
@@ -50,7 +58,7 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
     throw new Error('Invalid release version, repository or commit');
   }
   const files = fs.readdirSync(dist).sort();
-  if (!files.length || files.some(name => !packageName(name) || !name.includes(version) || !fs.statSync(path.join(dist, name)).isFile())) {
+  if (!files.length || files.some(name => /UserSetup/i.test(name) || !packageName(name) || !name.includes(version) || !fs.statSync(path.join(dist, name)).isFile())) {
     throw new Error('Expected only packages for this version in dist');
   }
   const hashes = new Map();

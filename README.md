@@ -128,6 +128,17 @@ sudo apt install ./arara-code_*_amd64.deb
 
 Pronto: o Arara Code aparece no menu de aplicativos. No terminal, abra com `arara-code`.
 
+No Linux, você também pode escolher o AppImage da release, sem instalar o `.deb`:
+
+```bash
+chmod +x AraraCode-linux-x64-*.AppImage
+./AraraCode-linux-x64-*.AppImage
+```
+
+O AppImage precisa de uma distribuição compatível com o Electron incluído. Se faltar FUSE, abra com `APPIMAGE_EXTRACT_AND_RUN=1 ./AraraCode-linux-x64-<versão>.AppImage`.
+
+No Windows, use `AraraCodeSetup-x64-<versão>.exe` (instalação para todos os usuários). O UserSetup foi retirado dos novos builds. Quem já o usa deve fechar o Arara Code e desinstalar a instalação antiga nas Configurações do Windows, preservando os dados de usuário, antes de executar o instalador normal. O ZIP continua disponível para uso portátil.
+
 A **Git History** (`donjayamanne.githistory`) vem embutida, com histórico de commits, arquivos e linhas. Para consultar uma linha, use **Git: View Line History**. O build e o modo dev baixam o VSIX do Open VSX, com versão e SHA256 fixados em `extensions.lock.json`.
 
 O **Prettier** (`esbenp.prettier-vscode`) também vem embutido pelo mesmo fluxo. A extensão Arara o define como formatador padrão para JavaScript, JSX (`javascriptreact`), TypeScript e TSX (`typescriptreact`), com `prettier.bracketSameLine: true`, `prettier.trailingComma: "none"`, `prettier.printWidth: 150` e `prettier.experimentalTernaries: true`. Esses defaults ficam em `contributes.configurationDefaults` do `arara-ai/package.json`; podem ser sobrescritos no `settings.json`. Configurações do Prettier no projeto (por exemplo, `.prettierrc`) têm precedência sobre as opções de estilo da IDE.
@@ -140,7 +151,15 @@ Para entrar na conta e usar a IA, o backend precisa estar no ar (nesta fase de t
 
 ### Atualizar
 
-Quando sai versão nova, aparece o botão **Atualizar** no topo da janela. Ele abre a página da release: baixe o `.deb` novo e rode o mesmo comando. Pode fazer com a IDE aberta: ela percebe o pacote novo e reinicia sozinha em 10 s (dá para adiar). Suas configurações, conversas e arquivos não salvos ficam.
+O botão **Atualizar** aparece depois que o pacote correspondente à sua instalação foi baixado e conferido com SHA-256. Se esse formato ainda não estiver no release, a IDE tenta novamente depois, sem trocar de formato.
+
+- **`.deb`:** abre um terminal com `sudo apt install` para o pacote novo. A IDE percebe a troca e pode reiniciar, com opção de adiar.
+- **AppImage:** mostra o arquivo novo, já executável. Feche a IDE e substitua o AppImage anterior, mantendo o local e o nome usados no seu atalho. Depois, reabra.
+- **Windows instalado:** abre o instalador normal. Instalações antigas do UserSetup recebem a orientação de migração antes de executar o instalador.
+- **Windows portátil:** mostra o ZIP novo; feche a IDE e substitua a pasta portátil, preservando a pasta `data`, se existir.
+- **Linux `.tar.gz`:** mostra o arquivo novo para substituir a pasta manualmente. **macOS:** extrai o app e o mostra no Finder para substituir em Aplicativos.
+
+As configurações e conversas são preservadas quando você mantém os dados de usuário.
 
 ### Desinstalar
 

@@ -4,6 +4,16 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ## [Não lançado]
 
+### Novidades
+- Instalação: AppImage opcional para Linux, com atualização no mesmo formato escolhido pelo usuário.
+
+### Correções
+- Inicialização: a tela de boas-vindas abre antes da leitura do histórico e não espera a instalação das skills.
+- Atualização: instalações portáteis do Windows recebem o ZIP correspondente, com orientação para preservar os dados.
+
+### Removido
+- Instalação: retirado o instalador Windows UserSetup; use o instalador normal para todos os usuários.
+
 ## [1.135.06934] - 2026-10-15
 
 ## [1.135.06930] - 2026-10-15

@@ -4,16 +4,18 @@ const os = require('node:os');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { test } = require('node:test');
-const { publish } = require('../publish-release.cjs');
+const { publish, releaseNotes } = require('../publish-release.cjs');
 
 const version = '1.135.07120';
 const sha = 'a'.repeat(40);
 const hash = data => createHash('sha256').update(data).digest('hex');
 const names = [
-  `AraraCodeUserSetup-x64-${version}.exe`,
+  `AraraCodeSetup-x64-${version}.exe`,
   `arara-code_${version}_amd64.deb`,
   `AraraCode-darwin-arm64-${version}.zip`,
   `AraraCode-darwin-x64-${version}.zip`,
+  `AraraCode-linux-x64-${version}.AppImage`,
+  `AraraCode-win32-x64-${version}.zip`,
 ];
 
 function fixture(t) {
@@ -139,7 +141,7 @@ test('interrupted first upload is resumed and remains draft until checksum publi
   await f.run(names[1]);
   assert.equal(f.state.creates, 1);
   assert.equal(f.state.release.draft, false);
-  assert.match(f.state.assets.find(a => a.name === 'SHA256SUMS').bytes.toString(), /UserSetup/);
+  assert.match(f.state.assets.find(a => a.name === 'SHA256SUMS').bytes.toString(), /AraraCodeSetup/);
 });
 
 test('each platform can independently be the first successful build', async t => {
@@ -259,4 +261,30 @@ test('stable release respects the input and starter assets can be recovered', as
   f.state.assets.push({ id: 999, name: names[1], state: 'starter', bytes: Buffer.alloc(0) });
   await f.run(names[1]);
   assert.ok(!f.state.assets.some(a => a.state === 'starter'));
+});
+
+test('rejects UserSetup packages before creating or changing a release', async t => {
+  const f = fixture(t);
+  await assert.rejects(f.run(`AraraCodeUserSetup-x64-${version}.exe`), /Expected only packages/);
+  assert.equal(f.state.creates, 0);
+  assert.equal(f.state.uploads.length, 0);
+});
+
+test('release instructions offer AppImage as a choice and explain UserSetup migration', () => {
+  const notes = releaseNotes(version, names, '', false);
+  assert.match(notes, /chmod \+x AraraCode-linux-x64-/);
+  assert.match(notes, /substitua o AppImage anterior/);
+  assert.match(notes, /desinstale a instalação antiga/);
+  assert.doesNotMatch(notes, /AraraCodeUserSetup-.*\.exe/);
+});
+
+test('resuming a release preserves checksums for previously published legacy packages', async t => {
+  const f = fixture(t);
+  await f.run();
+  const legacy = { id: 999, name: `AraraCodeUserSetup-x64-${version}.exe`, state: 'uploaded', bytes: Buffer.from('legacy') };
+  f.state.assets.push(legacy);
+  await f.run(names[1]);
+  const sums = f.state.assets.find(a => a.name === 'SHA256SUMS').bytes.toString();
+  assert.ok(sums.includes(`${hash(legacy.bytes)}  ${legacy.name}\n`));
+  assert.ok(f.state.assets.includes(legacy));
 });

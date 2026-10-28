@@ -137,7 +137,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            jq rsync fakeroot dpkg-dev libkrb5-dev libx11-dev libxkbfile-dev libsecret-1-dev
+            jq rsync fakeroot dpkg-dev desktop-file-utils libkrb5-dev libx11-dev libxkbfile-dev libsecret-1-dev
           df -h /
 
       - name: Swap extra (o build chega a ~13 GB de RAM)
@@ -147,6 +147,9 @@ jobs:
           sudo mkswap /swapfile2
           sudo swapon /swapfile2
           free -h
+
+      - name: Testar empacotamento AppImage
+        run: node --test scripts/tests/appimage.cjs
 
       - name: Build
         env:
@@ -167,6 +170,8 @@ jobs:
       - name: Validar artefatos
         run: |
           dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|extensions/arara-bot/package.json|extensions/arara-orchestra/package.json|bin/arara-code-uninstall"
+          test -x dist/AraraCode-linux-x64-*.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 timeout 120 dist/AraraCode-linux-x64-*.AppImage --version
 
       - name: Testar o binário (abre e traz o arara-ai)
         run: |
@@ -269,6 +274,8 @@ jobs:
           . .work/vscodium/dev/build.env
           [ "${RELEASE_VERSION}" = "${{ needs.version.outputs.release }}" ]
           ls -lh dist
+          test -f "dist/AraraCodeSetup-x64-${RELEASE_VERSION}.exe"
+          test -z "$(find dist -name '*UserSetup*' -print -quit)"
 
       - name: Testar o binário (abre e traz o arara-ai)
         run: |
