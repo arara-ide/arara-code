@@ -22,5 +22,21 @@
     "url": "https://open-vsx.org/api/vscode-icons-team/vscode-icons/13.0.0/file/vscode-icons-team.vscode-icons-13.0.0.vsix",
     "repo": "https://github.com/vscode-icons/vscode-icons",
     "metadata": {}
+  },
+  {
+    "name": "MS-CEINTL.vscode-language-pack-pt-BR",
+    "version": "1.131.0",
+    "sha256": "31cd674f7ae6f10cfb05f882f7bc01fe4e4e3cf9049bcaea4617338a537256e7",
+    "url": "https://open-vsx.org/api/MS-CEINTL/vscode-language-pack-pt-BR/1.131.0/file/MS-CEINTL.vscode-language-pack-pt-BR-1.131.0.vsix",
+    "repo": "https://github.com/microsoft/vscode-loc",
+    "metadata": {}
+  },
+  {
+    "name": "MS-CEINTL.vscode-language-pack-es",
+    "version": "1.131.0",
+    "sha256": "f08326d86e11ae4a6486b3217aa27eaaecf8f4bdd2597ac1fb450f9d346bebda",
+    "url": "https://open-vsx.org/api/MS-CEINTL/vscode-language-pack-es/1.131.0/file/MS-CEINTL.vscode-language-pack-es-1.131.0.vsix",
+    "repo": "https://github.com/microsoft/vscode-loc",
+    "metadata": {}
   }
 ]
