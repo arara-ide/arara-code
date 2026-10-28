@@ -33,7 +33,7 @@ const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: t
   write(path.join(library, 'lib/index.js'), 'module.exports = {};');
   write(path.join(library, 'prebuilds/linux-x64/pty.node'), 'legacy fallback');
   write(path.join(library, 'node_modules/node-addon-api/package.json'), '{"name":"node-addon-api"}');
-  write(path.join(directory, 'build/gyp/node_modules/node-gyp/bin/node-gyp.js'), '');
+  write(path.join(directory, 'build/npm/gyp/node_modules/node-gyp/bin/node-gyp.js'), '');
   write(path.join(library, 'build/Release/pty.node'), 'original primary');
   let builds = 0;
   const options = {

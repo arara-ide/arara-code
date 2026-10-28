@@ -50,7 +50,7 @@ async function prepareTerminal(vscode, { arch = process.arch, run = execFileSync
     const addon = path.dirname(require.resolve('node-addon-api/package.json', { paths: [library] }));
     fs.mkdirSync(path.join(stage, 'node_modules'), { recursive: true });
     fs.cpSync(addon, path.join(stage, 'node_modules/node-addon-api'), { recursive: true });
-    const gyp = require.resolve('node-gyp/bin/node-gyp.js', { paths: [path.join(vscode, 'build/gyp'), vscode] });
+    const gyp = require.resolve('node-gyp/bin/node-gyp.js', { paths: [path.join(vscode, 'build/npm/gyp'), vscode] });
     const env = { ...process.env,
       CC: path.join(toolchain, 'bin', `${target.triple}-gcc`),
       CXX: path.join(toolchain, 'bin', `${target.triple}-g++`),
