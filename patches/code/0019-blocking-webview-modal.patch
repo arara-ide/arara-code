@@ -5,8 +5,8 @@ capability, lifecycle veto or command admission hook. Reuse the native modal
 editor and its existing focus/layout machinery instead of intercepting DOM keys
 or reopening a closed tab. The extension supplies arara.modal.viewType and an
 exact arara.modal.allowedCommands list; clearing the viewType releases the gate.
-CannotClose prevents editor/modal dismissal. Native window close/load is vetoed
-while active; reload remains possible for language changes and recovery.
+CannotClose prevents editor/modal dismissal. Closing the window stays possible;
+the extension resumes its flow on the next launch.
 No setup steps, provider names, business decisions or process execution here.
 Touches: command service, webview editor input/service, native modal part/CSS.
 
