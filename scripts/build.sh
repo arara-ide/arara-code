@@ -225,6 +225,7 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
   (
     export SHOULD_BUILD_CLI="no" SHOULD_BUILD_REH="no" SHOULD_BUILD_REH_WEB="no"
     export SHOULD_BUILD_MSI="no" SHOULD_BUILD_MSI_NOUP="no"
+    export SHOULD_BUILD_EXE_SYS="yes" SHOULD_BUILD_EXE_USR="no"
     APP_NAME="AraraCode" ./prepare_assets.sh
   )
   OUT="${ROOT}/dist"
@@ -260,6 +261,7 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   OUT="${ROOT}/dist"
   mkdir -p "${OUT}"
   tar czf "${OUT}/arara-code-linux-${VSCODE_ARCH}-${RELEASE_VERSION}.tar.gz" -C "${WORK}/VSCode-linux-${VSCODE_ARCH}" .
+  bash "${ROOT}/scripts/package-appimage.sh" "${WORK}/VSCode-linux-${VSCODE_ARCH}" "${OUT}" "${VSCODE_ARCH}" "${RELEASE_VERSION}"
   if [[ "${BUILD_DEB}" == "yes" ]]; then
     if ! perl -e 'use Dpkg; exit(($Dpkg::PROGVERSION =~ /^1\.(2[3-9]|[3-9]\d)/) ? 0 : 1)' 2>/dev/null; then
       DPKG_SHLIBDEPS_PL="$(cd "${WORK}/vscode" && node -p "require('os').tmpdir()")/dpkg-shlibdeps.pl"

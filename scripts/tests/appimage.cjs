@@ -1,0 +1,33 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { test } = require('node:test');
+
+test('AppImage runs with spaced paths and preserves source metadata and launch arguments', { timeout: 180000 }, t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arara appimage test '));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repo = path.resolve(__dirname, '../..');
+  const source = path.join(root, 'source');
+  const resources = path.join(source, 'resources/app');
+  fs.mkdirSync(path.join(resources, 'resources/linux'), { recursive: true });
+  fs.mkdirSync(path.join(source, 'bin'));
+  const product = { version: '1.135.07236', applicationName: 'arara-code' };
+  fs.writeFileSync(path.join(resources, 'product.json'), JSON.stringify(product));
+  fs.copyFileSync(path.join(repo, 'branding/src-stable/resources/linux/code.png'), path.join(resources, 'resources/linux/code.png'));
+  fs.writeFileSync(path.join(source, 'bin/arara-code'), '#!/bin/sh\nprintf \'%s\\n\' "$@"\n', { mode: 0o755 });
+  const dist = path.join(root, 'dist');
+  const arch = process.arch;
+  execFileSync('bash', [path.join(repo, 'scripts/package-appimage.sh'), source, dist, arch, product.version], { timeout: 150000, stdio: 'pipe' });
+  const appimage = path.join(dist, `AraraCode-linux-${arch}-${product.version}.AppImage`);
+  const args = ['--version', 'a path with spaces', "a'quote", '$(literal)'];
+  assert.equal(execFileSync(appimage, args, { env: { ...process.env, APPIMAGE_EXTRACT_AND_RUN: '1' }, encoding: 'utf8' }), args.join('\n') + '\n');
+  execFileSync(appimage, ['--appimage-extract'], { cwd: root, stdio: 'pipe' });
+  const extracted = path.join(root, 'squashfs-root');
+  const packaged = JSON.parse(fs.readFileSync(path.join(extracted, 'usr/share/arara-code/resources/app/product.json'), 'utf8'));
+  assert.deepEqual(packaged, { ...product, araraInstallFormat: 'appimage' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(resources, 'product.json'), 'utf8')), product);
+  assert.equal(fs.statSync(path.join(extracted, 'AppRun')).mode & 0o777, 0o755);
+  assert.equal(execFileSync(path.join(extracted, 'AppRun'), args, { encoding: 'utf8' }), args.join('\n') + '\n');
+});
