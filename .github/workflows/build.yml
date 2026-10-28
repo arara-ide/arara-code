@@ -54,7 +54,7 @@ jobs:
           node scripts/tests/embed-arara-ai.cjs
           node scripts/tests/embed-arara-bot.cjs
           node scripts/tests/embed-arara-orchestra.cjs
-          node scripts/tests/terminal-fallback.cjs
+          node scripts/tests/terminal.cjs
           node --test scripts/tests/publish-release.cjs
 
   version:
