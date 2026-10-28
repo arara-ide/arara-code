@@ -176,6 +176,7 @@ fi
 if [[ "${OS_NAME}" == "linux" ]]; then
   . version.sh
   . prepare_vscode.sh
+  node "${ROOT}/scripts/tests/terminal-hooks.cjs"
   node "${ROOT}/scripts/prepare-terminal.cjs" "${WORK}/vscode" "${VSCODE_ARCH}"
   embed_arara_ai
   embed_arara_bot

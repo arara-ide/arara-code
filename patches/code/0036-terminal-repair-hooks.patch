@@ -3,6 +3,7 @@ Arara Code: expose local PTY Host recovery hooks to extensions.
 Why a patch: extension APIs do not expose PTY Host heartbeat failures, a local-only
 restart, or a host round-trip check. The patch delegates the local failure and
 status action to an extension command and exposes restart/latency commands.
+Stale direct-port state is reset even before the first successful connection.
 Diagnosis, consent, file repair and user messages remain in the extension.
 Remote backends and non-Linux status actions retain their existing behavior.
 Touches: src/vs/workbench/contrib/terminal/browser/baseTerminalBackend.ts
@@ -42,7 +43,7 @@ src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts
  import { URI } from '../../../../base/common/uri.js';
  import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
  import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
-@@ -97,8 +98,17 @@
+@@ -97,14 +98,31 @@
  		@IStatusbarService statusBarService: IStatusbarService,
  		@IRemoteAgentService private readonly _remoteAgentService: IRemoteAgentService,
  		@INativeWorkbenchEnvironmentService private readonly _environmentService: INativeWorkbenchEnvironmentService,
@@ -51,7 +52,10 @@ src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts
 -		super(_localPtyService, logService, historyService, _configurationResolverService, statusBarService, workspaceContextService);
 +		super(_localPtyService, logService, historyService, _configurationResolverService, statusBarService, workspaceContextService, isLinux ? 'arara.terminal.repair' : undefined);
 +
-+		this._register(CommandsRegistry.registerCommand('arara.internal.restartLocalPtyHost', () => this.restartPtyHost()));
++		this._register(CommandsRegistry.registerCommand('arara.internal.restartLocalPtyHost', () => {
++			this._resetDirectProxy();
++			this.restartPtyHost();
++		}));
 +		this._register(CommandsRegistry.registerCommand('arara.internal.terminalHostLatency', () => this.getLatency()));
 +		if (isLinux) {
 +			this._register(this.onPtyHostUnresponsive(() => {
@@ -60,4 +64,28 @@ src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts
 +		}
  
  		this._register(this.onPtyHostRestart(() => {
- 			this._directProxy = undefined;
+-			this._directProxy = undefined;
+-			this._directProxyClientEventually = undefined;
++			this._resetDirectProxy();
+ 			this._connectToDirectProxy();
+ 		}));
++	}
++
++	private _resetDirectProxy(): void {
++		this._directProxyDisposables.clear();
++		this._directProxy = undefined;
++		this._directProxyClientEventually = undefined;
+ 	}
+ 
+ 	/**
+@@ -133,6 +151,10 @@
+ 		mark('code/terminal/willConnectPtyHost');
+ 		this._logService.trace('Renderer->PtyHost#connect: before acquirePort');
+ 		acquirePort('vscode:createPtyHostMessageChannel', 'vscode:createPtyHostMessageChannelResult').then(port => {
++			if (this._directProxyClientEventually !== directProxyClientEventually) {
++				port.close();
++				return;
++			}
+ 			mark('code/terminal/didConnectPtyHost');
+ 			this._logService.trace('Renderer->PtyHost#connect: connection established');
+ 

@@ -28,7 +28,7 @@ function validateNative(file, arch, run = execFileSync) {
   const versions = run('readelf', ['--version-info', file], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } });
   const maximum = { GLIBC: '2.28', GLIBCXX: '3.4.25', CXXABI: '1.3.9' };
   for (const match of versions.matchAll(/\bName: (GLIBC|GLIBCXX|CXXABI)_([\d.]+)/g)) {
-    if (newerVersion(match[2], maximum[match[1]])) throw new Error(`Terminal fallback requires ${match[1]}_${match[2]} > ${maximum[match[1]]}`);
+    if (newerVersion(match[2], maximum[match[1]])) throw new Error(`Terminal module requires ${match[1]}_${match[2]} > ${maximum[match[1]]}`);
   }
   return createHash('sha256').update(binary).digest('hex');
 }

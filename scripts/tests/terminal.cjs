@@ -29,6 +29,8 @@ const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: t
   write(path.join(library, 'package.json'), JSON.stringify({ name: 'node-pty', version: '1.2.0-beta.15' }));
   write(path.join(library, 'binding.gyp'), '{}');
   write(path.join(library, 'src/unix/pty.cc'), 'native source');
+  write(path.join(library, 'lib/index.js'), 'module.exports = {};');
+  write(path.join(library, 'prebuilds/linux-x64/pty.node'), 'legacy fallback');
   write(path.join(library, 'node_modules/node-addon-api/package.json'), '{"name":"node-addon-api"}');
   write(path.join(directory, 'build/gyp/node_modules/node-gyp/bin/node-gyp.js'), '');
   write(path.join(library, 'build/Release/pty.node'), 'original primary');
@@ -56,15 +58,16 @@ const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: t
   const output = await prepareTerminal(directory, options);
   const manifest = JSON.parse(fs.readFileSync(path.join(output, 'manifest.json'), 'utf8'));
   assert.deepEqual(manifest, { version: '1.2.0-beta.15', platform: 'linux', arch, glibc: '2.28', sha256: hash });
-  assert.equal(validateNative(path.join(output, 'pty.node'), arch), hash);
+  const payload = path.join(output, 'node-pty/build/Release/pty.node');
+  assert.equal(validateNative(payload, arch), hash);
   assert.equal(validateNative(path.join(library, 'build/Release/pty.node'), arch), hash);
   assert.ok(!fs.existsSync(path.join(library, 'prebuilds')));
   assert.ok(fs.existsSync(path.join(output, 'probe.cjs')));
   await prepareTerminal(directory, options);
   assert.equal(builds, 2);
-  assert.equal(validateNative(path.join(output, 'pty.node'), arch), hash);
+  assert.equal(validateNative(payload, arch), hash);
   await assert.rejects(prepareTerminal(directory, { ...options, run: () => { throw Error('compiler failed'); } }), /compiler failed/);
-  assert.equal(validateNative(path.join(output, 'pty.node'), arch), hash);
+  assert.equal(validateNative(payload, arch), hash);
   assert.ok(!fs.readdirSync(library).some(name => name.startsWith('.arara-terminal-')));
   const build = fs.readFileSync(path.join(root, 'scripts/build.sh'), 'utf8');
   assert.ok(build.includes('prepare-terminal.cjs'));
