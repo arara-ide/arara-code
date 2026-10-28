@@ -1,8 +1,8 @@
 Arara Code: expose active user profile resource URIs to extensions.
 
 Why a patch: stable/proposed extension APIs do not expose the active profile's
-settings.json, keybindings.json and global state storage locations. globalStorageUri belongs to the
-default profile and cannot safely locate named profiles, portable or remote
+settings.json, keybindings.json and global state storage locations.
+globalStorageUri belongs to the default profile and cannot safely locate named profiles, portable or remote
 user-data. ProfileContentHandler only transports whole profile exports. This
 read-only hook returns the native resources, including useDefaultFlags handling;
 all discovery, filtering, merging and backup logic stays in the extension.
