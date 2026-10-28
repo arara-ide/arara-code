@@ -5,8 +5,8 @@ const os = require('node:os');
 const vm = require('node:vm');
 const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
-const ts = require(path.join(root, '../arara-ai/node_modules/typescript'));
 const upstream = path.join(root, '.work/vscodium/vscode');
+const ts = require(require.resolve('typescript', { paths: [upstream, path.resolve(root, '../arara-ai')] }));
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arara terminal hooks '));
 const files = ['src/vs/workbench/contrib/terminal/browser/baseTerminalBackend.ts', 'src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts'];
 
