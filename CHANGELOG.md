@@ -5,19 +5,23 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 ## [Não lançado]
 
 ### Novidades
+- Chat: modo Goal acompanha o objetivo até a conclusão, com recuperação de comunicação e opção de desligar, também no Arara Bot e na Orquestra.
 - Instalação: AppImage opcional para Linux, com atualização no mesmo formato escolhido pelo usuário.
 - Kiro: escolha do nível de esforço do modelo no chat, no Arara Bot e na Orquestra.
 
 ### Melhorias
+- Chat: o painel lateral direito mantém largura mínima suficiente para o campo e seus controles.
 - Kiro: chat, Arara Bot, Orquestra e terminal passam a usar o Kiro CLI V3.
 - Kiro: o "A propósito" chega direto à conversa em andamento.
 
 ### Correções
+- Arara Bot: ativar o Goal usa o servidor atualizado e deixa de retornar erro de configuração não suportada.
 - Arara Bot: o nível de esforço escolhido no seletor deixa de ser recusado ao salvar e ao enviar o pedido.
 - Inicialização: a tela de boas-vindas abre antes da leitura do histórico e não espera a instalação das skills.
 - Atualização: instalações portáteis do Windows recebem o ZIP correspondente, com orientação para preservar os dados.
 
 ### Removido
+- Orquestra: acessos pelo topo do chat e do Arara Bot e botões de mover bots ocultos temporariamente; comandos e dados preservados.
 - Instalação: retirado o instalador Windows UserSetup; use o instalador normal para todos os usuários.
 
 ## [1.135.06934] - 2026-10-15
