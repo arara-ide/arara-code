@@ -1,0 +1,18 @@
+Arara Code: raise the minimum width of the right-hand (auxiliary) bar from 170 to 330 px.
+
+Why a patch: the minimum size of a workbench part is a constant of AuxiliaryBarPart.
+No extension API or setting changes it, and a CSS min-width inside a webview would
+still let the bar shrink and add horizontal scrolling to the chat.
+Touches: src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+@@ -55,7 +55,7 @@
+ 	static readonly viewContainersWorkspaceStateKey = 'workbench.auxiliarybar.viewContainersWorkspaceState';
+ 
+ 	// Use the side bar dimensions
+-	override readonly minimumWidth: number = 170;
++	override readonly minimumWidth: number = 330;
+ 	override readonly maximumWidth: number = Number.POSITIVE_INFINITY;
+ 	override readonly minimumHeight: number = 0;
+ 	override readonly maximumHeight: number = Number.POSITIVE_INFINITY;
