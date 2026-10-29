@@ -355,16 +355,17 @@ jobs:
       - name: Publicar na Microsoft Store
         shell: pwsh
         env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
+          STORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          STORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          STORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          STORE_PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
           RELEASE_VERSION: ${{ needs.version.outputs.release }}
         run: |
-          msstore reconfigure --tenantId $env:MSSTORE_TENANT_ID --sellerId $env:MSSTORE_SELLER_ID --clientId $env:MSSTORE_CLIENT_ID --clientSecret $env:MSSTORE_CLIENT_SECRET
+          foreach ($name in 'STORE_TENANT_ID','STORE_SELLER_ID','STORE_CLIENT_ID','STORE_CLIENT_SECRET','STORE_PRODUCT_ID') { if (-not [Environment]::GetEnvironmentVariable($name)) { throw "$name is empty" } }
+          msstore reconfigure --tenantId $env:STORE_TENANT_ID --sellerId $env:STORE_SELLER_ID --clientId $env:STORE_CLIENT_ID --clientSecret $env:STORE_CLIENT_SECRET
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          msstore publish store --inputFile "store/AraraCode-x64-$env:RELEASE_VERSION.msix" --appId $env:MSSTORE_PRODUCT_ID
+          msstore publish store --inputFile "store/AraraCode-x64-$env:RELEASE_VERSION.msix" --appId $env:STORE_PRODUCT_ID
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   macos-x64:
