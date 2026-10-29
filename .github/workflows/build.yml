@@ -49,6 +49,7 @@ jobs:
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
           node --check scripts/apply-environment.cjs
+          node --check scripts/package-msix.cjs
           node scripts/tests/patches.cjs
           node scripts/tests/localization.cjs
           node scripts/tests/embed-arara-ai.cjs
@@ -294,38 +295,22 @@ jobs:
         if: github.ref == 'refs/heads/development'
         run: (cd dist && sha256sum ./* > SHA256SUMS)
 
-      - name: Enviar instalador para assinatura
-        id: unsigned-windows
-        if: github.ref == 'refs/heads/main' && vars.SIGNPATH_ORGANIZATION_ID != ''
+      - name: Empacotar MSIX para a Microsoft Store
+        if: github.ref == 'refs/heads/main' && vars.MSSTORE_PACKAGE_NAME != ''
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSSTORE_PACKAGE_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSSTORE_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME }}
+        run: node scripts/package-msix.cjs .work/vscodium/VSCode-win32-x64 store "${RELEASE_VERSION}"
+
+      - name: Guardar MSIX da Microsoft Store
+        if: github.ref == 'refs/heads/main' && vars.MSSTORE_PACKAGE_NAME != ''
         uses: actions/upload-artifact@v4
         with:
-          name: windows-unsigned
-          path: dist/AraraCodeSetup-x64-${{ env.RELEASE_VERSION }}.exe
-          retention-days: 1
+          name: windows-store
+          path: store/AraraCode-x64-${{ env.RELEASE_VERSION }}.msix
+          retention-days: 14
           if-no-files-found: error
-
-      - name: Assinar instalador com SignPath
-        if: github.ref == 'refs/heads/main' && vars.SIGNPATH_ORGANIZATION_ID != ''
-        uses: signpath/github-action-submit-signing-request@v3
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          github-artifact-id: ${{ steps.unsigned-windows.outputs.artifact-id }}
-          wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 3600
-          output-artifact-directory: signed-windows
-
-      - name: Conferir assinatura do instalador
-        if: github.ref == 'refs/heads/main' && vars.SIGNPATH_ORGANIZATION_ID != ''
-        shell: pwsh
-        run: |
-          $installer = "dist/AraraCodeSetup-x64-$env:RELEASE_VERSION.exe"
-          Copy-Item "signed-windows/AraraCodeSetup-x64-$env:RELEASE_VERSION.exe" $installer -Force
-          $signature = Get-AuthenticodeSignature $installer
-          if ($signature.Status -ne 'Valid') { throw "Assinatura Authenticode inválida: $($signature.Status)" }
-          $signature.SignerCertificate.Subject
 
       - uses: actions/upload-artifact@v4
         with:
@@ -353,6 +338,34 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-path: dist/AraraCodeSetup-x64-${{ needs.version.outputs.release }}.exe
+
+  store-windows:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && !inputs.prerelease && vars.MSSTORE_PACKAGE_NAME != '' && vars.MSSTORE_PRODUCT_ID != ''
+    needs: [version, windows, release-windows]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-store
+          path: store
+      - uses: microsoft/microsoft-store-apppublisher@v1.4
+      - name: Publicar na Microsoft Store
+        shell: pwsh
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
+          RELEASE_VERSION: ${{ needs.version.outputs.release }}
+        run: |
+          msstore reconfigure --tenantId $env:MSSTORE_TENANT_ID --sellerId $env:MSSTORE_SELLER_ID --clientId $env:MSSTORE_CLIENT_ID --clientSecret $env:MSSTORE_CLIENT_SECRET
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msstore publish store --inputFile "store/AraraCode-x64-$env:RELEASE_VERSION.msix" --appId $env:MSSTORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   macos-x64:
     if: github.ref == 'refs/heads/main'
