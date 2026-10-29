@@ -84,6 +84,13 @@ mkdir -p "${MSI}"
 bmp "${MSI}/wix-banner.bmp" 493x58 50 +438+6
 bmp "${MSI}/wix-dialog.bmp" 493x312 120 +22+152
 
+MSIX="${ROOT}/branding/msix"
+mkdir -p "${MSIX}"
+render_png "${ICON}" 50 "${MSIX}/StoreLogo.png"
+render_png "${ICON}" 44 "${MSIX}/Square44x44Logo.png"
+render_png "${ICON}" 100 "${TMP}/100.png"
+convert -size 150x150 canvas:transparent "${TMP}/100.png" -gravity center -composite PNG32:"${MSIX}/Square150x150Logo.png"
+
 mkdir -p "${DEST}/resources/darwin"
 for s in 16 32 64 128 256 512 1024; do render_png "${ICON}" "${s}" "${TMP}/m${s}.png"; done
 python3 - "${TMP}" "${DEST}/resources/darwin/code.icns" <<'PY'
