@@ -6,8 +6,14 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 
 ### Novidades
 - Instalação: AppImage opcional para Linux, com atualização no mesmo formato escolhido pelo usuário.
+- Kiro: escolha do nível de esforço do modelo no chat, no Arara Bot e na Orquestra.
+
+### Melhorias
+- Kiro: chat, Arara Bot, Orquestra e terminal passam a usar o Kiro CLI V3.
+- Kiro: o "A propósito" chega direto à conversa em andamento.
 
 ### Correções
+- Arara Bot: o nível de esforço escolhido no seletor deixa de ser recusado ao salvar e ao enviar o pedido.
 - Inicialização: a tela de boas-vindas abre antes da leitura do histórico e não espera a instalação das skills.
 - Atualização: instalações portáteis do Windows recebem o ZIP correspondente, com orientação para preservar os dados.
 
