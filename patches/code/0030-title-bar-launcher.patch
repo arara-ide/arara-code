@@ -4,7 +4,8 @@ Arara Code: gancho genérico de lançador (só ícone) na barra de título.
   MenuId.LayoutControlMenu (order -2, à esquerda do "Atualizar" do 0015 e do Customize
   Layout) com o ícone `sparkle` (estrelinha de IA).
   Só aparece com a context key `arara.ui.titleLauncher` ligada pela extensão; o clique
-  roda `arara.ui.titleLauncher.run`. O que abre (hoje: a seção lateral do Arara AI) é
+  roda `arara.ui.titleLauncher.run`. Ao lado do Customize Layout (order -0.5), o ícone
+  `type-hierarchy` roda `arara.codemap.show` quando a extensão liga `arara.codemap.available`. O que abre (hoje: a seção lateral do Arara AI) é
   decisão da extensão arara-ai.
 - workbench.desktop.main.ts: importa a contribution.
 
@@ -15,7 +16,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,39 @@
 +import { Codicon } from '../../../../base/common/codicons.js';
 +import { localize } from '../../../../nls.js';
 +import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
@@ -31,6 +32,17 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +		icon: Codicon.sparkle,
 +	},
 +	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.ui.titleLauncher')),
++});
++
++MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++	group: 'navigation',
++	order: -0.5,
++	command: {
++		id: 'arara.codemap.show',
++		title: localize('arara.codemap.show', "Code map"),
++		icon: Codicon.typeHierarchy,
++	},
++	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.codemap.available')),
 +});
 +
 +for (const id of [MenuId.MenubarPreferencesMenu, MenuId.GlobalActivity]) {
