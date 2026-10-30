@@ -25,6 +25,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Arara Bot: o nível de esforço escolhido no seletor deixa de ser recusado ao salvar e ao enviar o pedido.
 - Inicialização: a tela de boas-vindas abre antes da leitura do histórico e não espera a instalação das skills.
 - Atualização: instalações portáteis do Windows recebem o ZIP correspondente, com orientação para preservar os dados.
+- Editor: a tela inicial com os projetos recentes deixa de piscar quando a pasta aberta tem muitos repositórios Git.
 
 ### Removido
 - Orquestra: acessos pelo topo do chat e do Arara Bot e botões de mover bots ocultos temporariamente; comandos e dados preservados.
