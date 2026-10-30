@@ -8,7 +8,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 
 --- /dev/null
 +++ b/src/vs/araraNls.ts
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,81 @@
 +/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
 +const catalogs: Record<string, Record<string, string>> = {
 +	"en": {
@@ -32,7 +32,8 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Close to update": "Close to update",
 +		"New platform terminal": "New platform terminal",
 +		"Welcome to Arara Code": "Welcome to Arara Code",
-+		"Arara settings": "Arara settings"
++		"Arara settings": "Arara settings",
++		"Code map": "Code map"
 +	},
 +	"pt": {
 +		"Update": "Atualizar",
@@ -55,7 +56,8 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Close to update": "Fechar para atualizar",
 +		"New platform terminal": "Novo terminal de plataforma",
 +		"Welcome to Arara Code": "Bem-vindo ao Arara Code",
-+		"Arara settings": "Configurações do Arara"
++		"Arara settings": "Configurações do Arara",
++		"Code map": "Mapa do código"
 +	},
 +	"es": {
 +		"Update": "Actualizar",
@@ -78,7 +80,8 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Close to update": "Cerrar para actualizar",
 +		"New platform terminal": "Nuevo terminal de plataforma",
 +		"Welcome to Arara Code": "Bienvenido a Arara Code",
-+		"Arara settings": "Configuración de Arara"
++		"Arara settings": "Configuración de Arara",
++		"Code map": "Mapa del código"
 +	}
 +};
 +
