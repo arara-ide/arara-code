@@ -35,6 +35,9 @@
   "downloadUrl": "https://github.com/arara-ide/arara-code/releases",
   "licenseUrl": "https://github.com/arara-ide/arara-code/blob/main/LICENSE",
   "reportIssueUrl": "https://github.com/arara-ide/arara-code/issues/new",
+  "linkProtectionTrustedDomains": [
+    "*"
+  ],
   "extensionEnabledApiProposals": {
     "arara.arara-ai": [
       "quickPickSortByLabel"

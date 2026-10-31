@@ -3,9 +3,14 @@ Arara Code: botão "Atualizar" no topo e reinício automático quando o .deb nov
 - contrib/arara/electron-browser/araraUpdate.contribution.ts (novo):
   - Botão com texto "Atualizar" na barra de título, à esquerda do Customize Layout
     (MenuId.LayoutControlMenu, order -1). Só aparece com a context key
-    arara.update.available, ligada pela extensão arara-ai quando o ac-services
-    (GET /v1/ide/version, checado a cada 5 min) diz que há versão nova. O clique
-    roda arara.update.open (extensão), que abre o instalador baixado.
+    arara.update.available, ligada pela extensão built-in arara-update
+    (extensions/arara-update neste repositório) depois de conferir as releases
+    no GitHub e baixar o instalador. O clique roda arara.update.open (extensão),
+    que abre o instalador baixado.
+  - Com a context key arara.update.busy (ligada e desligada pela extensão), o botão
+    vira "Atualizando", desabilitado e com ícone girando. "Reiniciar/Fechar para
+    atualizar" (arara.update.installed) sempre tem prioridade. Quando ligar e
+    desligar fica na extensão.
   - O apt troca os arquivos de /usr/share/arara-code com a IDE aberta e o processo
     segue com o código antigo. O workbench relê <appRoot>/product.json a cada 30 s
     e ao ganhar foco; se duas leituras seguidas mostram outra versão, liga
@@ -27,7 +32,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,204 @@
 +import './media/araraUpdate.css';
 +import { reset } from '../../../../base/browser/dom.js';
 +import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
@@ -55,9 +60,11 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +
 +const UpdateAvailable = new RawContextKey<boolean>('arara.update.available', false);
 +const UpdateInstalled = new RawContextKey<boolean>('arara.update.installed', false, localize('arara.update.installed', "A newer Arara Code is installed and waits for a restart"));
++const UpdateBusy = new RawContextKey<boolean>('arara.update.busy', false);
 +
 +const OPEN_COMMAND = 'arara.update.open';
 +const RESTART_COMMAND = 'arara.update.restart';
++const UPDATING_COMMAND = 'arara.update.updating';
 +const POLL_MS = 30_000;
 +const COUNTDOWN_S = 10;
 +const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running', 'arara.opencode.running'];
@@ -72,7 +79,19 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +	group: 'navigation',
 +	order: -1,
 +	command: { id: OPEN_COMMAND, title: localize('arara.update.open', "Update") },
-+	when: ContextKeyExpr.and(notInAuxWindow, UpdateAvailable, UpdateInstalled.negate()),
++	when: ContextKeyExpr.and(notInAuxWindow, UpdateAvailable, UpdateBusy.negate(), UpdateInstalled.negate()),
++});
++
++registerAction2(class extends Action2 {
++	constructor() {
++		super({
++			id: UPDATING_COMMAND,
++			title: localize2('arara.update.updating', "Updating"),
++			precondition: ContextKeyExpr.false(),
++			menu: { id: MenuId.LayoutControlMenu, group: 'navigation', order: -1, when: ContextKeyExpr.and(notInAuxWindow, UpdateBusy, UpdateInstalled.negate()) },
++		});
++	}
++	run(): void { }
 +});
 +
 +registerAction2(class extends Action2 {
@@ -100,7 +119,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		if (!this.label) {
 +			return;
 +		}
-+		const icon = this._commandAction.id === RESTART_COMMAND ? '$(debug-restart)' : '$(cloud-download)';
++		const icon = this._commandAction.id === RESTART_COMMAND ? '$(debug-restart)' : this._commandAction.id === UPDATING_COMMAND ? '$(loading~spin)' : '$(cloud-download)';
 +		reset(this.label, ...renderLabelWithIcons(`${icon} ${this._commandAction.label}`));
 +	}
 +}
@@ -129,7 +148,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +	) {
 +		super();
 +
-+		for (const id of [OPEN_COMMAND, RESTART_COMMAND]) {
++		for (const id of [OPEN_COMMAND, UPDATING_COMMAND, RESTART_COMMAND]) {
 +			this._register(actionViewItemService.register(MenuId.LayoutControlMenu, id, (action, options) =>
 +				action instanceof MenuItemAction ? instantiationService.createInstance(AraraUpdateActionViewItem, action, options) : undefined
 +			));
@@ -220,7 +239,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +registerWorkbenchContribution2(AraraUpdateContribution.ID, AraraUpdateContribution, WorkbenchPhase.Eventually);
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/media/araraUpdate.css
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,27 @@
 +.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label {
 +	display: flex;
 +	align-items: center;
@@ -236,6 +255,12 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +
 +.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label:hover {
 +	background-color: var(--vscode-button-hoverBackground);
++}
++
++.monaco-workbench .part.titlebar .action-item.arara-update-action.disabled > .action-label,
++.monaco-workbench .part.titlebar .action-item.arara-update-action.disabled > .action-label:hover {
++	cursor: default;
++	background-color: var(--vscode-button-background);
 +}
 +
 +.monaco-workbench .part.titlebar .action-item.arara-update-action > .action-label .codicon {

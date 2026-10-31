@@ -18,6 +18,8 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Kiro: os créditos abaixo de cada resposta são só os daquele pedido, mesmo com várias conversas ao mesmo tempo, e aparecem assim que a resposta termina.
 - Arara Bot: os créditos do Kiro aparecem abaixo de cada resposta.
 - Chat: as instruções do workspace avisam a IA sobre o AGENTS.md e o CLAUDE.md da pasta do projeto, quando existem.
+- Atualização: depois do clique, o botão Atualizar fica desabilitado e mostra "Atualizando" até o instalador fechar, por no máximo 2 minutos.
+- Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
 - Chat: o botão Instruções volta a abrir o editor de instruções.

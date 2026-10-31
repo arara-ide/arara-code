@@ -8,11 +8,12 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 
 --- /dev/null
 +++ b/src/vs/araraNls.ts
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,84 @@
 +/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
 +const catalogs: Record<string, Record<string, string>> = {
 +	"en": {
 +		"Update": "Update",
++		"Updating": "Updating",
 +		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.",
 +		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} is installed. It will restart when the AI finishes responding.",
 +		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.",
@@ -37,6 +38,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +	},
 +	"pt": {
 +		"Update": "Atualizar",
++		"Updating": "Atualizando",
 +		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} foi instalado. Fecha assim que a IA terminar a resposta; depois, abra o Arara Code de novo.",
 +		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} foi instalado. Reinicia assim que a IA terminar a resposta.",
 +		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} foi instalado. Fechando em {1} s para aplicar a atualização; depois, abra o Arara Code de novo.",
@@ -61,6 +63,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +	},
 +	"es": {
 +		"Update": "Actualizar",
++		"Updating": "Actualizando",
 +		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} está instalado. Se cerrará cuando la IA termine de responder; después, vuelve a abrir Arara Code.",
 +		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} está instalado. Se reiniciará cuando la IA termine de responder.",
 +		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} está instalado. Se cerrará en {1} s para aplicar la actualización; después, vuelve a abrir Arara Code.",

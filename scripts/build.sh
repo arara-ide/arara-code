@@ -165,6 +165,17 @@ embed_arara_orchestra() {
   test -s "${dest}/dist/extension.js" && test -s "${dest}/dist/webview/webview.js"
 }
 
+embed_arara_update() {
+  local src="${ROOT}/extensions/arara-update" dest="${WORK}/vscode/extensions/arara-update"
+  echo "» Incluindo arara-update…"
+  rm -rf "${dest}"
+  mkdir -p "${dest}"
+  cp "${src}/package.json" "${dest}/"
+  for catalog in "${src}"/package.nls*.json; do cp "${catalog}" "${dest}/"; done
+  cp -R "${src}/src" "${dest}/"
+  test -s "${dest}/src/extension.js" && test -s "${dest}/src/locales/en.json" && test -s "${dest}/package.nls.json"
+}
+
 if [[ "${PREPARE_ONLY}" == "yes" ]]; then
   . version.sh
   . prepare_vscode.sh
@@ -181,6 +192,7 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   embed_arara_ai
   embed_arara_bot
   embed_arara_orchestra
+  embed_arara_update
   cp "${ROOT}/branding/linux/control.template" vscode/resources/linux/debian/control.template
   (
     cd vscode
@@ -212,6 +224,7 @@ elif [[ "${OS_NAME}" == "windows" ]]; then
   embed_arara_ai
   embed_arara_bot
   embed_arara_orchestra
+  embed_arara_update
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
@@ -237,6 +250,7 @@ else
   embed_arara_ai
   embed_arara_bot
   embed_arara_orchestra
+  embed_arara_update
   (
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"

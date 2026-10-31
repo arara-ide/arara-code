@@ -146,6 +146,9 @@ else
   echo "! ${ORCH_DIR} não encontrado; abrindo sem a Orquestra." >&2
 fi
 
+UPDATE_DIR="${ROOT}/extensions/arara-update"
+[[ -f "${UPDATE_DIR}/package.json" ]] && EXT_ARGS+=("--extensionDevelopmentPath=${UPDATE_DIR}")
+
 mkdir -p "${PROFILE}/data" "${PROFILE}/extensions"
 
 echo "» Abrindo Arara Code (dev, ${DEV_ENVIRONMENT}) — perfil: ${PROFILE}"

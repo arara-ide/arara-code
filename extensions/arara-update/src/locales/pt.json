@@ -1,0 +1,18 @@
+{
+  "$(check) Arara Code {0} is ready to update": "$(check) Arara Code {0} pronto para atualizar",
+  "Arara Code {0} is already installed. Restart Arara Code to use it.": "O Arara Code {0} já está instalado. Reinicie o Arara Code para usá-lo.",
+  "Arara Code {0} was just released. Downloading the latest version…": "O Arara Code {0} acabou de ser lançado. Baixando a versão mais recente…",
+  "The installer is no longer available. Preparing the update again…": "O instalador não está mais disponível. Preparando a atualização novamente…",
+  "The standard Windows installer is ready. Close Arara Code and uninstall the old UserSetup installation in Windows Settings, keeping your user data. Then run the downloaded installer to avoid duplicate installations.": "O instalador normal do Windows está pronto. Feche o Arara Code e desinstale a instalação antiga do UserSetup nas Configurações do Windows, preservando seus dados de usuário. Depois, execute o instalador baixado para evitar instalações duplicadas.",
+  "Arara Code {0} · Update": "Arara Code {0} · Atualizar",
+  "Arara Code {0} is already downloaded. {1}": "Arara Code {0} já foi baixado. {1}",
+  "Could not open the update installer. Try clicking Update again.": "Não foi possível abrir o instalador da atualização. Tente clicar em Atualizar novamente.",
+  "Close Arara Code and replace your previous AppImage with the downloaded file, keeping the same location and filename used by your shortcut. Then reopen the AppImage. Your settings are preserved.": "Feche o Arara Code e substitua o AppImage anterior pelo arquivo baixado, mantendo o local e o nome usados no seu atalho. Depois, reabra o AppImage. Suas configurações são preservadas.",
+  "Open the selected installer and follow the steps to update Arara Code. Then reopen the app.": "Abra o instalador selecionado e siga as etapas para atualizar o Arara Code. Depois, reabra o aplicativo.",
+  "Close Arara Code, drag the AraraCode.app shown in Finder to Applications and choose Replace. Then reopen the app.": "Feche o Arara Code, arraste o AraraCode.app mostrado no Finder para Aplicativos e escolha Substituir. Depois, reabra o aplicativo.",
+  "Close Arara Code, extract the downloaded ZIP and replace the portable installation folder. Keep your data folder if present. Then reopen Arara Code.": "Feche o Arara Code, extraia o ZIP baixado e substitua a pasta da instalação portátil. Preserve a pasta data, se existir. Depois, reabra o Arara Code.",
+  "Extract the selected file. Close Arara Code, drag the new app to Applications and confirm replacement. Then reopen the app.": "Descompacte o arquivo selecionado. Feche o Arara Code, arraste o novo app para Aplicativos e confirme a substituição. Depois, reabra o aplicativo.",
+  "Extract the selected file. Close Arara Code and replace the installation folder with the extracted content. Then reopen the app.": "Extraia o arquivo selecionado. Feche o Arara Code e substitua a pasta da instalação pelo conteúdo extraído. Depois, reabra o aplicativo.",
+  "Open the selected .deb package and choose Install/Update. If no installer opens, run in the terminal: sudo apt install ./{0}. Then reopen Arara Code.": "Abra o pacote .deb selecionado e escolha Instalar/Atualizar. Se o sistema não abrir um instalador, use no terminal: sudo apt install ./{0}. Depois, reabra o Arara Code.",
+  "Arara Code {0}: {1}": "Arara Code {0}: {1}"
+}
