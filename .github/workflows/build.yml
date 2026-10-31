@@ -5,6 +5,7 @@ on:
     branches: [main, development]
     paths:
       - 'patches/**'
+      - 'extensions/**'
       - '.gitattributes'
       - 'locales/**'
       - 'scripts/**'
@@ -55,6 +56,7 @@ jobs:
           node scripts/tests/embed-arara-ai.cjs
           node scripts/tests/embed-arara-bot.cjs
           node scripts/tests/embed-arara-orchestra.cjs
+          node scripts/tests/arara-update.cjs
           node scripts/tests/terminal.cjs
           node --test scripts/tests/publish-release.cjs
 

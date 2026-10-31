@@ -1,0 +1,5 @@
+{
+  "displayName": "Actualización de Arara Code",
+  "description": "Comprueba, descarga y abre las actualizaciones de Arara Code.",
+  "command.open.title": "Actualizar Arara Code"
+}

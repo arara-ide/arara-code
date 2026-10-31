@@ -1,5 +1,6 @@
 {
   "Update": "Actualizar",
+  "Updating": "Actualizando",
   "Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} está instalado. Se cerrará cuando la IA termine de responder; después, vuelve a abrir Arara Code.",
   "Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} está instalado. Se reiniciará cuando la IA termine de responder.",
   "Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} está instalado. Se cerrará en {1} s para aplicar la actualización; después, vuelve a abrir Arara Code.",

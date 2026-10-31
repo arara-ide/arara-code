@@ -1,0 +1,46 @@
+{
+  "name": "arara-update",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "publisher": "arara",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.134.0"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "arara.update.open",
+        "title": "%command.open.title%",
+        "category": "Arara",
+        "icon": "$(cloud-download)",
+        "enablement": "arara.update.available && !arara.update.busy"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "arara.update.open",
+          "when": "arara.update.available && !arara.update.busy"
+        }
+      ]
+    }
+  }
+}

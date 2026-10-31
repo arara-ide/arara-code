@@ -18,13 +18,19 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Kiro: os créditos abaixo de cada resposta são só os daquele pedido, mesmo com várias conversas ao mesmo tempo, e aparecem assim que a resposta termina.
 - Arara Bot: os créditos do Kiro aparecem abaixo de cada resposta.
 - Chat: as instruções do workspace avisam a IA sobre o AGENTS.md e o CLAUDE.md da pasta do projeto, quando existem.
+- Atualização: depois do clique, o botão Atualizar fica desabilitado e mostra "Atualizando" até o instalador fechar, por no máximo 2 minutos.
+- Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
+- Chat: Nova conversa durante uma resposta abre a conversa já parada, sem o "Pensando…" da resposta anterior, e encerra os subagentes dela.
+- Chat: subagentes que a IA deixou rodando são encerrados quando a resposta termina.
+- Links: clicar em um link abre o navegador direto, sem o diálogo Abrir, Copiar ou Configurar domínios confiáveis.
 - Chat: o botão Instruções volta a abrir o editor de instruções.
 - Arara Bot: ativar o Goal usa o servidor atualizado e deixa de retornar erro de configuração não suportada.
 - Arara Bot: o nível de esforço escolhido no seletor deixa de ser recusado ao salvar e ao enviar o pedido.
 - Inicialização: a tela de boas-vindas abre antes da leitura do histórico e não espera a instalação das skills.
 - Atualização: instalações portáteis do Windows recebem o ZIP correspondente, com orientação para preservar os dados.
+- Editor: a tela inicial com os projetos recentes deixa de piscar quando a pasta aberta tem muitos repositórios Git.
 
 ### Removido
 - Orquestra: acessos pelo topo do chat e do Arara Bot e botões de mover bots ocultos temporariamente; comandos e dados preservados.
