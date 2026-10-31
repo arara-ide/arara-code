@@ -22,6 +22,9 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
+- Chat: Nova conversa durante uma resposta abre a conversa já parada, sem o "Pensando…" da resposta anterior, e encerra os subagentes dela.
+- Chat: subagentes que a IA deixou rodando são encerrados quando a resposta termina.
+- Links: clicar em um link abre o navegador direto, sem o diálogo Abrir, Copiar ou Configurar domínios confiáveis.
 - Chat: o botão Instruções volta a abrir o editor de instruções.
 - Arara Bot: ativar o Goal usa o servidor atualizado e deixa de retornar erro de configuração não suportada.
 - Arara Bot: o nível de esforço escolhido no seletor deixa de ser recusado ao salvar e ao enviar o pedido.

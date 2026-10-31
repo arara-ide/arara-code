@@ -28,7 +28,7 @@ Scripts que transformam o VSCodium (submódulo em `upstream/vscodium`, tag fixa)
 Este repo é **open source**: todo patch fica público. Quanto menos lógica na IDE e mais no `arara-ai` (fechado), melhor.
 
 - Antes de criar ou crescer um patch, prove que a API de extensão (inclusive proposed) não resolve.
-- Quando o patch for inevitável, ele só abre o ponto de extensão: um item de menu, uma context key, um gancho que chama um comando `arara.*`. Regras de negócio, heurísticas, textos de produto, parsers de CLIs e tudo que faz a IA funcionar ficam na extensão. Exemplo: no `0015-ide-update` o patch só desenha o botão e reinicia; quem decide se há versão nova e para onde o botão leva é a `arara-ai`.
+- Quando o patch for inevitável, ele só abre o ponto de extensão: um item de menu, uma context key, um gancho que chama um comando `arara.*`. Regras de negócio, heurísticas, textos de produto, parsers de CLIs e tudo que faz a IA funcionar ficam na extensão. Exemplo: no `0015-ide-update` o patch só desenha o botão e reinicia; quem confere a versão nova, baixa e abre o instalador é a extensão aberta `extensions/arara-update` deste repositório (decisão de 31/10/2026: a atualização da IDE fica no código aberto).
 - Nunca colocar no patch nomes de modelos, prompts, URLs internas ou detalhes do `ac-services`.
 
 ## O que você pode mexer
@@ -37,6 +37,7 @@ Este repo é **open source**: todo patch fica público. Quanto menos lógica na 
 - `patches/vscodium/*.patch` — mudanças nos scripts do VSCodium (evitar).
 - `branding/` — `product.overlay.json`, ícones.
 - `extensions.lock.json` — versão + sha256 do `.vsix` do `arara-ai`.
+- `extensions/arara-update/` — extensão built-in de atualização da IDE (JavaScript sem build, testes com `node --test`). Embutida por `embed_arara_update` no `build.sh` e carregada pelo `dev.sh`. Nada de IA, `ac-services`, URLs internas ou segredos aqui. Verificar com `node scripts/tests/arara-update.cjs`.
 - `scripts/`, `.github/workflows/`.
 
 ## O que você NÃO mexe
@@ -51,7 +52,7 @@ Este repo é **open source**: todo patch fica público. Quanto menos lógica na 
 - Cabeçalho obrigatório: o que faz, por que não dá pra fazer via extensão, arquivos do upstream que toca.
 - Um patch = um assunto. Mantenha o diff mínimo; não reformatar código do upstream.
 - Patch que lida com processos, caminhos ou rede precisa de revisão de segurança.
-- Antes de concluir alterações em patches, execute `node scripts/tests/patches.cjs` e `node scripts/tests/localization.cjs`. Preserve LF nos `.patch` conforme `.gitattributes`; não ajuste a contagem de linhas de um hunk sem conferir o arquivo realmente aplicado pelo Git.
+- Antes de concluir alterações em patches, execute `node scripts/tests/patches.cjs` e `node scripts/tests/localization.cjs`; alterações no atualizador, `node scripts/tests/arara-update.cjs`. Preserve LF nos `.patch` conforme `.gitattributes`; não ajuste a contagem de linhas de um hunk sem conferir o arquivo realmente aplicado pelo Git.
 
 ## Comandos
 

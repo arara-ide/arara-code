@@ -12,6 +12,8 @@ const write = (file, text, mode) => { fs.mkdirSync(path.dirname(file), { recursi
 try {
   for (const script of ['dev.sh', 'apply-environment.cjs']) write(path.join(code, 'scripts', script), fs.readFileSync(path.join(root, 'scripts', script)));
   for (const script of ['sync-dev-patches.sh', 'default-extensions.sh']) write(path.join(code, 'scripts', script), '#!/bin/bash\nexit 0\n');
+  write(path.join(code, 'scripts/prepare-language-detection.cjs'), '');
+  write(path.join(code, 'extensions/arara-update/package.json'), '{}');
   write(path.join(dir, 'bin/npm'), '#!/bin/bash\nexit 0\n', 0o755);
   write(path.join(upstream, 'product.json'), JSON.stringify({ applicationName: 'arara-code' }));
   write(path.join(upstream, '.build/electron/arara-code'), '#!/bin/bash\nexit 0\n', 0o755);
@@ -35,6 +37,7 @@ try {
   assert.equal(args[args.indexOf('--user-data-dir') + 1], path.join(productionProfile, 'data'));
   assert.ok(fs.existsSync(path.join(localProfile, 'keep'))); assert.ok(!fs.existsSync(path.join(productionProfile, 'remove')));
   const staged = args.find(arg => arg.startsWith('--extensionDevelopmentPath=')).split('=')[1];
+  assert.ok(args.includes(`--extensionDevelopmentPath=${path.join(code, 'extensions/arara-update')}`), 'dev.sh must load arara-update');
   for (const folder of [staged, path.join(upstream, 'extensions/arara-ai')]) {
     const pkg = JSON.parse(fs.readFileSync(path.join(folder, 'package.json')));
     assert.equal(pkg.araraEnvironment, 'production');

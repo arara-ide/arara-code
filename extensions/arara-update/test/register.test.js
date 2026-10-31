@@ -16,7 +16,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara-code/resources/app', language = 'en', remoteName } = {}) {
+function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara-code/resources/app', language = 'en', remoteName, extensionKind = 1 } = {}) {
   const state = {
     product: { version: '1.135.06700', ...product }, executed: [], messages: [], errors: [], terminals: [], closeListeners: [],
     command: undefined, checker: undefined, downloads: undefined, spawned: [], execFiles: [],
@@ -71,7 +71,7 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
     homedir: () => '/home/user', platform, arch: 'x64', env: { PATH: '/bin' }, Checker, Downloads,
   };
   const subscriptions = [];
-  const context = { subscriptions, extension: { extensionKind: 1 }, globalStorageUri: { fsPath: '/storage' } };
+  const context = { subscriptions, extension: { extensionKind }, globalStorageUri: { fsPath: '/storage' } };
   const result = registerUpdate(context, vscode, deps);
   const contextValues = key => state.executed.filter(call => call[0] === 'setContext' && call[1] === key).map(call => call[2]);
   return {
@@ -161,10 +161,18 @@ describe('update button', () => {
     assert.equal(h.state.terminals.length, 0);
   });
 
-  it('does nothing in dev builds or in a remote workspace host', () => {
-    assert.equal(harness({ product: { version: '1.135.0-dev' } }).result, undefined);
-    const remote = harness({ remoteName: 'ssh-remote' });
-    assert.notEqual(remote.result, undefined);
+  it('does nothing in dev builds or when running on a remote workspace host', () => {
+    const dev = harness({ product: { version: '1.135.0-dev' } });
+    assert.equal(dev.result, undefined);
+    assert.equal(dev.state.command, undefined);
+    const remote = harness({ remoteName: 'ssh-remote', extensionKind: 2 });
+    assert.equal(remote.result, undefined);
+    assert.equal(remote.state.downloads, undefined);
+    assert.deepEqual(remote.available(), [false]);
+  });
+
+  it('keeps working locally in a remote window, where it runs as a UI extension', () => {
+    assert.notEqual(harness({ remoteName: 'ssh-remote' }).result, undefined);
   });
 
   for (const [platform, product, format, file, instruction] of [
