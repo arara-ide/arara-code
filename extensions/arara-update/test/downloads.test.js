@@ -6,7 +6,7 @@ const { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } = require('node
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { afterEach, describe, it } = require('node:test');
-const { UpdateDownloads, installAction, installInstructions, installerName, updateTarget } = require('../src/downloads');
+const { UpdateDownloads, installAction, installInstructions, installerName, updateTarget, windowsPowerShell } = require('../src/downloads');
 const { setLanguage } = require('../src/i18n');
 const { newerVersion } = require('../src/version');
 
@@ -162,6 +162,15 @@ describe('installation format selection', () => {
     const fetcher = recordingFetch(async () => new Response(`${'a'.repeat(64)}  arara-code_${version}_amd64.deb\n`));
     await assert.rejects(new UpdateDownloads(root, target, fetcher).prepare(version), /not published/);
     assert.equal(fetcher.calls.length, 1);
+  });
+
+  it('runs PowerShell only from a standard Windows folder, never from an arbitrary SystemRoot value', () => {
+    assert.equal(windowsPowerShell('D:\\Windows'), 'D:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+    assert.equal(windowsPowerShell('c:\\windows\\'), 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+    for (const value of ['C:\\evil', '\\\\server\\share\\Windows', 'C:\\Windows" & calc', '', undefined]) {
+      assert.equal(windowsPowerShell(value), 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', String(value));
+    }
+    assert.equal(installAction('C:\\cache\\Setup.exe', 'win32', undefined, undefined, 'E:\\Windows').command, 'E:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
   });
 
   it('opens macOS disk images with open -W so the end of the installer is observable', () => {

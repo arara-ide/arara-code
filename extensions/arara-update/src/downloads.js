@@ -3,7 +3,7 @@
 const { createHash } = require('node:crypto');
 const { createReadStream, createWriteStream } = require('node:fs');
 const { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, rmdir, writeFile } = require('node:fs/promises');
-const { join, win32 } = require('node:path');
+const { join } = require('node:path');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { t } = require('./i18n');
@@ -51,12 +51,20 @@ function shellQuote(value) {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function installAction(file, platform = process.platform, version, home, systemRoot = process.env.SystemRoot || 'C:\\Windows') {
+const DRIVES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function windowsPowerShell(systemRoot = process.env.SystemRoot) {
+  const root = String(systemRoot ?? '').toUpperCase().replace(/\\+$/, '');
+  const drive = [...DRIVES].find(letter => root === `${letter}:\\WINDOWS`) ?? 'C';
+  return `${drive}:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`;
+}
+
+function installAction(file, platform = process.platform, version, home, systemRoot) {
   if (platform === 'darwin' && file.endsWith('.zip') && version && home && versionPattern.test(version)) return { kind: 'extract-reveal', destination: join(home, 'Downloads', `AraraCode-${version}`) };
   if (platform === 'linux' && file.endsWith('.deb')) return { kind: 'terminal', command: `sudo apt install ${shellQuote(file)}` };
   if (platform === 'win32' && file.endsWith('.exe')) return {
     kind: 'open',
-    command: win32.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    command: windowsPowerShell(systemRoot),
     args: ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', `(Start-Process -FilePath $env:${INSTALLER_ENV} -PassThru).WaitForExit()`],
     env: { [INSTALLER_ENV]: file },
   };
@@ -148,4 +156,4 @@ class UpdateDownloads {
   }
 }
 
-module.exports = { INSTALLER_ENV, UpdateDownloads, installAction, installInstructions, installerName, shellQuote, updateTarget };
+module.exports = { INSTALLER_ENV, UpdateDownloads, installAction, installInstructions, installerName, shellQuote, updateTarget, windowsPowerShell };
