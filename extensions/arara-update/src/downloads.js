@@ -61,7 +61,7 @@ function windowsPowerShell(systemRoot = process.env.SystemRoot) {
 
 function installAction(file, platform = process.platform, version, home, systemRoot) {
   if (platform === 'darwin' && file.endsWith('.zip') && version && home && versionPattern.test(version)) return { kind: 'extract-reveal', destination: join(home, 'Downloads', `AraraCode-${version}`) };
-  if (platform === 'linux' && file.endsWith('.deb')) return { kind: 'terminal', command: `sudo apt install ${shellQuote(file)}` };
+  if (platform === 'linux' && file.endsWith('.deb')) return { kind: 'terminal', text: `sudo apt install ${shellQuote(file)}` };
   if (platform === 'win32' && file.endsWith('.exe')) return {
     kind: 'open',
     command: windowsPowerShell(systemRoot),

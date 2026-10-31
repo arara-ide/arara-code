@@ -133,7 +133,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
       return;
     }
     if (action.kind === 'terminal') {
-      openTerminal(verified, action.command, run);
+      openTerminal(verified, action.text, run);
       waitInstaller();
       return;
     }

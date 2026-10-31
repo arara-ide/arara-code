@@ -62,7 +62,7 @@ describe('installer preparation', () => {
       const action = installAction(ready.file, target.platform);
       assert.equal(action.kind, target.format === 'deb' ? 'terminal' : target.platform === 'win32' && name.endsWith('.exe') ? 'open' : 'reveal');
       if (target.format === 'AppImage') assert.equal((await stat(ready.file)).mode & 0o777, 0o755);
-      if (action.kind === 'terminal') assert.equal(action.command, `sudo apt install '${ready.file}'`);
+      if (action.kind === 'terminal') assert.equal(action.text, `sudo apt install '${ready.file}'`);
       if (action.kind === 'open') {
         assert.match(action.command, /WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/);
         assert.ok(!action.args.join(' ').includes(ready.file));
