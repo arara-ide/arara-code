@@ -367,7 +367,7 @@ jobs:
           foreach ($name in 'STORE_TENANT_ID','STORE_SELLER_ID','STORE_CLIENT_ID','STORE_CLIENT_SECRET','STORE_PRODUCT_ID') { if (-not [Environment]::GetEnvironmentVariable($name)) { throw "$name is empty" } }
           msstore reconfigure --tenantId $env:STORE_TENANT_ID --sellerId $env:STORE_SELLER_ID --clientId $env:STORE_CLIENT_ID --clientSecret $env:STORE_CLIENT_SECRET
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          msstore publish store --inputFile "store/AraraCode-x64-$env:RELEASE_VERSION.msix" --appId $env:STORE_PRODUCT_ID
+          msstore publish "store/AraraCode-x64-$env:RELEASE_VERSION.msix" -id $env:STORE_PRODUCT_ID
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   macos-x64:
