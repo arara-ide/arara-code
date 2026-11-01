@@ -5,6 +5,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 ## [Não lançado]
 
 ### Novidades
+- Chat: quem tem o plano Supporter escolhe de 1 a 8 chats por plataforma em Configurações; o padrão continua 3.
 - Chat: modo Goal acompanha o objetivo até a conclusão, com recuperação de comunicação e opção de desligar, também no Arara Bot e na Orquestra.
 - Instalação: AppImage opcional para Linux, com atualização no mesmo formato escolhido pelo usuário.
 - Kiro: escolha do nível de esforço do modelo no chat, no Arara Bot e na Orquestra.
@@ -12,6 +13,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: botão Fork abaixo da resposta abre uma nova conversa com as mensagens até ali, com o título "(Fork) Nome original" e numeração nos forks seguintes.
 
 ### Melhorias
+- Chat: voltar ao chat 1, 2 ou 3 mostra a conversa como ela estava, já no fim e com o que chegou enquanto você estava em outro chat, sem carregar tudo de novo.
 - Chat: o painel lateral direito mantém largura mínima suficiente para o campo e seus controles.
 - Kiro: chat, Arara Bot, Orquestra e terminal passam a usar o Kiro CLI V3.
 - Kiro: o "A propósito" chega direto à conversa em andamento.
@@ -31,6 +33,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Inicialização: a tela de boas-vindas abre antes da leitura do histórico e não espera a instalação das skills.
 - Atualização: instalações portáteis do Windows recebem o ZIP correspondente, com orientação para preservar os dados.
 - Editor: a tela inicial com os projetos recentes deixa de piscar quando a pasta aberta tem muitos repositórios Git.
+- Navegador: a IA espera 1 segundo depois de clicar num campo antes de digitar e não perde mais a primeira letra; campos fora da tela são alcançados com rolagem suave, também no Seu navegador.
 
 ### Removido
 - Orquestra: acessos pelo topo do chat e do Arara Bot e botões de mover bots ocultos temporariamente; comandos e dados preservados.
