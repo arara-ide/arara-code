@@ -90,6 +90,7 @@ describe('update button', () => {
   it('stays hidden until download completes, then installs the .deb in a terminal', async () => {
     const h = harness();
     assert.equal(h.state.downloads.target.format, 'deb');
+    assert.deepEqual(h.state.checker.options.target, h.state.downloads.target);
     assert.equal(h.state.downloads.root, '/storage/ide-update-temp');
     const download = deferred();
     h.state.prepare = () => download.promise;
@@ -280,8 +281,15 @@ describe('update button while updating', () => {
   it('goes back to Update right away when opening the installer fails', async () => {
     const h = harness();
     await h.found();
-    h.state.cached = async () => { throw new Error('disk'); };
-    await h.click();
+    const error = new Error('disk');
+    h.state.cached = async () => { throw error; };
+    const log = mock.method(console, 'error', () => {});
+    try {
+      await h.click();
+      assert.deepEqual(log.mock.calls[0].arguments, ['[arara update] Installation failed', error]);
+    } finally {
+      log.mock.restore();
+    }
     assert.deepEqual(h.state.errors, ['Could not open the update installer. Try clicking Update again.']);
     assert.equal(h.state.terminals.length, 0);
     assert.deepEqual(h.busy(), [false, true, false]);

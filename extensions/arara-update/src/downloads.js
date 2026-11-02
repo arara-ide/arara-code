@@ -123,9 +123,6 @@ class UpdateDownloads {
   }
 
   async prepare(version, signal) {
-    for (const entry of await readdir(this.root, { withFileTypes: true }).catch(() => [])) {
-      if (entry.isDirectory() && newerVersion(version, entry.name)) await rm(join(this.root, entry.name), { recursive: true, force: true });
-    }
     const existing = await this.cached(version);
     if (existing) return existing;
     const name = installerName(version, this.target);
@@ -150,6 +147,9 @@ class UpdateDownloads {
       await mkdir(destination, { recursive: true, mode: 0o700 });
       await rename(file, join(destination, name));
       await rename(join(staging, `${name}.json`), join(destination, `${name}.json`));
+      for (const entry of await readdir(this.root, { withFileTypes: true })) {
+        if (entry.isDirectory() && newerVersion(version, entry.name)) await rm(join(this.root, entry.name), { recursive: true, force: true });
+      }
       return { version, file: join(destination, name) };
     } finally {
       await rm(staging, { recursive: true, force: true });

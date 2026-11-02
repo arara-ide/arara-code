@@ -1,6 +1,7 @@
 'use strict';
 
 const { newerVersion } = require('./version');
+const { installerName } = require('./downloads');
 
 const CHECK_INTERVAL_MS = 5 * 60_000;
 const RELEASES_URL = 'https://api.github.com/repos/arara-ide/arara-code/releases?per_page=100';
@@ -46,7 +47,12 @@ class UpdateChecker {
     let latest = null;
     for (const release of body) {
       if (!release || release.draft || typeof release.tag_name !== 'string') continue;
-      if (newerVersion(release.tag_name, latest ?? than)) latest = release.tag_name;
+      if (!newerVersion(release.tag_name, latest ?? than)) continue;
+      if (this.options.target) {
+        const names = new Set(Array.isArray(release.assets) ? release.assets.filter(asset => asset && asset.state === 'uploaded' && Number.isSafeInteger(asset.size) && asset.size > 0).map(asset => asset.name) : []);
+        if (!names.has(installerName(release.tag_name, this.options.target)) || !names.has('SHA256SUMS')) continue;
+      }
+      latest = release.tag_name;
     }
     return latest ? { current: this.options.currentVersion, latest } : null;
   }

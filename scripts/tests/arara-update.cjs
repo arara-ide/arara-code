@@ -42,7 +42,9 @@ try {
     assert.equal(fs.readFileSync(path.join(dest, file), 'utf8'), fs.readFileSync(path.join(extension, file), 'utf8'), file);
   }
   assert.ok(!fs.existsSync(path.join(dest, 'test')), 'tests must not ship');
-  console.log(`PASS: arara-update unit tests (${tests.length} files), catalogs and release staging.`);
+  const live = spawnSync(process.execPath, [path.join(__dirname, 'arara-update-live.cjs')], { env: { ...process.env, ARARA_UPDATE_EXTENSION: dest }, encoding: 'utf8' });
+  assert.equal(live.status, 0, live.stdout + live.stderr);
+  console.log(`PASS: arara-update unit tests (${tests.length} files), catalogs, release staging and live HTTP update flow.`);
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }
