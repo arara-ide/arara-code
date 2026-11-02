@@ -1,0 +1,12 @@
+Arara Code: opt in to the upstream esbuild packaging pipeline on macOS.
+
+Why a patch: extension APIs cannot configure the compiler that builds the host.
+The build environment selects the existing upstream pipeline without changing
+runtime behavior or the default compiler on other platforms.
+Touches: build/buildConfig.ts
+
+--- a/build/buildConfig.ts
++++ b/build/buildConfig.ts
+@@ -12 +12 @@
+-export const useEsbuildTranspile = false;
++export const useEsbuildTranspile = process.env['ARARA_MACOS_ESBUILD'] === '1';

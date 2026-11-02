@@ -81,6 +81,13 @@ jobs:
         with:
           node-version-file: upstream/vscodium/.nvmrc
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: macos-npm-${{ inputs.arch }}-${{ hashFiles('upstream/vscodium/upstream/stable.json') }}-${{ inputs.ai }}-${{ inputs.bot }}-${{ inputs.orchestra }}
+          restore-keys: |
+            macos-npm-${{ inputs.arch }}-${{ hashFiles('upstream/vscodium/upstream/stable.json') }}-
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -106,7 +113,11 @@ jobs:
 
       - name: Build
         env:
-          MAX_OLD_SPACE_SIZE: '12288'
+          MAX_OLD_SPACE_SIZE: '4096'
+          ARARA_MACOS_ESBUILD: '1'
+          npm_config_audit: 'false'
+          npm_config_fund: 'false'
+          npm_config_prefer_offline: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -137,7 +148,7 @@ jobs:
 
       - name: Preparar ferramentas do upstream para unir os apps
         if: inputs.arch == 'arm64'
-        run: tar --exclude=node_modules -czf dist/macos-merge-tools.tar.gz -C .work/vscodium/vscode build product.json package.json
+        run: bash scripts/package-macos-tools.sh .work/vscodium/vscode dist/macos-merge-tools.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
