@@ -16,7 +16,7 @@ const STALE_STAGING_MS = 24 * 60 * 60_000;
 
 function updateTarget(platform, arch, product, appRoot, debInstalled) {
   const format = platform === 'win32' ? (product.target === 'system' || product.target === 'user' ? 'system' : 'zip')
-    : platform === 'darwin' ? 'zip'
+    : platform === 'darwin' ? 'dmg'
       : product.araraInstallFormat === 'appimage' ? 'AppImage'
         : appRoot.startsWith('/usr/share/arara-code/') && debInstalled ? 'deb' : 'tar.gz';
   return { platform, arch, format };
@@ -26,7 +26,7 @@ function installerName(version, target) {
   if (!versionPattern.test(version)) throw new Error('Invalid release version');
   const { platform, arch, format } = target;
   if (!['x64', 'arm64', 'ia32', 'arm'].includes(arch)) throw new Error('Unsupported architecture');
-  if (platform === 'darwin' && ['x64', 'arm64'].includes(arch)) return `AraraCode-darwin-${arch}-${version}.zip`;
+  if (platform === 'darwin' && ['x64', 'arm64'].includes(arch)) return `AraraCode-darwin-universal-${version}.dmg`;
   if (platform === 'win32' && ['user', 'system'].includes(format)) return `AraraCodeSetup-${arch}-${version}.exe`;
   if (platform === 'win32' && format === 'zip') return `AraraCode-win32-${arch}-${version}.zip`;
   if (platform === 'linux') {
@@ -40,6 +40,7 @@ function installerName(version, target) {
 function installInstructions(name) {
   if (name.endsWith('.AppImage')) return t('Close Arara Code and replace your previous AppImage with the downloaded file, keeping the same location and filename used by your shortcut. Then reopen the AppImage. Your settings are preserved.');
   if (name.endsWith('.exe')) return t('Open the selected installer and follow the steps to update Arara Code. Then reopen the app.');
+  if (name.endsWith('.dmg')) return t('Open the DMG, close Arara Code and drag the app to Applications to replace the previous version. Then reopen Arara Code.');
   if (name.endsWith('.app')) return t('Close Arara Code, drag the AraraCode.app shown in Finder to Applications and choose Replace. Then reopen the app.');
   if (name.includes('-win32-') && name.endsWith('.zip')) return t('Close Arara Code, extract the downloaded ZIP and replace the portable installation folder. Keep your data folder if present. Then reopen Arara Code.');
   if (name.endsWith('.zip')) return t('Extract the selected file. Close Arara Code, drag the new app to Applications and confirm replacement. Then reopen the app.');

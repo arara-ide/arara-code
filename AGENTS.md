@@ -72,6 +72,10 @@ Fluxo para mudar o core: edite em `.work/vscodium/vscode`, teste com `scripts/de
 - **"Buildar em development"**: só disparar o workflow na branch `development`, sem commit nem push que o usuário não tenha pedido: `gh workflow run build.yml -R arara-ide/arara-code --ref development`. O workflow pega `arara-ai`, `arara-bot` e `arara-orchestra` das branches `development` no GitHub, então mudanças locais não commitadas **não entram** no build: avise o usuário. O resultado é um **Artifact** do Actions (SHA-256, retenção de 14 dias), que o usuário baixa na máquina dele (`gh run download <RUN_ID> -R arara-ide/arara-code`). Informe o link ou o ID da execução.
 - **"Buildar em produção"**: commitar e subir tudo o que foi alterado em cada repositório (seguindo o fluxo de cada um até a `main`), por último commitar e subir o `arara-code`, e então disparar o workflow de release na `main`: `gh workflow run build.yml -R arara-ide/arara-code --ref main`. Esse pedido vale como autorização explícita de commit e push para essa entrega; força e reescrita de histórico continuam proibidas.
 
+## Distribuição macOS
+
+- Por decisão do usuário em 02/11/2026, compile Intel e Apple Silicon em paralelo na `main` e na `development`, una com o montador universal do Code-OSS e publique somente `AraraCode-darwin-universal-<versão>.dmg`. ZIPs por arquitetura são intermediários internos do Actions. Na `development`, entregue o DMG com SHA-256 apenas como Artifact de 14 dias, sem release; publicação segue exclusiva da `main`. O mesmo DMG precisa passar nos testes reais em runners Intel e Silicon antes da publicação; detalhes em `ac-docs/docs/26-build-changelog-release.md`.
+
 ## Pronto quando
 
 - `scripts/build.sh` termina sem `.rej` e o binário abre com nome/ícone do Arara, chat no painel direito e Open VSX funcionando.

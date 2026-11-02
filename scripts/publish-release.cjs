@@ -4,7 +4,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
-const packageName = name => /^[\w.+-]+\.(?:deb|tar\.gz|exe|zip|AppImage)$/.test(name);
+const packageName = name => /^[\w.+-]+\.(?:deb|tar\.gz|exe|zip|dmg|AppImage)$/.test(name);
 const digestOf = file => new Promise((resolve, reject) => {
   const hash = createHash('sha256');
   const stream = fs.createReadStream(file);
@@ -40,8 +40,8 @@ function releaseNotes(version, names, changelog, prerelease) {
     'Também há o `.zip`, sem instalar. O instalador ainda não é assinado: o Windows pode avisar.', '');
   const mac = names.filter(n => n.includes('-darwin-'));
   if (mac.length) lines.push('### macOS (teste)',
-    ...mac.map(n => `Baixe \`${n}\` (${n.includes('-arm64-') ? 'Apple Silicon' : 'Intel'}).`),
-    'Descompacte e arraste o app para Aplicativos. O app não é notarizado. Na primeira vez, rode no Terminal:', '',
+    ...mac.map(n => `Baixe \`${n}\` (${n.includes('-universal-') ? 'Intel e Apple Silicon' : n.includes('-arm64-') ? 'Apple Silicon' : 'Intel'}).`),
+    mac.some(n => n.endsWith('.dmg')) ? 'Abra o DMG e arraste Arara Code para Aplicativos. O app não é notarizado. Na primeira vez, rode no Terminal:' : 'Descompacte e arraste o app para Aplicativos. O app não é notarizado. Na primeira vez, rode no Terminal:', '',
     '    xattr -cr "/Applications/Arara Code.app"', '');
   return lines.join('\n');
 }
@@ -57,8 +57,8 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
   if (!/^\d+\.\d+\.\d+$/.test(version || '') || !/^[\w.-]+\/[\w.-]+$/.test(repo || '') || !/^[a-f0-9]{40}$/.test(sha || '')) {
     throw new Error('Invalid release version, repository or commit');
   }
-  const files = fs.readdirSync(dist).sort();
-  if (!files.length || files.some(name => /UserSetup/i.test(name) || !packageName(name) || !name.includes(version) || !fs.statSync(path.join(dist, name)).isFile())) {
+  const files = fs.readdirSync(dist).filter(name => name !== 'SHA256SUMS').sort();
+  if (!files.length || files.some(name => /UserSetup/i.test(name) || name.includes('-darwin-') && name !== `AraraCode-darwin-universal-${version}.dmg` || !packageName(name) || !name.includes(version) || !fs.statSync(path.join(dist, name)).isFile())) {
     throw new Error('Expected only packages for this version in dist');
   }
   const hashes = new Map();

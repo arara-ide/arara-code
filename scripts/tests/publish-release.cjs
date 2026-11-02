@@ -12,8 +12,7 @@ const hash = data => createHash('sha256').update(data).digest('hex');
 const names = [
   `AraraCodeSetup-x64-${version}.exe`,
   `arara-code_${version}_amd64.deb`,
-  `AraraCode-darwin-arm64-${version}.zip`,
-  `AraraCode-darwin-x64-${version}.zip`,
+  `AraraCode-darwin-universal-${version}.dmg`,
   `AraraCode-linux-x64-${version}.AppImage`,
   `AraraCode-win32-x64-${version}.zip`,
 ];
@@ -113,7 +112,7 @@ test('a draft that never becomes visible stops with an actionable error', async 
   assert.equal(f.state.uploads.length, 0);
 });
 
-test('Windows can publish first; Linux and both Macs append to the same release, with cumulative checksums', async t => {
+test('Windows can publish first; Linux and universal Mac append to the same release, with cumulative checksums', async t => {
   const f = fixture(t);
   for (let i = 0; i < names.length; i++) {
     await f.run(names[i]);
@@ -287,4 +286,29 @@ test('resuming a release preserves checksums for previously published legacy pac
   const sums = f.state.assets.find(a => a.name === 'SHA256SUMS').bytes.toString();
   assert.ok(sums.includes(`${hash(legacy.bytes)}  ${legacy.name}\n`));
   assert.ok(f.state.assets.includes(legacy));
+});
+test('universal DMG publication includes checksums and installation instructions for both Mac architectures', async t => {
+  const f = fixture(t);
+  const name = `AraraCode-darwin-universal-${version}.dmg`;
+  await f.run(name);
+  assert.match(f.state.notes, /Intel e Apple Silicon/);
+  assert.match(f.state.notes, /Abra o DMG/);
+  assert.ok(f.state.assets.find(asset => asset.name === 'SHA256SUMS').bytes.toString().includes(name));
+});
+
+test('rejects new per-architecture Mac ZIP uploads before changing a release', async t => {
+  for (const arch of ['x64', 'arm64', 'universal']) {
+    const f = fixture(t);
+    await assert.rejects(f.run(`AraraCode-darwin-${arch}-${version}.zip`), /Expected only packages/);
+    assert.equal(f.state.creates, 0);
+    assert.deepEqual(f.state.uploads, []);
+  }
+});
+
+test('recomputes artifact checksums instead of trusting its SHA256SUMS file', async t => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.dist, 'SHA256SUMS'), 'untrusted artifact checksum');
+  await f.run();
+  const sums = f.state.assets.find(asset => asset.name === 'SHA256SUMS').bytes.toString();
+  assert.equal(sums, `${hash(`package ${names[0]}`)}  ${names[0]}\n`);
 });

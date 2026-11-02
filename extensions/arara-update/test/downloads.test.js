@@ -18,8 +18,8 @@ afterEach(async () => {
 
 const version = '1.135.06780';
 const cases = [
-  [{ platform: 'darwin', arch: 'arm64', format: 'zip' }, `AraraCode-darwin-arm64-${version}.zip`],
-  [{ platform: 'darwin', arch: 'x64', format: 'zip' }, `AraraCode-darwin-x64-${version}.zip`],
+  [{ platform: 'darwin', arch: 'arm64', format: 'dmg' }, `AraraCode-darwin-universal-${version}.dmg`],
+  [{ platform: 'darwin', arch: 'x64', format: 'dmg' }, `AraraCode-darwin-universal-${version}.dmg`],
   [{ platform: 'win32', arch: 'x64', format: 'user' }, `AraraCodeSetup-x64-${version}.exe`],
   [{ platform: 'win32', arch: 'ia32', format: 'system' }, `AraraCodeSetup-ia32-${version}.exe`],
   [{ platform: 'win32', arch: 'arm64', format: 'user' }, `AraraCodeSetup-arm64-${version}.exe`],
@@ -60,10 +60,10 @@ describe('installer preparation', () => {
       assert.deepEqual(await cache.prepare(version), ready);
       assert.equal(fetcher.calls.length, 2);
       const action = installAction(ready.file, target.platform);
-      assert.equal(action.kind, target.format === 'deb' ? 'terminal' : target.platform === 'win32' && name.endsWith('.exe') ? 'open' : 'reveal');
+      assert.equal(action.kind, target.format === 'deb' ? 'terminal' : (target.platform === 'darwin' || target.platform === 'win32' && name.endsWith('.exe')) ? 'open' : 'reveal');
       if (target.format === 'AppImage') assert.equal((await stat(ready.file)).mode & 0o777, 0o755);
       if (action.kind === 'terminal') assert.equal(action.text, `sudo apt install '${ready.file}'`);
-      if (action.kind === 'open') {
+      if (action.kind === 'open' && target.platform === 'win32') {
         assert.match(action.command, /WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/);
         assert.ok(!action.args.join(' ').includes(ready.file));
         assert.deepEqual(action.env, { ARARA_UPDATE_INSTALLER: ready.file });
@@ -148,7 +148,7 @@ describe('installation format selection', () => {
     ['win32', { target: 'user' }, 'C:\\Arara', false, 'system'],
     ['win32', { target: 'system' }, 'C:\\Arara', false, 'system'],
     ['win32', {}, 'C:\\Portable', false, 'zip'],
-    ['darwin', {}, '/Applications/AraraCode.app', false, 'zip'],
+    ['darwin', {}, '/Applications/AraraCode.app', false, 'dmg'],
   ];
   for (const [platform, product, appRoot, debInstalled, format] of formats) {
     it(`preserves the installation method for ${platform} ${JSON.stringify(product)} ${appRoot}`, () => {
@@ -205,4 +205,16 @@ describe('installation instructions', () => {
       for (const name of names) assert.doesNotMatch(installInstructions(name), /\{\d+\}/);
     }
   });
+});
+it('downloads only the universal DMG for both Mac architectures and localizes its instructions', async () => {
+  for (const arch of ['x64', 'arm64']) {
+    const { cache, fetcher } = await fixture({ platform: 'darwin', arch, format: 'dmg' });
+    await cache.prepare(version);
+    assert.ok(fetcher.calls[1].endsWith(`AraraCode-darwin-universal-${version}.dmg`));
+    assert.ok(!fetcher.calls.some(url => url.endsWith('.zip')));
+  }
+  for (const [locale, expected] of [['en', 'Open the DMG'], ['pt', 'Abra o DMG'], ['es', 'Abre el DMG']]) {
+    setLanguage(locale);
+    assert.ok(installInstructions('AraraCode.dmg').startsWith(expected));
+  }
 });
