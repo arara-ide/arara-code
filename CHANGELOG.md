@@ -27,6 +27,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
+- Instalação: corrigida a geração do pacote universal para Macs Intel e Apple Silicon.
 - Inicialização: janelas sem pasta mostram o Explorer e ações para abrir pasta e projetos recentes, mesmo enquanto a tela inicial carrega.
 - Chat: Nova conversa durante uma resposta abre a conversa já parada, sem o "Pensando…" da resposta anterior, e encerra os subagentes dela.
 - Chat: subagentes que a IA deixou rodando são encerrados quando a resposta termina.

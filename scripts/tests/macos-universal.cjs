@@ -18,6 +18,11 @@ function fixture(t, fail = '') {
   const tools = path.join(directory, 'tools');
   for (const folder of [input, bin, tools]) fs.mkdirSync(folder);
   fs.mkdirSync(path.join(tools, 'build'));
+  for (const name of ['vscode-universal-bundler', 'minimatch']) {
+    const dependency = path.join(tools, 'build/node_modules', name);
+    fs.mkdirSync(dependency, { recursive: true });
+    fs.writeFileSync(path.join(dependency, 'package.json'), '{}');
+  }
   fs.writeFileSync(path.join(tools, 'product.json'), '{}');
   for (const arch of ['x64', 'arm64']) fs.writeFileSync(path.join(input, `AraraCode-darwin-${arch}-${version}.zip`), 'app fixture');
   assert.equal(spawnSync('tar', ['-czf', path.join(input, 'macos-merge-tools.tar.gz'), '-C', tools, '.']).status, 0);
@@ -54,13 +59,14 @@ test('packages both architectures through the upstream merger and produces only 
   assert.ok(extracts[1].some(arg => arg.endsWith(`arm64-${version}.zip`)));
   assert.ok(calls.some(([command, file]) => command === 'node' && file.endsWith('/build/darwin/verify-macho.ts')));
   assert.ok(calls.some(([command, action]) => command === 'hdiutil' && action === 'makehybrid'));
+  assert.ok(!calls.some(([command]) => command === 'npm'));
   assert.deepEqual(calls.at(-1), ['hdiutil', 'verify', path.join(f.output, dmgName)]);
   const signed = calls.findIndex(([command]) => command === 'codesign');
   const assembled = calls.findIndex(([command, file]) => command === 'node' && file.endsWith('create-universal-app.ts'));
   assert.ok(signed > assembled);
 });
 
-for (const command of ['npm', 'node', 'codesign', 'hdiutil']) {
+for (const command of ['node', 'codesign', 'hdiutil']) {
   test(`does not publish a DMG when ${command} fails`, t => {
     const f = fixture(t, command);
     assert.notEqual(f.run().status, 0);
@@ -74,6 +80,66 @@ test('rejects unsafe versions and missing input artifacts', t => {
   fs.unlinkSync(path.join(f.input, 'macos-merge-tools.tar.gz'));
   assert.notEqual(f.run().status, 0);
   assert.deepEqual(fs.readdirSync(f.output), []);
+});
+
+test('rejects merge tools without installed dependencies before extracting apps', t => {
+  const f = fixture(t);
+  const tools = path.join(path.dirname(f.input), 'tools');
+  fs.rmSync(path.join(tools, 'build/node_modules'), { recursive: true });
+  assert.equal(spawnSync('tar', ['-czf', path.join(f.input, 'macos-merge-tools.tar.gz'), '-C', tools, '.']).status, 0);
+  assert.notEqual(f.run().status, 0);
+  assert.deepEqual(fs.readdirSync(f.output), []);
+});
+
+test('transports the installed upstream tools including hidden configuration and dependency files', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arara merge tools '));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const source = path.join(directory, 'source');
+  const files = ['build/darwin/create-universal-app.ts', 'build/darwin/verify-macho.ts', 'build/node_modules/vscode-universal-bundler/package.json', 'build/node_modules/minimatch/package.json', 'build/node_modules/.package-lock.json', 'build/.npmrc', 'product.json', 'package.json'];
+  for (const file of files) {
+    fs.mkdirSync(path.dirname(path.join(source, file)), { recursive: true });
+    fs.writeFileSync(path.join(source, file), '{}');
+  }
+  const archive = path.join(directory, 'tools.tar.gz');
+  const run = () => spawnSync('bash', [path.join(root, 'scripts/package-macos-tools.sh'), source, archive], { encoding: 'utf8' });
+  const result = run();
+  assert.equal(result.status, 0, result.stderr);
+  const listing = spawnSync('tar', ['-tzf', archive], { encoding: 'utf8' });
+  assert.equal(listing.status, 0);
+  for (const file of files) assert.ok(listing.stdout.split('\n').includes(file), file);
+  fs.unlinkSync(archive);
+  fs.unlinkSync(path.join(source, 'build/node_modules/vscode-universal-bundler/package.json'));
+  assert.notEqual(run().status, 0);
+  assert.ok(!fs.existsSync(archive));
+});
+
+test('macOS opts into upstream esbuild with a separate typecheck and a heap below runner memory', () => {
+  const workflow = fs.readFileSync(path.join(root, '.github/workflows/build-macos.yml'), 'utf8');
+  assert.match(workflow, /ARARA_MACOS_ESBUILD: '1'/);
+  assert.match(workflow, /MAX_OLD_SPACE_SIZE: '4096'/);
+  assert.match(workflow, /scripts\/package-macos-tools.sh/);
+  const build = fs.readFileSync(path.join(root, 'scripts/build.sh'), 'utf8');
+  const mac = build.split('\nelse\n  . version.sh')[1];
+  assert.ok(mac.includes('spawnTsgo("src/tsconfig.json", { taskName: "typecheck-macos", noEmit: true })'));
+  assert.ok(mac.indexOf('typecheck-macos') < mac.indexOf('npm run gulp vscode-min-prepack'));
+});
+
+test('the compiler patch applies and enables esbuild only for an explicit opt-in', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arara esbuild config '));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(directory, 'build'));
+  const file = path.join(directory, 'build/buildConfig.ts');
+  fs.writeFileSync(file, '\n'.repeat(11) + 'export const useEsbuildTranspile = false;\n');
+  const patch = path.join(root, 'patches/code/0040-macos-esbuild.patch');
+  const apply = spawnSync('git', ['apply', patch], { cwd: directory, encoding: 'utf8' });
+  assert.equal(apply.status, 0, apply.stderr);
+  for (const [value, expected] of [['', 'false'], ['0', 'false'], ['1', 'true']]) {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', 'import { useEsbuildTranspile } from "./build/buildConfig.ts"; process.stdout.write(String(useEsbuildTranspile));'], {
+      cwd: directory, env: { ...process.env, ARARA_MACOS_ESBUILD: value }, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, expected);
+  }
 });
 
 test('stops before merging if either architecture archive is missing', t => {

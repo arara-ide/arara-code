@@ -255,6 +255,10 @@ else
     cd vscode
     export NODE_OPTIONS="--max-old-space-size=${MAX_OLD_SPACE_SIZE}"
     export VSCODE_PUBLISH_COUNTER=1
+    if [[ "${ARARA_MACOS_ESBUILD:-}" == "1" ]]; then
+      npm run gulp compile-api-proposal-names compile-extension-point-names
+      node --input-type=module -e 'import { spawnTsgo } from "./build/lib/tsgo.ts"; await spawnTsgo("src/tsconfig.json", { taskName: "typecheck-macos", noEmit: true });'
+    fi
     npm run gulp vscode-min-prepack
     rm -f .build/extensions/ms-vscode.js-debug/src/win32-app-container-tokens.*.node
     npm run copy-policy-dto --prefix build
