@@ -15,5 +15,6 @@
   "Extract the selected file. Close Arara Code, drag the new app to Applications and confirm replacement. Then reopen the app.": "Descomprime el archivo seleccionado. Cierra Arara Code, arrastra la aplicación nueva a Aplicaciones y confirma la sustitución. Después vuelve a abrirla.",
   "Extract the selected file. Close Arara Code and replace the installation folder with the extracted content. Then reopen the app.": "Extrae el archivo seleccionado. Cierra Arara Code y sustituye la carpeta de instalación por el contenido extraído. Después vuelve a abrirlo.",
   "Open the selected .deb package and choose Install/Update. If no installer opens, run in the terminal: sudo apt install ./{0}. Then reopen Arara Code.": "Abre el paquete .deb seleccionado y elige Instalar/Actualizar. Si no se abre un instalador, ejecuta en el terminal: sudo apt install ./{0}. Después, vuelve a abrir Arara Code.",
-  "Arara Code {0}: {1}": "Arara Code {0}: {1}"
+  "Arara Code {0}: {1}": "Arara Code {0}: {1}",
+  "Open the DMG, close Arara Code and drag the app to Applications to replace the previous version. Then reopen Arara Code.": "Abre el DMG, cierra Arara Code y arrastra la aplicación a Aplicaciones para sustituir la versión anterior. Después, vuelve a abrir Arara Code."
 }

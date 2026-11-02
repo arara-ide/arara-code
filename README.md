@@ -35,7 +35,7 @@ Este repositório é público. Mantenha somente patches, branding e infraestrutu
 
 ## Publicação por plataforma
 
-Na `main`, Linux, Windows e macOS (Intel e Apple Silicon) compilam em paralelo. O primeiro build aprovado cria e publica uma única release da versão; cada um dos demais acrescenta seus arquivos à mesma release assim que termina. Falhas de outra plataforma não bloqueiam os pacotes aprovados.
+Na `main`, Linux, Windows e as duas arquiteturas macOS compilam em paralelo. Os apps Intel e Apple Silicon são unidos em um único `AraraCode-darwin-universal-<versão>.dmg`, publicado após montar, instalar e abrir o mesmo DMG em runners das duas arquiteturas. Os ZIPs por arquitetura são intermediários internos do Actions. Linux e Windows podem publicar antes; falhas do macOS não bloqueiam os pacotes aprovados das outras plataformas.
 
 Os uploads passam por uma fila para acumular todos os arquivos no `SHA256SUMS` e atualizar as instruções de instalação. Uma execução nova da `main` aguarda a atual terminar, para não interromper uma release parcialmente publicada. Releases precisam permanecer mutáveis para receber os próximos arquivos. Reexecutar um job aceita arquivos idênticos; arquivos com o mesmo nome e conteúdo diferente são recusados.
 
@@ -43,7 +43,7 @@ Os uploads passam por uma fila para acumular todos os arquivos no `SHA256SUMS` e
 
 Pushes em `development` executam testes e build. A execução manual também aceita essa branch; o botão **Run workflow** depende da definição com `workflow_dispatch` estar na branch padrão do GitHub. Na aba **Actions**, selecione uma execução bem-sucedida de `development` e baixe o pacote na seção **Artifacts**. É necessário estar conectado ao GitHub e ter acesso de leitura ao repositório. Os arquivos expiram após 14 dias; execute novamente o workflow se precisar de outro pacote. Não há publicação em GitHub Releases, criação de tags ou atualização automática para esses builds.
 
-Os artifacts `arara-code-development-linux` e `arara-code-development-windows` contêm os instaladores/pacotes e `SHA256SUMS`. O build embute `arara-ai` da branch `development`; builds da `main` continuam usando `arara-ai/main`. macOS (Intel e Apple Silicon) é compilado na `main`.
+Os artifacts `arara-code-development-linux` e `arara-code-development-windows` contêm os instaladores/pacotes e `SHA256SUMS`. O build embute `arara-ai` da branch `development`; builds da `main` continuam usando `arara-ai/main`. macOS Intel e Apple Silicon também compilam na development, com os componentes da mesma branch, e geram o artifact `arara-code-development-macos-universal` com DMG e SHA256SUMS (14 dias), sem release.
 
 ```sh
 gh run list -R arara-ide/arara-code --workflow build.yml --branch development --status success
@@ -157,7 +157,7 @@ O botão **Atualizar** aparece depois que o pacote correspondente à sua instala
 - **AppImage:** mostra o arquivo novo, já executável. Feche a IDE e substitua o AppImage anterior, mantendo o local e o nome usados no seu atalho. Depois, reabra.
 - **Windows instalado:** abre o instalador normal. Instalações antigas do UserSetup recebem a orientação de migração antes de executar o instalador.
 - **Windows portátil:** mostra o ZIP novo; feche a IDE e substitua a pasta portátil, preservando a pasta `data`, se existir.
-- **Linux `.tar.gz`:** mostra o arquivo novo para substituir a pasta manualmente. **macOS:** extrai o app e o mostra no Finder para substituir em Aplicativos.
+- **Linux `.tar.gz`:** mostra o arquivo novo para substituir a pasta manualmente. **macOS:** abre o DMG universal; feche a IDE e arraste o app para Aplicativos, confirmando a substituição.
 
 As configurações e conversas são preservadas quando você mantém os dados de usuário.
 
