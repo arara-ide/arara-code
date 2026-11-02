@@ -370,15 +370,16 @@ jobs:
           msstore publish "store/AraraCode-x64-$env:RELEASE_VERSION.msix" -id $env:STORE_PRODUCT_ID
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-  macos-x64:
-    if: github.ref == 'refs/heads/main'
-    needs: version
-    uses: ./.github/workflows/build-macos.yml
-    with:
-      version: ${{ needs.version.outputs.release }}
-      runner: macos-15-intel
-      arch: x64
-    secrets: inherit
+  # Temporarily disabled by owner decisions: no macOS Intel (x64) builds or releases.
+  # macos-x64:
+  #   if: github.ref == 'refs/heads/main'
+  #   needs: version
+  #   uses: ./.github/workflows/build-macos.yml
+  #   with:
+  #     version: ${{ needs.version.outputs.release }}
+  #     runner: macos-15-intel
+  #     arch: x64
+  #   secrets: inherit
 
   macos-arm64:
     if: github.ref == 'refs/heads/main'
@@ -412,16 +413,17 @@ jobs:
       artifact: windows
       prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
 
-  release-macos-x64:
-    if: github.ref == 'refs/heads/main'
-    needs: [version, macos-x64]
-    permissions:
-      contents: write
-    uses: ./.github/workflows/publish-release.yml
-    with:
-      version: ${{ needs.version.outputs.release }}
-      artifact: macos-x64
-      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+  # Temporarily disabled by owner decision on 2026-11-02: no macOS Intel (x64) builds or releases.
+  # release-macos-x64:
+  #   if: github.ref == 'refs/heads/main'
+  #   needs: [version, macos-x64]
+  #   permissions:
+  #     contents: write
+  #   uses: ./.github/workflows/publish-release.yml
+  #   with:
+  #     version: ${{ needs.version.outputs.release }}
+  #     artifact: macos-x64
+  #     prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
 
   release-macos-arm64:
     if: github.ref == 'refs/heads/main'
