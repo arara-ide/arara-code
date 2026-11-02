@@ -5,6 +5,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 ## [Não lançado]
 
 ### Novidades
+- App: controle os chats e bots da IDE pelo celular em um aplicativo instalável, com pareamento por código e conexão direta ao computador.
 - Chat: quem tem o plano Supporter escolhe de 1 a 8 chats por plataforma em Configurações; o padrão continua 3.
 - Chat: modo Goal acompanha o objetivo até a conclusão, com recuperação de comunicação e opção de desligar, também no Arara Bot e na Orquestra.
 - Instalação: AppImage opcional para Linux, com atualização no mesmo formato escolhido pelo usuário.
@@ -13,6 +14,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: botão Fork abaixo da resposta abre uma nova conversa com as mensagens até ali, com o título "(Fork) Nome original" e numeração nos forks seguintes.
 
 ### Melhorias
+- WhatsApp: a conexão informa os riscos da integração não oficial e recomenda o app do Arara antes de continuar.
 - Chat: voltar ao chat 1, 2 ou 3 mostra a conversa como ela estava, já no fim e com o que chegou enquanto você estava em outro chat, sem carregar tudo de novo.
 - Chat: o painel lateral direito mantém largura mínima suficiente para o campo e seus controles.
 - Kiro: chat, Arara Bot, Orquestra e terminal passam a usar o Kiro CLI V3.
