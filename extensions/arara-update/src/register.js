@@ -87,15 +87,14 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
     child.once('spawn', () => { child.unref(); resolve(); });
   });
 
-  const revealApp = async (verified, destination) => {
+  const extractApp = async (verified, destination) => {
     await deps.mkdir(destination, { recursive: true });
     await deps.execFile('/usr/bin/ditto', ['-x', '-k', verified.file, destination]);
     const app = (await deps.readdir(destination)).find(entry => entry.endsWith('.app'));
     if (!app) throw new Error('App not found in archive');
     const appPath = join(destination, app);
     await deps.execFile('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', appPath]).catch(() => {});
-    await deps.execFile('/usr/bin/open', ['-R', appPath]);
-    return app;
+    return appPath;
   };
 
   const install = async (run, waitInstaller) => {
@@ -127,9 +126,16 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
       return;
     }
     if (action.kind === 'extract-reveal') {
-      const app = await revealApp(verified, action.destination);
-      waitInstaller();
-      void vscode.window.showInformationMessage(t('Arara Code {0}: {1}', verified.version, installInstructions(app)));
+      const appPath = await extractApp(verified, action.destination);
+      const proceed = t('Continue');
+      const selected = await vscode.window.showInformationMessage(
+        t('Arara Code {0}: {1}', verified.version, installInstructions(basename(appPath))),
+        { modal: true },
+        proceed,
+      );
+      if (selected !== proceed) return;
+      await deps.execFile('/usr/bin/open', ['-R', appPath]);
+      await vscode.commands.executeCommand('workbench.action.quit');
       return;
     }
     if (action.kind === 'terminal') {

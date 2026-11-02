@@ -1,4 +1,5 @@
 {
+  "Continue": "Continuar",
   "$(check) Arara Code {0} is ready to update": "$(check) Arara Code {0} está listo para actualizar",
   "Arara Code {0} is already installed. Restart Arara Code to use it.": "Arara Code {0} ya está instalado. Reinicia Arara Code para usarlo.",
   "Arara Code {0} was just released. Downloading the latest version…": "Arara Code {0} acaba de publicarse. Descargando la versión más reciente…",
