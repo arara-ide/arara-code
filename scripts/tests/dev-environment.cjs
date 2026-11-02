@@ -24,8 +24,8 @@ try {
   write(path.join(extension, 'package.json'), manifest);
   for (const folder of ['dist', 'media', 'themes']) write(path.join(extension, folder, 'fixture'), 'fixture');
   const capture = path.join(dir, 'arguments.txt');
-  write(path.join(upstream, 'scripts/code.sh'), '#!/bin/bash\nprintf "%s\\n" "$@" > "$CAPTURE"\n', 0o755);
-  const env = { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`, CAPTURE: capture, ARARA_AI_DIR: extension };
+  write(path.join(upstream, 'scripts/code.sh'), '#!/bin/bash\n[ -z "${ELECTRON_RUN_AS_NODE:-}${VSCODE_IPC_HOOK:-}${VSCODE_CWD:-}${VSCODE_PID:-}" ] || exit 42\nprintf "%s\\n" "$@" > "$CAPTURE"\n', 0o755);
+  const env = { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`, CAPTURE: capture, ARARA_AI_DIR: extension, ELECTRON_RUN_AS_NODE: '1', VSCODE_IPC_HOOK: '/tmp/parent.sock', VSCODE_CWD: '/', VSCODE_PID: '99999' };
   delete env.ARARA_DEV_PROFILE;
   const launch = args => { execFileSync('bash', [path.join(code, 'scripts/dev.sh'), ...args], { env, stdio: 'pipe' }); return fs.readFileSync(capture, 'utf8').trim().split('\n'); };
   const productionProfile = path.join(code, '.work/dev-profile-production');
@@ -50,6 +50,25 @@ try {
   assert.ok(local.includes(`--extensionDevelopmentPath=${extension}`));
   assert.equal(local[local.indexOf('--user-data-dir') + 1], path.join(localProfile, 'data'));
   const defaults = launch([]); assert.deepEqual(defaults, local.filter(arg => arg !== '--no-sandbox'));
+  const productionDefaults = launch(['--production']);
+  assert.deepEqual(productionDefaults, args.filter(arg => arg !== '--no-sandbox' && arg !== '/project with spaces'));
+  write(path.join(productionProfile, 'data/code.lock'), '999999\n');
+  write(path.join(productionProfile, 'data/1.13-main.sock'), 'stale');
+  launch(['--production']);
+  assert.equal(fs.existsSync(path.join(productionProfile, 'data/code.lock')), false);
+  assert.equal(fs.existsSync(path.join(productionProfile, 'data/1.13-main.sock')), false);
+  write(path.join(productionProfile, 'data/code.lock'), `${process.pid}\n`);
+  write(path.join(productionProfile, 'data/1.13-main.sock'), 'live');
+  launch(['--production']);
+  assert.equal(fs.existsSync(path.join(productionProfile, 'data/code.lock')), true);
+  assert.equal(fs.existsSync(path.join(productionProfile, 'data/1.13-main.sock')), true);
+  fs.rmSync(path.join(code, 'extensions/arara-update/package.json'));
+  execFileSync('bash', [path.join(code, 'scripts/dev.sh'), '--production'], {
+    env: { ...env, ARARA_AI_DIR: path.join(dir, 'missing-ai'), ARARA_BOT_DIR: path.join(dir, 'missing-bot'), ARARA_ORCHESTRA_DIR: path.join(dir, 'missing-orchestra') },
+    stdio: 'pipe',
+  });
+  const withoutExtensions = fs.readFileSync(capture, 'utf8').trim().split('\n');
+  assert.equal(withoutExtensions.some(arg => arg.startsWith('--extensionDevelopmentPath=')), false);
   const conflict = spawnSync('bash', [path.join(code, 'scripts/dev.sh'), '--local', '--production'], { env });
   assert.equal(conflict.status, 1);
   console.log('PASS: production endpoints and marker, isolated profiles, reset ordering, unchanged checkout, local/default modes and forwarded Electron arguments.');

@@ -11,6 +11,13 @@ ENVIRONMENT_SELECTED=""
 RESET_PROFILE=false
 
 case "${OSTYPE}" in
+  darwin*)
+    for mac_bin in /opt/homebrew/opt/node@24/bin /opt/homebrew/bin /usr/local/opt/node@24/bin /usr/local/bin; do
+      if [[ -d "${mac_bin}" && ":${PATH}:" != *":${mac_bin}:"* ]]; then
+        export PATH="${PATH}:${mac_bin}"
+      fi
+    done
+    ;;
   msys*|cygwin*)
     if [[ -f "${VSCODE}/.nvmrc" ]]; then
       WINDOWS_NODE_VERSION="$(tr -d '\r\n' < "${VSCODE}/.nvmrc")"
@@ -150,21 +157,29 @@ UPDATE_DIR="${ROOT}/extensions/arara-update"
 [[ -f "${UPDATE_DIR}/package.json" ]] && EXT_ARGS+=("--extensionDevelopmentPath=${UPDATE_DIR}")
 
 mkdir -p "${PROFILE}/data" "${PROFILE}/extensions"
+if [[ -f "${PROFILE}/data/code.lock" ]]; then
+  LOCK_PID="$(tr -d '[:space:]' < "${PROFILE}/data/code.lock" 2>/dev/null || true)"
+  if [[ "${LOCK_PID}" =~ ^[0-9]+$ ]] && ! kill -0 "${LOCK_PID}" 2>/dev/null; then
+    rm -f "${PROFILE}/data/code.lock" "${PROFILE}/data/"*-main.sock
+  fi
+fi
 
 echo "» Abrindo Arara Code (dev, ${DEV_ENVIRONMENT}) — perfil: ${PROFILE}"
+unset ELECTRON_RUN_AS_NODE VSCODE_IPC_HOOK VSCODE_IPC_HOOK_CLI VSCODE_GIT_IPC_HANDLE \
+  VSCODE_PID VSCODE_CWD VSCODE_NLS_CONFIG VSCODE_CODE_CACHE_PATH \
+  VSCODE_ESM_ENTRYPOINT VSCODE_CRASH_REPORTER_PROCESS_TYPE VSCODE_HANDLES_UNCAUGHT_ERRORS
 case "${OSTYPE}" in
   msys*|cygwin*)
-    unset ELECTRON_RUN_AS_NODE
     NODE_ENV=development VSCODE_DEV=1 VSCODE_CLI=1 \
       ELECTRON_ENABLE_LOGGING=1 ELECTRON_ENABLE_STACK_DUMPING=1 \
       exec "${ELECTRON_BIN}" . --disable-extension=vscode.vscode-api-tests \
       --user-data-dir "${PROFILE}/data" \
       --extensions-dir "${PROFILE}/extensions" \
-      "${EXT_ARGS[@]}" "${ARGS[@]}"
+      ${EXT_ARGS[@]+"${EXT_ARGS[@]}"} ${ARGS[@]+"${ARGS[@]}"}
     ;;
 esac
 VSCODE_SKIP_PRELAUNCH=1 exec ./scripts/code.sh \
   --user-data-dir "${PROFILE}/data" \
   --extensions-dir "${PROFILE}/extensions" \
-  "${EXT_ARGS[@]}" \
-  "${ARGS[@]}"
+  ${EXT_ARGS[@]+"${EXT_ARGS[@]}"} \
+  ${ARGS[@]+"${ARGS[@]}"}
