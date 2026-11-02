@@ -1,0 +1,56 @@
+Arara Code: keep an empty window usable before the start-screen provider responds.
+
+Why a patch: extensions cannot render the native empty editor watermark or set
+initial sidebar layout before workbench restoration. Preserve stored layout;
+only the default for a new window shows Explorer. Keep native folder/recent
+actions available when tips are disabled in an empty window or the provider
+is absent, empty or fails. Extension sections still replace this fallback.
+Touches: editorGroupWatermark.ts and browser/layout.ts.
+
+--- a/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
++++ b/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
+@@ -8,6 +8,7 @@
+ import { KeybindingLabel } from '../../../../base/browser/ui/keybindingLabel/keybindingLabel.js';
+ import { Throttler } from '../../../../base/common/async.js';
+ import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
++import { localize } from '../../../../nls.js';
+ import { OS } from '../../../../base/common/platform.js';
+ import { MenuId } from '../../../../platform/actions/common/actions.js';
+ import { HiddenItemStrategy, MenuWorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
+@@ -114,10 +115,21 @@
+ 	}
+ 
+ 	private async renderContent(): Promise<void> {
+-		this.enabled = this.configurationService.getValue<boolean>(EditorGroupWatermark.SETTINGS_KEY);
+-		const sections = this.enabled && CommandsRegistry.getCommand(EditorGroupWatermark.START_COMMAND)
+-			? await this.commandService.executeCommand<StartSection[]>(EditorGroupWatermark.START_COMMAND)
+-			: undefined;
++		this.enabled = this.workbenchState === WorkbenchState.EMPTY || this.configurationService.getValue<boolean>(EditorGroupWatermark.SETTINGS_KEY);
++		let sections: StartSection[] | undefined;
++		if (this.enabled) {
++			sections = [{
++				title: localize('arara.start.recent', 'Recent projects'),
++				action: { id: 'workbench.action.files.openFolder', text: localize('arara.start.openFolder', 'Open folder') },
++				entries: [{ id: 'workbench.action.openRecent', text: localize('arara.start.openRecent', 'Show all recent…') }],
++			}];
++			if (CommandsRegistry.getCommand(EditorGroupWatermark.START_COMMAND)) {
++				try {
++					const provided = await this.commandService.executeCommand<StartSection[]>(EditorGroupWatermark.START_COMMAND);
++					if (provided?.some(section => section.entries.length)) { sections = provided; }
++				} catch (error) { onUnexpectedError(error); }
++			}
++		}
+ 		if (this._store.isDisposed) { return; }
+ 
+ 		const keyLabels = sections?.map(section => section.entries.map(entry => this.keybindingService.lookupKeybinding(entry.id)?.getLabel() ?? null));
+--- a/src/vs/workbench/browser/layout.ts
++++ b/src/vs/workbench/browser/layout.ts
+@@ -3017,7 +3017,7 @@
+ 		const workbenchState = this.contextService.getWorkbenchState();
+ 		const mainContainerDimension = configuration.mainContainerDimension;
+ 		LayoutStateKeys.SIDEBAR_SIZE.defaultValue = Math.min(300, mainContainerDimension.width / 4);
+-		LayoutStateKeys.SIDEBAR_HIDDEN.defaultValue = workbenchState === WorkbenchState.EMPTY || auxiliaryBarForceMaximized === true;
++		LayoutStateKeys.SIDEBAR_HIDDEN.defaultValue = auxiliaryBarForceMaximized === true;
+ 		LayoutStateKeys.AUXILIARYBAR_SIZE.defaultValue = auxiliaryBarForceMaximized ? Math.max(300, mainContainerDimension.width / 2) : Math.min(300, mainContainerDimension.width / 4);
+ 		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
+ 			if (isWeb && !this.environmentService.remoteAuthority) {
