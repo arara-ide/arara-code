@@ -19,8 +19,8 @@ function deferred() {
 function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara-code/resources/app', language = 'en', remoteName, extensionKind = 1 } = {}) {
   const state = {
     product: { version: '1.135.06700', ...product }, executed: [], messages: [], errors: [], terminals: [], closeListeners: [],
-    command: undefined, checker: undefined, downloads: undefined, spawned: [], execFiles: [],
-    latest: async () => null, prepare: async () => ready, cached: async () => ready, startup: async () => null,
+    information: () => undefined, dialogs: [], command: undefined, checker: undefined, downloads: undefined, spawned: [], execFiles: [],
+    execFile: async () => {}, latest: async () => null, prepare: async () => ready, cached: async () => ready, startup: async () => null,
   };
   const vscode = {
     ExtensionKind: { UI: 1, Workspace: 2 },
@@ -34,7 +34,7 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
     window: {
       terminals: [],
       withProgress: (_options, task) => task(),
-      showInformationMessage: text => { state.messages.push(text); },
+      showInformationMessage: (text, ...args) => { state.messages.push(text); state.dialogs.push([text, ...args]); return state.information(text, ...args); },
       showErrorMessage: text => { state.errors.push(text); },
       setStatusBarMessage: text => { state.messages.push(text); },
       createTerminal: options => {
@@ -61,7 +61,7 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
   const deps = {
     readFileSync: () => JSON.stringify(state.product), existsSync: () => true,
     mkdir: async () => {}, readdir: async () => ['AraraCode.app'],
-    execFile: async (...args) => { state.execFiles.push(args); },
+    execFile: async (...args) => { state.execFiles.push(args); return state.execFile(...args); },
     spawn: (...args) => {
       const child = Object.assign(new EventEmitter(), { unref() {} });
       state.spawned.push({ args, child });
@@ -191,14 +191,46 @@ describe('update button', () => {
     });
   }
 
-  it('extracts the macOS app, reveals it and shows translated instructions', async () => {
+  it('waits for Continue in the macOS modal before revealing the app and quitting', async () => {
     const h = harness({ platform: 'darwin', language: 'pt-br' });
     await h.found({ ...ready, file: '/cache/AraraCode-darwin-x64-1.135.06780.zip' });
-    await h.click();
+    const confirmation = deferred();
+    h.state.information = () => confirmation.promise;
+    const pending = h.click();
+    await tick();
+    assert.deepEqual(h.state.execFiles.map(([command]) => command), ['/usr/bin/ditto', '/usr/bin/xattr']);
+    assert.deepEqual(h.state.dialogs.at(-1).slice(1), [{ modal: true }, 'Continuar']);
+    assert.ok(!h.state.executed.some(([command]) => command === 'workbench.action.quit'));
+    confirmation.resolve('Continuar');
+    await pending;
     assert.deepEqual(h.state.execFiles.map(([command]) => command), ['/usr/bin/ditto', '/usr/bin/xattr', '/usr/bin/open']);
+    assert.equal(h.state.executed.filter(([command]) => command === 'workbench.action.quit').length, 1);
     assert.deepEqual(h.state.execFiles[2][1], ['-R', '/home/user/Downloads/AraraCode-1.135.06780/AraraCode.app']);
     assert.ok(h.state.messages.some(text => text.startsWith('Arara Code 1.135.06780: Feche o Arara Code')));
   });
+
+  it('leaves Finder closed and allows retry when the macOS modal is dismissed', async () => {
+    const h = harness({ platform: 'darwin' });
+    await h.found({ ...ready, file: '/cache/AraraCode-darwin-x64-1.135.06780.zip' });
+    await h.click();
+    assert.deepEqual(h.state.execFiles.map(([command]) => command), ['/usr/bin/ditto', '/usr/bin/xattr']);
+    assert.ok(!h.state.executed.some(([command]) => command === 'workbench.action.quit'));
+    assert.deepEqual(h.busy(), [false, true, false]);
+  });
+
+  it('keeps macOS running and reports an error when Finder cannot open', async () => {
+    const h = harness({ platform: 'darwin' });
+    await h.found({ ...ready, file: '/cache/AraraCode-darwin-x64-1.135.06780.zip' });
+    h.state.information = () => 'Continue';
+    h.state.execFile = async command => {
+      if (command === '/usr/bin/open') throw new Error('Finder failed');
+    };
+    await h.click();
+    assert.ok(!h.state.executed.some(([command]) => command === 'workbench.action.quit'));
+    assert.equal(h.state.errors.length, 1);
+    assert.deepEqual(h.busy(), [false, true, false]);
+  });
+
 });
 
 describe('update button while updating', () => {
