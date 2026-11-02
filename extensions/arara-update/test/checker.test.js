@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { describe, it } = require('node:test');
 const { RELEASES_URL, UpdateChecker } = require('../src/checker');
+const { installerName } = require('../src/downloads');
 const { productVersion } = require('../src/version');
 
 const releases = (...tags) => async () => Response.json(tags.map(tag => typeof tag === 'string' ? { tag_name: tag } : tag));
@@ -15,6 +16,45 @@ function counting(impl) {
 }
 
 describe('UpdateChecker', () => {
+  for (const target of [
+    { platform: 'darwin', arch: 'arm64', format: 'dmg' },
+    { platform: 'darwin', arch: 'x64', format: 'dmg' },
+    { platform: 'linux', arch: 'x64', format: 'AppImage' },
+    { platform: 'linux', arch: 'x64', format: 'deb' },
+    { platform: 'win32', arch: 'x64', format: 'system' },
+  ]) {
+    it(`ignores partial releases until the ${JSON.stringify(target)} installer and checksums are uploaded`, async () => {
+      const asset = name => ({ name, state: 'uploaded', size: 100 });
+      const release = (version, assets) => ({ tag_name: version, assets });
+      const available = '1.135.07353';
+      const partial = '1.135.07354';
+      const published = release(available, [asset(installerName(available, target)), asset('SHA256SUMS')]);
+      const pending = release(partial, [asset('unrelated-package.zip'), asset('SHA256SUMS')]);
+      const checker = new UpdateChecker({
+        currentVersion: '1.135.07347', target, onUpdate: () => {}, fetchImpl: releases(pending, published),
+      });
+      assert.equal((await checker.latest()).latest, available);
+      assert.equal(await checker.latest(available), null);
+      pending.assets = [asset(installerName(partial, target))];
+      assert.equal(await checker.latest(available), null);
+      pending.assets.push({ ...asset('SHA256SUMS'), state: 'starter' });
+      assert.equal(await checker.latest(available), null);
+      pending.assets[1] = asset('SHA256SUMS');
+      pending.assets[0].size = 0;
+      assert.equal(await checker.latest(available), null);
+      pending.assets[0].size = 100;
+      assert.equal((await checker.latest(available)).latest, partial);
+    });
+  }
+
+  it('keeps platform updates unavailable when assets are absent or malformed', async () => {
+    const checker = new UpdateChecker({
+      currentVersion: '1.135.07347', target: { platform: 'darwin', arch: 'arm64', format: 'dmg' },
+      onUpdate: () => {}, fetchImpl: releases('1.135.07354', { tag_name: '1.135.07353', assets: {} }),
+    });
+    assert.equal(await checker.latest(), null);
+  });
+
   it('polls every 5 min and keeps looking for a newer release after preparing one', async () => {
     const timer = { fn: undefined, ms: 0, disposed: false };
     const replies = [[], ['1.135.06777'], ['1.135.06777'], ['1.135.06777', '1.135.06790']];

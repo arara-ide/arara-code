@@ -63,6 +63,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
   };
   const checker = new deps.Checker({
     currentVersion: current,
+    target,
     onUpdate: async found => {
       if (!newerVersion(found.latest, found.current)) throw new Error('Invalid update version');
       await publish(await downloads.prepare(found.latest, abort.signal));
@@ -167,7 +168,8 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
       let installing = false;
       try {
         await install(run, () => { installing = true; busy.wait(run); });
-      } catch {
+      } catch (error) {
+        console.error('[arara update] Installation failed', error);
         void vscode.window.showErrorMessage(t('Could not open the update installer. Try clicking Update again.'));
       } finally {
         if (!installing) busy.finish(run);

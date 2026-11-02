@@ -124,17 +124,36 @@ describe('installer preparation', () => {
     assert.equal((await cache.prepare(version)).version, version);
   });
 
-  it('deletes a superseded installer before fetching the latest one', async () => {
-    const { cache, root, fetcher } = await fixture();
-    const old = join(root, '1.135.06701');
-    await mkdir(old, { recursive: true });
-    await writeFile(join(old, 'installer'), 'old');
-    fetcher.next.push(async () => {
-      await assert.rejects(readdir(old));
-      return new Response('', { status: 503 });
+  for (const failure of ['unpublished', 'offline', 'corrupt']) {
+    it(`preserves the verified installer when the newer release is ${failure}`, async () => {
+      const { cache, fetcher } = await fixture();
+      const previous = await cache.prepare(version);
+      const nextVersion = '1.135.06800';
+      const nextName = installerName(nextVersion, cache.target);
+      const digest = createHash('sha256').update('installer bytes').digest('hex');
+      fetcher.next.push(async () => failure === 'offline' ? new Response('', { status: 503 })
+        : new Response(failure === 'unpublished' ? '' : `${digest}  ${nextName}\n`));
+      if (failure === 'corrupt') fetcher.next.push(async () => new Response('corrupt bytes'));
+      await assert.rejects(cache.prepare(nextVersion));
+      assert.deepEqual(await cache.cached(version), previous);
+      assert.equal(await cache.cached(nextVersion), null);
     });
-    await assert.rejects(cache.prepare(version), /503/);
-    await assert.rejects(readdir(old));
+  }
+
+  it('removes the previous installer only after verifying and publishing its replacement', async () => {
+    const { cache, fetcher } = await fixture();
+    await cache.prepare(version);
+    const nextVersion = '1.135.06800';
+    const nextName = installerName(nextVersion, cache.target);
+    const digest = createHash('sha256').update('new bytes').digest('hex');
+    fetcher.next.push(async () => new Response(`${digest}  ${nextName}\n`), async () => {
+      assert.ok(await cache.cached(version));
+      return new Response('new bytes');
+    });
+    const next = await cache.prepare(nextVersion);
+    assert.equal(await readFile(next.file, 'utf8'), 'new bytes');
+    assert.deepEqual(await cache.cached(nextVersion), next);
+    assert.equal(await cache.cached(version), null);
   });
 });
 
