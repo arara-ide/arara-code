@@ -203,3 +203,15 @@ test('the DMG smoke verifies architectures with the file before lipo flags and i
   assert.ok(source.includes('--version "${ISOLATED_ARGS[@]}"'));
   assert.ok(source.includes('"$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@]}"'));
 });
+
+test('the DMG smoke keeps socket paths short even when the system temporary path is long', t => {
+  const source = fs.readFileSync(path.join(root, 'scripts/test-macos-dmg.sh'), 'utf8');
+  const create = source.split('\n').find(line => line.startsWith('WORK='));
+  const result = spawnSync('bash', ['-c', `${create}\nprintf '%s' "$WORK"`], {
+    env: { ...process.env, TMPDIR: '/tmp/' + 'system-temporary-path/'.repeat(10) }, encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  t.after(() => fs.rmSync(result.stdout, { recursive: true, force: true }));
+  assert.ok(result.stdout.startsWith('/tmp/arara-dmg-test.'));
+  assert.ok(`${fs.realpathSync(result.stdout)}/profile/1.13-main.sock`.length < 103);
+});
