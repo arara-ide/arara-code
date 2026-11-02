@@ -10,11 +10,12 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/arara-universal.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/vscode"
 tar -xzf "$INPUT/macos-merge-tools.tar.gz" -C "$WORK/vscode"
+test -s "$WORK/vscode/build/node_modules/vscode-universal-bundler/package.json"
+test -s "$WORK/vscode/build/node_modules/minimatch/package.json"
 for arch in x64 arm64; do
   mkdir -p "$WORK/VSCode-darwin-$arch"
   ditto -x -k "$INPUT/AraraCode-darwin-$arch-$VERSION.zip" "$WORK/VSCode-darwin-$arch"
 done
-npm ci --prefix "$WORK/vscode/build" --ignore-scripts --no-audit --no-fund
 export VSCODE_ARCH=universal
 node "$WORK/vscode/build/darwin/create-universal-app.ts" "$WORK"
 for APP in "$WORK/VSCode-darwin-universal/"*.app; do break; done
