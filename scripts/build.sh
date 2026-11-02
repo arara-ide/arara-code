@@ -124,7 +124,7 @@ embed_arara_ai() {
   local dest="${WORK}/vscode/extensions/arara-ai"
   rm -rf "${dest}"
   mkdir -p "${dest}"
-  cp "${ARARA_AI_DIR}/package.json" "${dest}/"
+  jq 'del(.dependencies, .devDependencies, .scripts)' "${ARARA_AI_DIR}/package.json" > "${dest}/package.json"
   for catalog in "${ARARA_AI_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
   node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
   [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"

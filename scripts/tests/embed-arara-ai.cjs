@@ -24,6 +24,9 @@ try {
   fs.mkdirSync(path.join(extension, 'node_modules'), { recursive: true });
   write(path.join(extension, 'package.json'), JSON.stringify({
     publisher: 'arara', name: 'arara-ai', main: './dist/extension.js',
+    dependencies: { qrcode: '1.5.4' },
+    devDependencies: { esbuild: '0.25.0' },
+    scripts: { build: 'node esbuild.mjs' },
     contributes: { configuration: { properties: { 'arara.apiUrl': {}, 'arara.webUrl': {} } } },
   }));
   const assets = {
@@ -45,7 +48,15 @@ try {
   for (const [file, text] of Object.entries(assets)) {
     assert.equal(fs.readFileSync(path.join(dest, file), 'utf8'), text, file);
   }
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dest, 'package.json'))).araraEnvironment, 'production');
+  const manifest = JSON.parse(fs.readFileSync(path.join(dest, 'package.json')));
+  assert.equal(manifest.araraEnvironment, 'production');
+  const dependencies = spawnSync('npm', ['list', '--production', '--parseable', '--depth=99999', '--loglevel=error'], {
+    cwd: dest, encoding: 'utf8',
+  });
+  assert.equal(dependencies.status, 0, dependencies.stderr);
+  for (const key of ['dependencies', 'devDependencies', 'scripts']) assert.equal(manifest[key], undefined, key);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(extension, 'package.json'))).dependencies, { qrcode: '1.5.4' });
+  assert.ok(!fs.existsSync(path.join(dest, 'node_modules')));
   assert.ok(!fs.existsSync(path.join(dest, 'dist/extension.js.map')));
   fs.unlinkSync(path.join(extension, 'dist/extension.js'));
   assert.notEqual(run().status, 0, 'missing extension bundle must fail the release');
