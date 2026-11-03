@@ -19,9 +19,9 @@ function platformDeps() {
   const childProcess = require('node:child_process');
   const os = require('node:os');
   return {
-    readFileSync: fs.readFileSync, existsSync: fs.existsSync, mkdir: fsp.mkdir, readdir: fsp.readdir,
+    readFileSync: fs.readFileSync, existsSync: fs.existsSync, mkdir: fsp.mkdir, readdir: fsp.readdir, mkdtemp: fsp.mkdtemp, rmdir: fsp.rmdir,
     spawn: childProcess.spawn, execFile: promisify(childProcess.execFile), homedir: os.homedir,
-    platform: process.platform, arch: process.arch, env: process.env,
+    platform: process.platform, arch: process.arch, env: process.env, tmpdir: os.tmpdir,
     Checker: UpdateChecker, Downloads: UpdateDownloads,
   };
 }
@@ -98,6 +98,20 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
     return appPath;
   };
 
+  const mountApp = async file => {
+    const mount = await deps.mkdtemp(join(deps.tmpdir(), 'arara-update-'));
+    let mounted = false;
+    try {
+      await deps.execFile('/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', mount, file]);
+      mounted = true;
+      await deps.execFile('/usr/bin/open', [mount]);
+    } catch (error) {
+      if (mounted) await deps.execFile('/usr/bin/hdiutil', ['detach', mount]).catch(() => {});
+      await deps.rmdir(mount).catch(() => {});
+      throw error;
+    }
+  };
+
   const install = async (run, waitInstaller) => {
     const installed = installedVersion() ?? current;
     if (ready && !newerVersion(ready.version, installed)) {
@@ -126,8 +140,8 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
       void vscode.window.showInformationMessage(t('The standard Windows installer is ready. Close Arara Code and uninstall the old UserSetup installation in Windows Settings, keeping your user data. Then run the downloaded installer to avoid duplicate installations.'));
       return;
     }
-    if (action.kind === 'extract-reveal') {
-      const appPath = await extractApp(verified, action.destination);
+    if (action.kind === 'extract-reveal' || action.kind === 'mount-reveal') {
+      const appPath = action.kind === 'extract-reveal' ? await extractApp(verified, action.destination) : verified.file;
       const proceed = t('Continue');
       const selected = await vscode.window.showInformationMessage(
         t('Arara Code {0}: {1}', verified.version, installInstructions(basename(appPath))),
@@ -135,7 +149,8 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
         proceed,
       );
       if (selected !== proceed) return;
-      await deps.execFile('/usr/bin/open', ['-R', appPath]);
+      if (action.kind === 'mount-reveal') await mountApp(verified.file);
+      else await deps.execFile('/usr/bin/open', ['-R', appPath]);
       await vscode.commands.executeCommand('workbench.action.quit');
       return;
     }

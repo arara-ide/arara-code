@@ -20,7 +20,7 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
   const state = {
     product: { version: '1.135.06700', ...product }, executed: [], messages: [], errors: [], terminals: [], closeListeners: [],
     information: () => undefined, dialogs: [], command: undefined, checker: undefined, downloads: undefined, spawned: [], execFiles: [],
-    execFile: async () => {}, latest: async () => null, prepare: async () => ready, cached: async () => ready, startup: async () => null,
+    execFile: async () => {}, removed: [], latest: async () => null, prepare: async () => ready, cached: async () => ready, startup: async () => null,
   };
   const vscode = {
     ExtensionKind: { UI: 1, Workspace: 2 },
@@ -61,6 +61,7 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
   const deps = {
     readFileSync: () => JSON.stringify(state.product), existsSync: () => true,
     mkdir: async () => {}, readdir: async () => ['AraraCode.app'],
+    mkdtemp: async () => '/tmp/arara-update-fixture', rmdir: async file => { state.removed.push(file); }, tmpdir: () => '/tmp',
     execFile: async (...args) => { state.execFiles.push(args); return state.execFile(...args); },
     spawn: (...args) => {
       const child = Object.assign(new EventEmitter(), { unref() {} });
@@ -209,6 +210,56 @@ describe('update button', () => {
     assert.deepEqual(h.state.execFiles[2][1], ['-R', '/home/user/Downloads/AraraCode-1.135.06780/AraraCode.app']);
     assert.ok(h.state.messages.some(text => text.startsWith('Arara Code 1.135.06780: Feche o Arara Code')));
   });
+
+  for (const [language, proceed] of [['en', 'Continue'], ['pt-br', 'Continuar'], ['es', 'Continuar']]) {
+    it(`confirms, mounts the DMG, opens Finder and quits in ${language}`, async () => {
+      const h = harness({ platform: 'darwin', language });
+      await h.found({ ...ready, file: '/cache/AraraCode-darwin-universal-1.135.06780.dmg' });
+      const confirmation = deferred();
+      h.state.information = () => confirmation.promise;
+      const pending = h.click();
+      await tick();
+      assert.deepEqual(h.state.dialogs.at(-1).slice(1), [{ modal: true }, proceed]);
+      assert.equal(h.state.execFiles.length, 0);
+      assert.equal(h.state.spawned.length, 0);
+      confirmation.resolve(proceed);
+      await pending;
+      assert.deepEqual(h.state.execFiles, [
+        ['/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', '/tmp/arara-update-fixture', '/cache/AraraCode-darwin-universal-1.135.06780.dmg']],
+        ['/usr/bin/open', ['/tmp/arara-update-fixture']],
+      ]);
+      assert.equal(h.state.executed.filter(([command]) => command === 'workbench.action.quit').length, 1);
+      assert.deepEqual(h.busy(), [false, true, false]);
+      assert.equal(h.state.removed.length, 0);
+    });
+  }
+
+  it('does not mount a DMG or quit after Cancel', async () => {
+    const h = harness({ platform: 'darwin' });
+    await h.found({ ...ready, file: '/cache/update.dmg' });
+    await h.click();
+    assert.equal(h.state.execFiles.length, 0);
+    assert.equal(h.state.spawned.length, 0);
+    assert.ok(!h.state.executed.some(([command]) => command === 'workbench.action.quit'));
+    assert.deepEqual(h.busy(), [false, true, false]);
+  });
+
+  for (const failed of ['/usr/bin/hdiutil', '/usr/bin/open']) {
+    it(`reports ${failed} failure, releases its mount and keeps the IDE open`, async () => {
+      const h = harness({ platform: 'darwin' });
+      await h.found({ ...ready, file: '/cache/update.dmg' });
+      h.state.information = () => 'Continue';
+      h.state.execFile = async (command, args) => {
+        if (command === failed && args[0] !== 'detach') throw new Error('native command failed');
+      };
+      await h.click();
+      assert.ok(!h.state.executed.some(([command]) => command === 'workbench.action.quit'));
+      assert.equal(h.state.errors.length, 1);
+      assert.deepEqual(h.state.removed, ['/tmp/arara-update-fixture']);
+      assert.equal(h.state.execFiles.some(([command, args]) => command === '/usr/bin/hdiutil' && args[0] === 'detach'), failed === '/usr/bin/open');
+      assert.deepEqual(h.busy(), [false, true, false]);
+    });
+  }
 
   it('leaves Finder closed and allows retry when the macOS modal is dismissed', async () => {
     const h = harness({ platform: 'darwin' });
