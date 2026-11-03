@@ -15,6 +15,14 @@ test -s "$WORK/vscode/build/node_modules/minimatch/package.json"
 for arch in x64 arm64; do
   mkdir -p "$WORK/VSCode-darwin-$arch"
   ditto -x -k "$INPUT/AraraCode-darwin-$arch-$VERSION.zip" "$WORK/VSCode-darwin-$arch"
+  for APP in "$WORK/VSCode-darwin-$arch/"*.app; do break; done
+  KERBEROS="$APP/Contents/Resources/app/node_modules.asar.unpacked/kerberos/build/Release/kerberos.node"
+  CPU="$arch"
+  if [[ "$arch" == x64 ]]; then CPU=x86_64; fi
+  lipo "$KERBEROS" -verify_arch "$CPU"
+  if [[ "$(lipo "$KERBEROS" -archs)" == *" "* ]]; then
+    lipo "$KERBEROS" -thin "$CPU" -output "$KERBEROS"
+  fi
 done
 export VSCODE_ARCH=universal
 node "$WORK/vscode/build/darwin/create-universal-app.ts" "$WORK"
@@ -28,6 +36,5 @@ ditto "$APP" "$WORK/stage/Arara Code.app"
 ln -s /Applications "$WORK/stage/Applications"
 DMG="$OUTPUT/AraraCode-darwin-universal-$VERSION.dmg"
 test ! -e "$DMG"
-hdiutil makehybrid -hfs -hfs-volume-name "Arara Code" -hfs-openfolder "$WORK/stage" -o "$WORK/raw.dmg" "$WORK/stage"
-hdiutil convert "$WORK/raw.dmg" -format UDZO -imagekey zlib-level=9 -o "$DMG"
+hdiutil create -srcfolder "$WORK/stage" -volname "Arara Code" -fs HFS+ -format UDZO -imagekey zlib-level=9 "$DMG"
 hdiutil verify "$DMG"

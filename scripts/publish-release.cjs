@@ -51,7 +51,7 @@ async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELO
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), retryMs = 5000 } = {}) {
   const version = env.RELEASE_VERSION;
   const repo = env.GITHUB_REPOSITORY;
-  const sha = env.GITHUB_SHA;
+  const sha = env.RELEASE_SOURCE_SHA || env.GITHUB_SHA;
   const prerelease = env.PRERELEASE !== 'false';
   if (env.GITHUB_REF !== 'refs/heads/main') throw new Error('Releases are allowed only from main');
   if (!/^\d+\.\d+\.\d+$/.test(version || '') || !/^[\w.-]+\/[\w.-]+$/.test(repo || '') || !/^[a-f0-9]{40}$/.test(sha || '')) {

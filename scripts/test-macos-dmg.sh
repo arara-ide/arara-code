@@ -21,12 +21,13 @@ APP="$WORK/Arara Code.app"
 codesign --verify --strict --deep "$APP"
 EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
 lipo "$APP/Contents/MacOS/$EXECUTABLE" -verify_arch x86_64 arm64
+lipo "$APP/Contents/Resources/app/node_modules.asar.unpacked/kerberos/build/Release/kerberos.node" -verify_arch x86_64 arm64
 for extension in arara-ai arara-bot arara-orchestra arara-update; do
   test -s "$APP/Contents/Resources/app/extensions/$extension/package.json"
 done
 ISOLATED_ARGS=(--user-data-dir "$WORK/profile" --extensions-dir "$WORK/extensions" --shared-data-dir "$WORK/shared" --agent-plugins-dir "$WORK/plugins" --agents-user-data-dir "$WORK/agents-profile" --agents-extensions-dir "$WORK/agents-extensions")
 "$APP/Contents/Resources/app/bin/arara-code" --version "${ISOLATED_ARGS[@]}"
-"$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@]}" --prof-append-timers "$WORK/startup.txt" --disable-telemetry --skip-welcome --skip-release-notes --disable-updates > "$WORK/startup.log" 2>&1 &
+env -u ELECTRON_RUN_AS_NODE "$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@]}" --prof-append-timers "$WORK/startup.txt" --disable-telemetry --skip-welcome --skip-release-notes --disable-updates > "$WORK/startup.log" 2>&1 &
 APP_PID=$!
 for attempt in {1..90}; do
   if [[ -s "$WORK/startup.txt" ]]; then
