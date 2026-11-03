@@ -22,8 +22,6 @@ on:
         description: 'Publicar como pre-release (versão de teste)'
         type: boolean
         default: true
-      macos_source_run:
-        description: 'Retomar somente o macOS de um Build da main já compilado (ID opcional)'
         type: string
         default: ''
 
@@ -62,16 +60,14 @@ jobs:
           node scripts/tests/embed-arara-orchestra.cjs
           node scripts/tests/arara-update.cjs
           node scripts/tests/terminal.cjs
-          node --test scripts/tests/publish-release.cjs scripts/tests/macos-universal.cjs scripts/tests/macos-recovery.cjs
+          node --test scripts/tests/publish-release.cjs scripts/tests/macos-release.cjs
 
   version:
     needs: verify
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     outputs:
-      release: ${{ steps.recovery.outputs.release || steps.v.outputs.release }}
-      source_sha: ${{ steps.recovery.outputs.sha || github.sha }}
-      prerelease: ${{ steps.recovery.outputs.prerelease || (github.event_name != 'workflow_dispatch' || inputs.prerelease) }}
+      release: ${{ steps.v.outputs.release }}
       ai: ${{ steps.components.outputs.ai }}
       bot: ${{ steps.components.outputs.bot }}
       orchestra: ${{ steps.components.outputs.orchestra }}
@@ -80,13 +76,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - id: recovery
-        if: inputs.macos_source_run != '' && inputs.macos_source_run != null
-        env:
-          MACOS_SOURCE_RUN: ${{ inputs.macos_source_run }}
-        run: node scripts/macos-recovery.cjs
       - id: v
-        if: ${{ !inputs.macos_source_run }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -103,7 +93,7 @@ jobs:
           echo "release=${release}" >> "$GITHUB_OUTPUT"
 
       - id: components
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && !inputs.macos_source_run
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
         env:
           GH_TOKEN: ${{ vars.ENVS_REPO_PAT || secrets.ENVS_REPO_PAT }}
         run: |
@@ -113,7 +103,7 @@ jobs:
           done
 
   linux:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && !inputs.macos_source_run
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
     needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -227,7 +217,7 @@ jobs:
           if-no-files-found: error
 
   windows:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && !inputs.macos_source_run
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
     needs: version
     runs-on: windows-2022
     timeout-minutes: 240
@@ -396,7 +386,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   macos-x64:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && !inputs.macos_source_run
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
     needs: version
     uses: ./.github/workflows/build-macos.yml
     with:
@@ -409,7 +399,7 @@ jobs:
     secrets: inherit
 
   macos-arm64:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && !inputs.macos_source_run
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
     needs: version
     uses: ./.github/workflows/build-macos.yml
     with:
@@ -420,66 +410,6 @@ jobs:
       bot: ${{ needs.version.outputs.bot }}
       orchestra: ${{ needs.version.outputs.orchestra }}
     secrets: inherit
-
-  macos-universal:
-    if: always() && needs.version.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && (inputs.macos_source_run || (needs.macos-x64.result == 'success' && needs.macos-arm64.result == 'success'))
-    needs: [version, macos-x64, macos-arm64]
-    runs-on: macos-15
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: upstream/vscodium/.nvmrc
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: macos-input-*
-          path: macos-inputs
-          merge-multiple: true
-          run-id: ${{ inputs.macos_source_run || github.run_id }}
-          github-token: ${{ github.token }}
-      - name: Unir arquiteturas e criar DMG
-        env:
-          RELEASE_VERSION: ${{ needs.version.outputs.release }}
-        run: |
-          bash scripts/package-macos-universal.sh macos-inputs dist "$RELEASE_VERSION"
-          (cd dist && shasum -a 256 *.dmg > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ github.ref_name == 'development' && 'arara-code-development-macos-universal' || 'macos-universal' }}
-          compression-level: 0
-          path: |
-            dist/*.dmg
-            dist/SHA256SUMS
-          retention-days: 14
-          if-no-files-found: error
-
-  test-macos-universal:
-    if: always() && needs.version.result == 'success' && needs.macos-universal.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
-    needs: [version, macos-universal]
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [macos-15-intel, macos-15]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ github.ref_name == 'development' && 'arara-code-development-macos-universal' || 'macos-universal' }}
-          path: dist
-      - name: Testar DMG real nesta arquitetura
-        env:
-          RELEASE_VERSION: ${{ needs.version.outputs.release }}
-        run: |
-          (cd dist && shasum -a 256 -c SHA256SUMS)
-          bash scripts/test-macos-dmg.sh "dist/AraraCode-darwin-universal-${RELEASE_VERSION}.dmg"
 
   release-linux:
     if: github.ref == 'refs/heads/main'
@@ -503,14 +433,24 @@ jobs:
       artifact: windows
       prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
 
-  release-macos-universal:
-    if: always() && needs.version.result == 'success' && needs.test-macos-universal.result == 'success' && github.ref == 'refs/heads/main'
-    needs: [version, test-macos-universal]
+  release-macos-x64:
+    if: github.ref == 'refs/heads/main'
+    needs: [version, macos-x64]
     permissions:
       contents: write
     uses: ./.github/workflows/publish-release.yml
     with:
       version: ${{ needs.version.outputs.release }}
-      artifact: macos-universal
-      prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
-      source-sha: ${{ needs.version.outputs.source_sha }}
+      artifact: macos-x64
+      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+
+  release-macos-arm64:
+    if: github.ref == 'refs/heads/main'
+    needs: [version, macos-arm64]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish-release.yml
+    with:
+      version: ${{ needs.version.outputs.release }}
+      artifact: macos-arm64
+      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}

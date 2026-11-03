@@ -6,7 +6,7 @@ const { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } = require('node
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { afterEach, describe, it } = require('node:test');
-const { UpdateDownloads, installAction, installInstructions, installerName, updateTarget, windowsPowerShell } = require('../src/downloads');
+const { UpdateDownloads, hostArch, installAction, installInstructions, installerName, updateTarget, windowsPowerShell } = require('../src/downloads');
 const { setLanguage } = require('../src/i18n');
 const { newerVersion } = require('../src/version');
 
@@ -18,8 +18,8 @@ afterEach(async () => {
 
 const version = '1.135.06780';
 const cases = [
-  [{ platform: 'darwin', arch: 'arm64', format: 'dmg' }, `AraraCode-darwin-universal-${version}.dmg`],
-  [{ platform: 'darwin', arch: 'x64', format: 'dmg' }, `AraraCode-darwin-universal-${version}.dmg`],
+  [{ platform: 'darwin', arch: 'arm64', format: 'dmg' }, `AraraCode-darwin-arm64-${version}.dmg`],
+  [{ platform: 'darwin', arch: 'x64', format: 'dmg' }, `AraraCode-darwin-x64-${version}.dmg`],
   [{ platform: 'win32', arch: 'x64', format: 'user' }, `AraraCodeSetup-x64-${version}.exe`],
   [{ platform: 'win32', arch: 'ia32', format: 'system' }, `AraraCodeSetup-ia32-${version}.exe`],
   [{ platform: 'win32', arch: 'arm64', format: 'user' }, `AraraCodeSetup-arm64-${version}.exe`],
@@ -225,13 +225,17 @@ describe('installation instructions', () => {
     }
   });
 });
-it('downloads only the universal DMG for both Mac architectures and localizes its instructions', async () => {
+it('downloads the DMG of each Mac processor, prefers Apple Silicon under Rosetta and localizes its instructions', async () => {
   for (const arch of ['x64', 'arm64']) {
     const { cache, fetcher } = await fixture({ platform: 'darwin', arch, format: 'dmg' });
     await cache.prepare(version);
-    assert.ok(fetcher.calls[1].endsWith(`AraraCode-darwin-universal-${version}.dmg`));
+    assert.ok(fetcher.calls[1].endsWith(`AraraCode-darwin-${arch}-${version}.dmg`));
     assert.ok(!fetcher.calls.some(url => url.endsWith('.zip')));
   }
+  assert.equal(hostArch('darwin', 'x64', true), 'arm64');
+  assert.equal(hostArch('darwin', 'x64', false), 'x64');
+  assert.equal(hostArch('darwin', 'arm64', false), 'arm64');
+  assert.equal(hostArch('linux', 'x64', true), 'x64');
   for (const [locale, expected] of [['en', 'After you continue'], ['pt', 'Ao continuar'], ['es', 'Al continuar']]) {
     setLanguage(locale);
     assert.ok(installInstructions('AraraCode.dmg').startsWith(expected));

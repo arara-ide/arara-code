@@ -20,8 +20,9 @@ hdiutil detach "$MOUNT"
 APP="$WORK/Arara Code.app"
 codesign --verify --strict --deep "$APP"
 EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
-lipo "$APP/Contents/MacOS/$EXECUTABLE" -verify_arch x86_64 arm64
-lipo "$APP/Contents/Resources/app/node_modules.asar.unpacked/kerberos/build/Release/kerberos.node" -verify_arch x86_64 arm64
+CPU="$(uname -m)"
+lipo "$APP/Contents/MacOS/$EXECUTABLE" -verify_arch "$CPU"
+lipo "$APP/Contents/Resources/app/node_modules.asar.unpacked/kerberos/build/Release/kerberos.node" -verify_arch "$CPU"
 for extension in arara-ai arara-bot arara-orchestra arara-update; do
   test -s "$APP/Contents/Resources/app/extensions/$extension/package.json"
 done
@@ -31,12 +32,12 @@ env -u ELECTRON_RUN_AS_NODE "$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@
 APP_PID=$!
 for attempt in {1..90}; do
   if [[ -s "$WORK/startup.txt" ]]; then
-    echo "PASS: universal DMG mounted, installed and started on $(uname -m)"
+    echo "PASS: DMG mounted, installed and started on $(uname -m)"
     exit 0
   fi
   if ! kill -0 "$APP_PID" 2>/dev/null; then break; fi
   sleep 1
 done
 cat "$WORK/startup.log"
-echo "FAIL: installed universal app did not report startup" >&2
+echo "FAIL: installed app did not report startup" >&2
 exit 1

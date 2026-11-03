@@ -12,7 +12,8 @@ const hash = data => createHash('sha256').update(data).digest('hex');
 const names = [
   `AraraCodeSetup-x64-${version}.exe`,
   `arara-code_${version}_amd64.deb`,
-  `AraraCode-darwin-universal-${version}.dmg`,
+  `AraraCode-darwin-x64-${version}.dmg`,
+  `AraraCode-darwin-arm64-${version}.dmg`,
   `AraraCode-linux-x64-${version}.AppImage`,
   `AraraCode-win32-x64-${version}.zip`,
 ];
@@ -112,7 +113,7 @@ test('a draft that never becomes visible stops with an actionable error', async 
   assert.equal(f.state.uploads.length, 0);
 });
 
-test('Windows can publish first; Linux and universal Mac append to the same release, with cumulative checksums', async t => {
+test('Windows can publish first; Linux and each Mac processor append to the same release, with cumulative checksums', async t => {
   const f = fixture(t);
   for (let i = 0; i < names.length; i++) {
     await f.run(names[i]);
@@ -131,7 +132,7 @@ test('Windows can publish first; Linux and universal Mac append to the same rele
   assert.equal(f.state.uploads.filter(n => n === names[0]).length, 1, 'rerunning identical bytes does not replace a package');
 });
 
-test('macOS recovery appends to the original release while preserving its source commit and existing packages', async t => {
+test('a platform rerun appends to the original release while preserving its source commit and existing packages', async t => {
   const f = fixture(t);
   await f.run(names[0]);
   f.env.GITHUB_SHA = 'b'.repeat(40);
@@ -302,16 +303,20 @@ test('resuming a release preserves checksums for previously published legacy pac
   assert.ok(sums.includes(`${hash(legacy.bytes)}  ${legacy.name}\n`));
   assert.ok(f.state.assets.includes(legacy));
 });
-test('universal DMG publication includes checksums and installation instructions for both Mac architectures', async t => {
+test('each Mac DMG is published separately with its processor in the notes', async t => {
+  for (const [arch, label] of [['x64', /\(Intel\)/], ['arm64', /\(Apple Silicon\)/]]) {
+    const f = fixture(t);
+    const name = `AraraCode-darwin-${arch}-${version}.dmg`;
+    await f.run(name);
+    assert.match(f.state.notes, label);
+    assert.match(f.state.notes, /Abra o DMG/);
+    assert.ok(f.state.assets.find(asset => asset.name === 'SHA256SUMS').bytes.toString().includes(name));
+  }
   const f = fixture(t);
-  const name = `AraraCode-darwin-universal-${version}.dmg`;
-  await f.run(name);
-  assert.match(f.state.notes, /Intel e Apple Silicon/);
-  assert.match(f.state.notes, /Abra o DMG/);
-  assert.ok(f.state.assets.find(asset => asset.name === 'SHA256SUMS').bytes.toString().includes(name));
+  await assert.rejects(f.run(`AraraCode-darwin-universal-${version}.dmg`), /Expected only packages/);
 });
 
-test('rejects new per-architecture Mac ZIP uploads before changing a release', async t => {
+test('rejects Mac ZIP uploads before changing a release', async t => {
   for (const arch of ['x64', 'arm64', 'universal']) {
     const f = fixture(t);
     await assert.rejects(f.run(`AraraCode-darwin-${arch}-${version}.zip`), /Expected only packages/);

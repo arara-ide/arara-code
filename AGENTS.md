@@ -74,7 +74,7 @@ Fluxo para mudar o core: edite em `.work/vscodium/vscode`, teste com `scripts/de
 
 ## Distribuição macOS
 
-- Por decisão do usuário em 02/11/2026, compile Intel e Apple Silicon em paralelo na `main` e na `development`, una com o montador universal do Code-OSS e publique somente `AraraCode-darwin-universal-<versão>.dmg`. ZIPs por arquitetura são intermediários internos do Actions. Na `development`, entregue o DMG com SHA-256 apenas como Artifact de 14 dias, sem release; publicação segue exclusiva da `main`. O mesmo DMG precisa passar nos testes reais em runners Intel e Silicon antes da publicação; detalhes em `ac-docs/docs/26-build-changelog-release.md`.
+- Por decisão do usuário em 03/11/2026 (que desfaz o DMG universal de 02/11/2026), Intel (`macos-15-intel`) e Apple Silicon (`macos-15`) compilam em paralelo na `main` e na `development`, e cada um gera, testa no próprio runner (`scripts/test-macos-dmg.sh`) e publica separadamente `AraraCode-darwin-<x64|arm64>-<versão>.dmg`, como Linux e Windows. Não há etapa de união nem DMG universal. Na `development`, os DMGs saem como Artifacts `arara-code-development-macos-<arch>` com SHA-256 por 14 dias, sem release. O `arara-update` escolhe o DMG do processador real, inclusive sob Rosetta; detalhes em `ac-docs/docs/26-build-changelog-release.md`.
 
 ## Pronto quando
 

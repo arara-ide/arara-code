@@ -14,7 +14,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: botão Fork abaixo da resposta abre uma nova conversa com as mensagens até ali, com o título "(Fork) Nome original" e numeração nos forks seguintes.
 
 ### Melhorias
-- Instalação: macOS passa a ter um único DMG para Macs Intel e Apple Silicon.
+- Instalação: macOS passa a ter um DMG para Macs Intel e outro para Apple Silicon, e a atualização baixa o do seu processador.
 - WhatsApp: a conexão informa os riscos da integração não oficial e recomenda o app do Arara antes de continuar.
 - Chat: voltar ao chat 1, 2 ou 3 mostra a conversa como ela estava, já no fim e com o que chegou enquanto você estava em outro chat, sem carregar tudo de novo.
 - Chat: o painel lateral direito mantém largura mínima suficiente para o campo e seus controles.

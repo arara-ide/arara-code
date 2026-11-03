@@ -146,14 +146,25 @@ jobs:
           test -s "$app/Contents/Resources/app/extensions/arara-bot/dist/hub.js"
           codesign --verify --deep "$app"
 
-      - name: Preparar ferramentas do upstream para unir os apps
-        if: inputs.arch == 'arm64'
-        run: bash scripts/package-macos-tools.sh .work/vscodium/vscode dist/macos-merge-tools.tar.gz
+      - name: Criar DMG
+        env:
+          ARCH: ${{ inputs.arch }}
+        run: |
+          mkdir -p release
+          bash scripts/package-macos-dmg.sh dist release "$RELEASE_VERSION" "$ARCH"
+          (cd release && shasum -a 256 *.dmg > SHA256SUMS)
+
+      - name: Testar DMG real nesta arquitetura
+        env:
+          ARCH: ${{ inputs.arch }}
+        run: bash scripts/test-macos-dmg.sh "release/AraraCode-darwin-${ARCH}-${RELEASE_VERSION}.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-input-${{ inputs.arch }}
+          name: ${{ github.ref_name == 'development' && format('arara-code-development-macos-{0}', inputs.arch) || format('macos-{0}', inputs.arch) }}
           compression-level: 0
-          path: dist/
+          path: |
+            release/*.dmg
+            release/SHA256SUMS
           retention-days: 14
           if-no-files-found: error
