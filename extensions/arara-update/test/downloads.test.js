@@ -60,7 +60,7 @@ describe('installer preparation', () => {
       assert.deepEqual(await cache.prepare(version), ready);
       assert.equal(fetcher.calls.length, 2);
       const action = installAction(ready.file, target.platform);
-      assert.equal(action.kind, target.format === 'deb' ? 'terminal' : (target.platform === 'darwin' || target.platform === 'win32' && name.endsWith('.exe')) ? 'open' : 'reveal');
+      assert.equal(action.kind, target.platform === 'darwin' ? 'mount-reveal' : target.format === 'deb' ? 'terminal' : target.platform === 'win32' && name.endsWith('.exe') ? 'open' : 'reveal');
       if (target.format === 'AppImage') assert.equal((await stat(ready.file)).mode & 0o777, 0o755);
       if (action.kind === 'terminal') assert.equal(action.text, `sudo apt install '${ready.file}'`);
       if (action.kind === 'open' && target.platform === 'win32') {
@@ -192,8 +192,8 @@ describe('installation format selection', () => {
     assert.equal(installAction('C:\\cache\\Setup.exe', 'win32', undefined, undefined, 'E:\\Windows').command, 'E:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
   });
 
-  it('opens macOS disk images with open -W so the end of the installer is observable', () => {
-    assert.deepEqual(installAction('/tmp/AraraCode.dmg', 'darwin'), { kind: 'open', command: '/usr/bin/open', args: ['-W', '/tmp/AraraCode.dmg'] });
+  it('routes macOS disk images through confirmation, mounting and Finder', () => {
+    assert.deepEqual(installAction('/tmp/AraraCode.dmg', 'darwin'), { kind: 'mount-reveal' });
   });
 });
 
@@ -232,7 +232,7 @@ it('downloads only the universal DMG for both Mac architectures and localizes it
     assert.ok(fetcher.calls[1].endsWith(`AraraCode-darwin-universal-${version}.dmg`));
     assert.ok(!fetcher.calls.some(url => url.endsWith('.zip')));
   }
-  for (const [locale, expected] of [['en', 'Open the DMG'], ['pt', 'Abra o DMG'], ['es', 'Abre el DMG']]) {
+  for (const [locale, expected] of [['en', 'After you continue'], ['pt', 'Ao continuar'], ['es', 'Al continuar']]) {
     setLanguage(locale);
     assert.ok(installInstructions('AraraCode.dmg').startsWith(expected));
   }

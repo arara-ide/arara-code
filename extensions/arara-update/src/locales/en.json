@@ -16,5 +16,5 @@
   "Extract the selected file. Close Arara Code and replace the installation folder with the extracted content. Then reopen the app.": "Extract the selected file. Close Arara Code and replace the installation folder with the extracted content. Then reopen the app.",
   "Open the selected .deb package and choose Install/Update. If no installer opens, run in the terminal: sudo apt install ./{0}. Then reopen Arara Code.": "Open the selected .deb package and choose Install/Update. If no installer opens, run in the terminal: sudo apt install ./{0}. Then reopen Arara Code.",
   "Arara Code {0}: {1}": "Arara Code {0}: {1}",
-  "Open the DMG, close Arara Code and drag the app to Applications to replace the previous version. Then reopen Arara Code.": "Open the DMG, close Arara Code and drag the app to Applications to replace the previous version. Then reopen Arara Code."
+  "After you continue, Arara Code will open the update in Finder and close. Drag Arara Code to Applications, choose Replace, then reopen the app.": "After you continue, Arara Code will open the update in Finder and close. Drag Arara Code to Applications, choose Replace, then reopen the app."
 }
