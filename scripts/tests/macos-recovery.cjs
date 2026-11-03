@@ -75,7 +75,9 @@ test('recovery skips compilation, uses the original artifacts and publishes only
   assert.match(job('macos-universal'), /needs.version.result == 'success'/);
   assert.match(job('macos-universal'), /run-id: \$\{\{ inputs.macos_source_run \|\| github.run_id \}\}/);
   assert.match(job('test-macos-universal'), /runner: \[macos-15-intel, macos-15\]/);
+  assert.match(job('test-macos-universal'), /always\(\) && needs.version.result == 'success' && needs.macos-universal.result == 'success'/);
   assert.match(job('release-macos-universal'), /needs: \[version, test-macos-universal\]/);
+  assert.match(job('release-macos-universal'), /always\(\) && needs.version.result == 'success' && needs.test-macos-universal.result == 'success'/);
   assert.match(job('release-macos-universal'), /source-sha: \$\{\{ needs.version.outputs.source_sha \}\}/);
   const publish = fs.readFileSync(path.join(root, '.github/workflows/publish-release.yml'), 'utf8');
   assert.match(publish, /RELEASE_SOURCE_SHA: \$\{\{ inputs.source-sha \}\}/);

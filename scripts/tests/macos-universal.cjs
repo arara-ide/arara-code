@@ -220,7 +220,7 @@ test('development delivers a checksummed universal artifact without publishing a
   assert.ok(workflow.includes('shasum -a 256 *.dmg > SHA256SUMS'));
   assert.ok(workflow.includes('shasum -a 256 -c SHA256SUMS'));
   const release = workflow.split('  release-macos-universal:')[1];
-  assert.match(release, /^\n    if: github.ref == 'refs\/heads\/main'\n/);
+  assert.match(release, /^\n    if: .*github.ref == 'refs\/heads\/main'\n/);
   assert.doesNotMatch(release, /heads\/development/);
 });
 
