@@ -22,8 +22,6 @@ on:
         description: 'Publicar como pre-release (versão de teste)'
         type: boolean
         default: true
-        type: string
-        default: ''
 
 permissions:
   contents: read
