@@ -247,6 +247,7 @@ test('the DMG smoke verifies architectures with the file before lipo flags and i
   assert.equal(new Set(isolated.filter((_, index) => index % 2 === 1)).size, 6);
   assert.ok(source.includes('--version "${ISOLATED_ARGS[@]}"'));
   assert.ok(source.includes('"$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@]}"'));
+  assert.ok(source.includes('env -u ELECTRON_RUN_AS_NODE "$APP/Contents/MacOS/$EXECUTABLE"'));
 });
 
 test('the DMG smoke keeps socket paths short even when the system temporary path is long', t => {

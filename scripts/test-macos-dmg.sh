@@ -27,7 +27,7 @@ for extension in arara-ai arara-bot arara-orchestra arara-update; do
 done
 ISOLATED_ARGS=(--user-data-dir "$WORK/profile" --extensions-dir "$WORK/extensions" --shared-data-dir "$WORK/shared" --agent-plugins-dir "$WORK/plugins" --agents-user-data-dir "$WORK/agents-profile" --agents-extensions-dir "$WORK/agents-extensions")
 "$APP/Contents/Resources/app/bin/arara-code" --version "${ISOLATED_ARGS[@]}"
-"$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@]}" --prof-append-timers "$WORK/startup.txt" --disable-telemetry --skip-welcome --skip-release-notes --disable-updates > "$WORK/startup.log" 2>&1 &
+env -u ELECTRON_RUN_AS_NODE "$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@]}" --prof-append-timers "$WORK/startup.txt" --disable-telemetry --skip-welcome --skip-release-notes --disable-updates > "$WORK/startup.log" 2>&1 &
 APP_PID=$!
 for attempt in {1..90}; do
   if [[ -s "$WORK/startup.txt" ]]; then
