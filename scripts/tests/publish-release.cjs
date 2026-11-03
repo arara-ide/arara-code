@@ -131,6 +131,21 @@ test('Windows can publish first; Linux and universal Mac append to the same rele
   assert.equal(f.state.uploads.filter(n => n === names[0]).length, 1, 'rerunning identical bytes does not replace a package');
 });
 
+test('macOS recovery appends to the original release while preserving its source commit and existing packages', async t => {
+  const f = fixture(t);
+  await f.run(names[0]);
+  f.env.GITHUB_SHA = 'b'.repeat(40);
+  await assert.rejects(f.run(names[2]), /different commit/);
+  f.env.RELEASE_SOURCE_SHA = sha;
+  await f.run(names[2]);
+  assert.equal(f.state.creates, 1);
+  assert.equal(f.state.release.target_commitish, sha);
+  assert.ok(f.state.assets.some(asset => asset.name === names[0]));
+  assert.ok(f.state.assets.some(asset => asset.name === names[2]));
+  f.env.RELEASE_SOURCE_SHA = 'invalid';
+  await assert.rejects(f.run(names[2]), /Invalid release/);
+});
+
 test('interrupted first upload is resumed and remains draft until checksum publication succeeds', async t => {
   const f = fixture(t);
   f.state.failUpload = 'SHA256SUMS';

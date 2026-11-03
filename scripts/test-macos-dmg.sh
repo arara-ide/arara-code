@@ -21,6 +21,7 @@ APP="$WORK/Arara Code.app"
 codesign --verify --strict --deep "$APP"
 EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
 lipo "$APP/Contents/MacOS/$EXECUTABLE" -verify_arch x86_64 arm64
+lipo "$APP/Contents/Resources/app/node_modules.asar.unpacked/kerberos/build/Release/kerberos.node" -verify_arch x86_64 arm64
 for extension in arara-ai arara-bot arara-orchestra arara-update; do
   test -s "$APP/Contents/Resources/app/extensions/$extension/package.json"
 done
