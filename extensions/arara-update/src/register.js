@@ -4,7 +4,7 @@ const { basename, dirname, join } = require('node:path');
 const { promisify } = require('node:util');
 const { UpdateBusy } = require('./busy');
 const { UpdateChecker } = require('./checker');
-const { UpdateDownloads, installAction, installInstructions, updateTarget } = require('./downloads');
+const { UpdateDownloads, hostArch, installAction, installInstructions, updateTarget } = require('./downloads');
 const { setLanguage, t } = require('./i18n');
 const { newerVersion, productVersion } = require('./version');
 
@@ -22,6 +22,7 @@ function platformDeps() {
     readFileSync: fs.readFileSync, existsSync: fs.existsSync, mkdir: fsp.mkdir, readdir: fsp.readdir, mkdtemp: fsp.mkdtemp, rmdir: fsp.rmdir,
     spawn: childProcess.spawn, execFile: promisify(childProcess.execFile), homedir: os.homedir,
     platform: process.platform, arch: process.arch, env: process.env, tmpdir: os.tmpdir,
+    translated: () => { try { return childProcess.execFileSync('/usr/sbin/sysctl', ['-in', 'sysctl.proc_translated'], { encoding: 'utf8', timeout: 2000 }).trim() === '1'; } catch { return false; } },
     Checker: UpdateChecker, Downloads: UpdateDownloads,
   };
 }
@@ -46,7 +47,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
   const installedVersion = () => {
     try { return productVersion(deps.readFileSync(productFile, 'utf8')); } catch { return null; }
   };
-  const target = updateTarget(deps.platform, deps.arch, product, vscode.env.appRoot, deps.existsSync(DEB_REGISTRY));
+  const target = updateTarget(deps.platform, hostArch(deps.platform, deps.arch, deps.platform === 'darwin' && deps.arch === 'x64' && !!deps.translated?.()), product, vscode.env.appRoot, deps.existsSync(DEB_REGISTRY));
   const downloads = new deps.Downloads(join(context.globalStorageUri.fsPath, 'ide-update-temp'), target);
   const abort = new AbortController();
   let ready = null;

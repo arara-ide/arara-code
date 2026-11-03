@@ -16,8 +16,9 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara-code/resources/app', language = 'en', remoteName, extensionKind = 1 } = {}) {
+function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara-code/resources/app', language = 'en', remoteName, extensionKind = 1, translated = false } = {}) {
   const state = {
+    translated,
     product: { version: '1.135.06700', ...product }, executed: [], messages: [], errors: [], terminals: [], closeListeners: [],
     information: () => undefined, dialogs: [], command: undefined, checker: undefined, downloads: undefined, spawned: [], execFiles: [],
     execFile: async () => {}, removed: [], latest: async () => null, prepare: async () => ready, cached: async () => ready, startup: async () => null,
@@ -69,7 +70,7 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
       queueMicrotask(() => child.emit('spawn'));
       return child;
     },
-    homedir: () => '/home/user', platform, arch: 'x64', env: { PATH: '/bin' }, Checker, Downloads,
+    homedir: () => '/home/user', platform, arch: 'x64', env: { PATH: '/bin' }, Checker, Downloads, translated: () => state.translated === true,
   };
   const subscriptions = [];
   const context = { subscriptions, extension: { extensionKind }, globalStorageUri: { fsPath: '/storage' } };
@@ -88,6 +89,12 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
 afterEach(() => { setLanguage('en'); mock.timers.reset(); });
 
 describe('update button', () => {
+  it('picks the Mac package of the real processor, including an Intel app under Rosetta', () => {
+    assert.equal(harness({ platform: 'darwin' }).state.downloads.target.arch, 'x64');
+    assert.equal(harness({ platform: 'darwin', translated: true }).state.downloads.target.arch, 'arm64');
+    assert.equal(harness({ platform: 'linux', translated: true }).state.downloads.target.arch, 'x64');
+  });
+
   it('stays hidden until download completes, then installs the .deb in a terminal', async () => {
     const h = harness();
     assert.equal(h.state.downloads.target.format, 'deb');
@@ -214,7 +221,7 @@ describe('update button', () => {
   for (const [language, proceed] of [['en', 'Continue'], ['pt-br', 'Continuar'], ['es', 'Continuar']]) {
     it(`confirms, mounts the DMG, opens Finder and quits in ${language}`, async () => {
       const h = harness({ platform: 'darwin', language });
-      await h.found({ ...ready, file: '/cache/AraraCode-darwin-universal-1.135.06780.dmg' });
+      await h.found({ ...ready, file: '/cache/AraraCode-darwin-arm64-1.135.06780.dmg' });
       const confirmation = deferred();
       h.state.information = () => confirmation.promise;
       const pending = h.click();
@@ -225,7 +232,7 @@ describe('update button', () => {
       confirmation.resolve(proceed);
       await pending;
       assert.deepEqual(h.state.execFiles, [
-        ['/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', '/tmp/arara-update-fixture', '/cache/AraraCode-darwin-universal-1.135.06780.dmg']],
+        ['/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', '/tmp/arara-update-fixture', '/cache/AraraCode-darwin-arm64-1.135.06780.dmg']],
         ['/usr/bin/open', ['/tmp/arara-update-fixture']],
       ]);
       assert.equal(h.state.executed.filter(([command]) => command === 'workbench.action.quit').length, 1);

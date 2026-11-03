@@ -14,6 +14,10 @@ const RELEASE_DOWNLOAD = 'https://github.com/arara-ide/arara-code/releases/downl
 const DOWNLOAD_TIMEOUT_MS = 30 * 60_000;
 const STALE_STAGING_MS = 24 * 60 * 60_000;
 
+function hostArch(platform, arch, translated) {
+  return platform === 'darwin' && arch === 'x64' && translated ? 'arm64' : arch;
+}
+
 function updateTarget(platform, arch, product, appRoot, debInstalled) {
   const format = platform === 'win32' ? (product.target === 'system' || product.target === 'user' ? 'system' : 'zip')
     : platform === 'darwin' ? 'dmg'
@@ -26,7 +30,7 @@ function installerName(version, target) {
   if (!versionPattern.test(version)) throw new Error('Invalid release version');
   const { platform, arch, format } = target;
   if (!['x64', 'arm64', 'ia32', 'arm'].includes(arch)) throw new Error('Unsupported architecture');
-  if (platform === 'darwin' && ['x64', 'arm64'].includes(arch)) return `AraraCode-darwin-universal-${version}.dmg`;
+  if (platform === 'darwin' && ['x64', 'arm64'].includes(arch)) return `AraraCode-darwin-${arch}-${version}.dmg`;
   if (platform === 'win32' && ['user', 'system'].includes(format)) return `AraraCodeSetup-${arch}-${version}.exe`;
   if (platform === 'win32' && format === 'zip') return `AraraCode-win32-${arch}-${version}.zip`;
   if (platform === 'linux') {
@@ -158,4 +162,4 @@ class UpdateDownloads {
   }
 }
 
-module.exports = { INSTALLER_ENV, UpdateDownloads, installAction, installInstructions, installerName, shellQuote, updateTarget, windowsPowerShell };
+module.exports = { INSTALLER_ENV, hostArch, UpdateDownloads, installAction, installInstructions, installerName, shellQuote, updateTarget, windowsPowerShell };

@@ -137,7 +137,7 @@ async function main() {
   const image = join(work, 'fixture.dmg');
   await native('/usr/bin/hdiutil', ['create', '-srcfolder', stage, '-volname', 'Arara Update Test', '-fs', 'HFS+', '-format', 'UDZO', image]);
   const payload = await fs.readFile(image);
-  const name = 'AraraCode-darwin-universal-9.999.99999.dmg';
+  const name = 'AraraCode-darwin-arm64-9.999.99999.dmg';
   const digest = createHash('sha256').update(payload).digest('hex');
   const server = createServer((request, response) => {
     if (request.url.startsWith('/repos/')) response.end(JSON.stringify([{ tag_name: '9.999.99999', assets: [name, 'SHA256SUMS'].map(name => ({ name, size: payload.length, state: 'uploaded' })) }]));
