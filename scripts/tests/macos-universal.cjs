@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '../..');
 const version = '1.135.07340';
 const dmgName = `AraraCode-darwin-universal-${version}.dmg`;
 
-function fixture(t, fail = '') {
+function fixture(t, fail = '', arm64Kerberos = 'x86_64 arm64') {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arara universal '));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const input = path.join(directory, 'input');
@@ -36,13 +36,31 @@ const args = process.argv.slice(2);
 fs.appendFileSync(process.env.COMMAND_LOG, JSON.stringify([name, ...args]) + '\\n');
 if (name === process.env.FAIL_COMMAND) process.exit(1);
 if (name === 'node' && args[0].endsWith('create-universal-app.ts')) fs.mkdirSync(path.join(args[1], 'VSCode-darwin-universal', 'Arara Code.app'), { recursive: true });
-if (name === 'ditto') { if (args[0] === '-x') fs.accessSync(args[2]); fs.mkdirSync(args.at(-1), { recursive: true }); }
+if (name === 'ditto') {
+  if (args[0] === '-x') {
+    fs.accessSync(args[2]);
+    const binding = path.join(args.at(-1), 'Arara Code.app/Contents/Resources/app/node_modules.asar.unpacked/kerberos/build/Release/kerberos.node');
+    fs.mkdirSync(path.dirname(binding), { recursive: true });
+    fs.writeFileSync(binding, args.at(-1).endsWith('-arm64') ? process.env.ARM64_KERBEROS : 'x86_64');
+  }
+  fs.mkdirSync(args.at(-1), { recursive: true });
+}
+if (name === 'lipo') {
+  const arches = fs.readFileSync(args[0], 'utf8').split(' ');
+  if (args[1] === '-archs') process.stdout.write(arches.join(' '));
+  if (args[1] === '-verify_arch' && !args.slice(2).every(arch => arches.includes(arch))) process.exit(1);
+  if (args[1] === '-thin') {
+    if (!arches.includes(args[2]) || arches.length < 2) process.exit(1);
+    fs.writeFileSync(args.at(-1), args[2]);
+  }
+}
 if (name === 'hdiutil' && args.includes('-o')) fs.writeFileSync(args[args.indexOf('-o') + 1], 'DMG fixture');
+if (name === 'hdiutil' && args[0] === 'create') fs.writeFileSync(args.at(-1), 'DMG fixture');
 `);
   fs.chmodSync(mock, 0o755);
-  for (const command of ['npm', 'node', 'ditto', 'codesign', 'hdiutil']) fs.symlinkSync(mock, path.join(bin, command));
+  for (const command of ['npm', 'node', 'ditto', 'lipo', 'codesign', 'hdiutil']) fs.symlinkSync(mock, path.join(bin, command));
   const run = value => spawnSync('bash', [path.join(root, 'scripts/package-macos-universal.sh'), input, output, value ?? version], {
-    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, COMMAND_LOG: log, FAIL_COMMAND: fail }, encoding: 'utf8',
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, COMMAND_LOG: log, FAIL_COMMAND: fail, ARM64_KERBEROS: arm64Kerberos }, encoding: 'utf8',
   });
   return { input, output, run, commands: () => fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)) };
 }
@@ -58,7 +76,11 @@ test('packages both architectures through the upstream merger and produces only 
   assert.ok(extracts[0].some(arg => arg.endsWith(`x64-${version}.zip`)));
   assert.ok(extracts[1].some(arg => arg.endsWith(`arm64-${version}.zip`)));
   assert.ok(calls.some(([command, file]) => command === 'node' && file.endsWith('/build/darwin/verify-macho.ts')));
-  assert.ok(calls.some(([command, action]) => command === 'hdiutil' && action === 'makehybrid'));
+  const image = calls.find(([command, action]) => command === 'hdiutil' && action === 'create');
+  assert.ok(image);
+  assert.equal(image[image.indexOf('-fs') + 1], 'HFS+');
+  assert.equal(image[image.indexOf('-format') + 1], 'UDZO');
+  assert.ok(!calls.some(([command, action]) => command === 'hdiutil' && action === 'makehybrid'));
   assert.ok(!calls.some(([command]) => command === 'npm'));
   assert.deepEqual(calls.at(-1), ['hdiutil', 'verify', path.join(f.output, dmgName)]);
   const signed = calls.findIndex(([command]) => command === 'codesign');
@@ -66,7 +88,30 @@ test('packages both architectures through the upstream merger and produces only 
   assert.ok(signed > assembled);
 });
 
-for (const command of ['node', 'codesign', 'hdiutil']) {
+test('thins the already universal Silicon Kerberos binding before the upstream ASAR merger', t => {
+  const f = fixture(t);
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  const calls = f.commands();
+  const thin = calls.findIndex(([command, , flag]) => command === 'lipo' && flag === '-thin');
+  const merge = calls.findIndex(([command, file]) => command === 'node' && file.endsWith('create-universal-app.ts'));
+  assert.ok(thin >= 0 && thin < merge);
+  assert.equal(calls[thin][3], 'arm64');
+  assert.equal(calls.filter(([command, , flag]) => command === 'lipo' && flag === '-thin').length, 1);
+  for (const arch of ['x86_64', 'arm64']) assert.ok(calls.some(([command, , flag, cpu]) => command === 'lipo' && flag === '-verify_arch' && cpu === arch));
+});
+
+test('keeps a thin Silicon binding intact and rejects a binding without arm64 before merging', t => {
+  const thin = fixture(t, '', 'arm64');
+  assert.equal(thin.run().status, 0);
+  assert.ok(!thin.commands().some(([command, , flag]) => command === 'lipo' && flag === '-thin'));
+  const invalid = fixture(t, '', 'x86_64');
+  assert.notEqual(invalid.run().status, 0);
+  assert.ok(!invalid.commands().some(([command]) => command === 'node'));
+  assert.deepEqual(fs.readdirSync(invalid.output), []);
+});
+
+for (const command of ['lipo', 'node', 'codesign', 'hdiutil']) {
   test(`does not publish a DMG when ${command} fails`, t => {
     const f = fixture(t, command);
     assert.notEqual(f.run().status, 0);
@@ -202,6 +247,7 @@ test('the DMG smoke verifies architectures with the file before lipo flags and i
   assert.equal(new Set(isolated.filter((_, index) => index % 2 === 1)).size, 6);
   assert.ok(source.includes('--version "${ISOLATED_ARGS[@]}"'));
   assert.ok(source.includes('"$APP/Contents/MacOS/$EXECUTABLE" "${ISOLATED_ARGS[@]}"'));
+  assert.ok(source.includes('env -u ELECTRON_RUN_AS_NODE "$APP/Contents/MacOS/$EXECUTABLE"'));
 });
 
 test('the DMG smoke keeps socket paths short even when the system temporary path is long', t => {

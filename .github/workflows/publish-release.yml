@@ -12,6 +12,9 @@ on:
       prerelease:
         type: boolean
         required: true
+      source-sha:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -56,4 +59,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ inputs.version }}
           PRERELEASE: ${{ inputs.prerelease }}
+          RELEASE_SOURCE_SHA: ${{ inputs.source-sha }}
         run: node scripts/publish-release.cjs
