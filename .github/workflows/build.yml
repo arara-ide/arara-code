@@ -458,7 +458,7 @@ jobs:
           if-no-files-found: error
 
   test-macos-universal:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    if: always() && needs.version.result == 'success' && needs.macos-universal.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
     needs: [version, macos-universal]
     strategy:
       fail-fast: false
@@ -504,7 +504,7 @@ jobs:
       prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
 
   release-macos-universal:
-    if: github.ref == 'refs/heads/main'
+    if: always() && needs.version.result == 'success' && needs.test-macos-universal.result == 'success' && github.ref == 'refs/heads/main'
     needs: [version, test-macos-universal]
     permissions:
       contents: write
