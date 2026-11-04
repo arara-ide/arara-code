@@ -6,6 +6,7 @@ const { UpdateBusy } = require('./busy');
 const { UpdateChecker } = require('./checker');
 const { UpdateDownloads, hostArch, installAction, installInstructions, updateTarget } = require('./downloads');
 const { setLanguage, t } = require('./i18n');
+const { STORE_URI, StoreChecker, isStoreInstall } = require('./store');
 const { newerVersion, productVersion } = require('./version');
 
 const UPDATE_OPEN_COMMAND = 'arara.update.open';
@@ -47,6 +48,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
   const installedVersion = () => {
     try { return productVersion(deps.readFileSync(productFile, 'utf8')); } catch { return null; }
   };
+  if (isStoreInstall(deps.platform, vscode.env.appRoot)) return registerStoreUpdate(context, vscode, deps, current, setContext);
   const target = updateTarget(deps.platform, hostArch(deps.platform, deps.arch, deps.platform === 'darwin' && deps.arch === 'x64' && !!deps.translated?.()), product, vscode.env.appRoot, deps.existsSync(DEB_REGISTRY));
   const downloads = new deps.Downloads(join(context.globalStorageUri.fsPath, 'ide-update-temp'), target);
   const abort = new AbortController();
@@ -195,6 +197,25 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
   void downloads.startup(current).catch(error => console.warn('[arara update] Cache cleanup failed', error)).finally(() => {
     if (!disposed) checker.start();
   });
+  return checker;
+}
+
+function registerStoreUpdate(context, vscode, deps, current, setContext) {
+  let ready = null;
+  const checker = new (deps.StoreChecker ?? StoreChecker)({
+    currentVersion: current,
+    onUpdate: async found => {
+      ready = found.latest;
+      await setContext(UPDATE_CONTEXT_KEY, true);
+      vscode.window.setStatusBarMessage(t('$(check) Arara Code {0} is available in the Microsoft Store', found.latest), 8000);
+    },
+  });
+  context.subscriptions.push(checker, vscode.commands.registerCommand(UPDATE_OPEN_COMMAND, async () => {
+    const opened = await vscode.env.openExternal(vscode.Uri.parse(STORE_URI));
+    if (!opened) { void vscode.window.showErrorMessage(t('Could not open the Microsoft Store. Open it and update Arara Code in Library.')); return; }
+    void vscode.window.showInformationMessage(t('Arara Code {0} opens in the Microsoft Store. Choose Update, then reopen Arara Code.', ready ?? current));
+  }));
+  checker.start();
   return checker;
 }
 

@@ -16,5 +16,8 @@
   "Extract the selected file. Close Arara Code and replace the installation folder with the extracted content. Then reopen the app.": "Extrae el archivo seleccionado. Cierra Arara Code y sustituye la carpeta de instalación por el contenido extraído. Después vuelve a abrirlo.",
   "Open the selected .deb package and choose Install/Update. If no installer opens, run in the terminal: sudo apt install ./{0}. Then reopen Arara Code.": "Abre el paquete .deb seleccionado y elige Instalar/Actualizar. Si no se abre un instalador, ejecuta en el terminal: sudo apt install ./{0}. Después, vuelve a abrir Arara Code.",
   "Arara Code {0}: {1}": "Arara Code {0}: {1}",
-  "After you continue, Arara Code will open the update in Finder and close. Drag Arara Code to Applications, choose Replace, then reopen the app.": "Al continuar, Arara Code abrirá la actualización en Finder y se cerrará. Arrastra Arara Code a Aplicaciones, elige Reemplazar y vuelve a abrir la app."
+  "After you continue, Arara Code will open the update in Finder and close. Drag Arara Code to Applications, choose Replace, then reopen the app.": "Al continuar, Arara Code abrirá la actualización en Finder y se cerrará. Arrastra Arara Code a Aplicaciones, elige Reemplazar y vuelve a abrir la app.",
+  "$(check) Arara Code {0} is available in the Microsoft Store": "$(check) Arara Code {0} disponible en Microsoft Store",
+  "Could not open the Microsoft Store. Open it and update Arara Code in Library.": "No se pudo abrir Microsoft Store. Ábrela y actualiza Arara Code en Biblioteca.",
+  "Arara Code {0} opens in the Microsoft Store. Choose Update, then reopen Arara Code.": "Arara Code {0} se abre en Microsoft Store. Elige Actualizar y luego vuelve a abrir Arara Code."
 }
