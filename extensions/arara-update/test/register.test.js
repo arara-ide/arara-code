@@ -19,6 +19,7 @@ function deferred() {
 function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara-code/resources/app', language = 'en', remoteName, extensionKind = 1, translated = false } = {}) {
   const state = {
     translated,
+    external: [],
     product: { version: '1.135.06700', ...product }, executed: [], messages: [], errors: [], terminals: [], closeListeners: [],
     information: () => undefined, dialogs: [], command: undefined, checker: undefined, downloads: undefined, spawned: [], execFiles: [],
     execFile: async () => {}, removed: [], latest: async () => null, prepare: async () => ready, cached: async () => ready, startup: async () => null,
@@ -26,8 +27,8 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
   const vscode = {
     ExtensionKind: { UI: 1, Workspace: 2 },
     ProgressLocation: { Notification: 15 },
-    env: { appRoot, language, remoteName },
-    Uri: { file: file => ({ fsPath: file }) },
+    env: { appRoot, language, remoteName, openExternal: async uri => { state.external.push(uri.value); return true; } },
+    Uri: { file: file => ({ fsPath: file }), parse: value => ({ value }) },
     commands: {
       executeCommand: async (...args) => { state.executed.push(args); },
       registerCommand: (id, fn) => { state.command = { id, fn }; return { dispose() {} }; },
@@ -70,7 +71,7 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
       queueMicrotask(() => child.emit('spawn'));
       return child;
     },
-    homedir: () => '/home/user', platform, arch: 'x64', env: { PATH: '/bin' }, Checker, Downloads, translated: () => state.translated === true,
+    homedir: () => '/home/user', platform, arch: 'x64', env: { PATH: '/bin' }, Checker, Downloads, StoreChecker: class { constructor(options) { state.store = options; } start() {} dispose() {} }, translated: () => state.translated === true,
   };
   const subscriptions = [];
   const context = { subscriptions, extension: { extensionKind }, globalStorageUri: { fsPath: '/storage' } };
@@ -89,6 +90,17 @@ function harness({ platform = 'linux', product = {}, appRoot = '/usr/share/arara
 afterEach(() => { setLanguage('en'); mock.timers.reset(); });
 
 describe('update button', () => {
+  it('uses the Microsoft Store for Store installs: hidden until the catalog has a newer version, then opens the product page', async () => {
+    const h = harness({ platform: 'win32', appRoot: 'C:\\Program Files\\WindowsApps\\AraraCode.AraraCode_1.135.7347.0_x64__r0jhj54qmdcam\\resources\\app' });
+    assert.equal(h.state.downloads, undefined);
+    assert.deepEqual(h.available(), [false]);
+    await h.state.store.onUpdate({ current: h.state.product.version, latest: '1.135.07366' });
+    assert.deepEqual(h.available(), [false, true]);
+    await h.click();
+    assert.deepEqual(h.state.external, ['ms-windows-store://pdp/?ProductId=9PLLLF8RWMMM']);
+    assert.equal(h.state.spawned.length, 0);
+  });
+
   it('picks the Mac package of the real processor, including an Intel app under Rosetta', () => {
     assert.equal(harness({ platform: 'darwin' }).state.downloads.target.arch, 'x64');
     assert.equal(harness({ platform: 'darwin', translated: true }).state.downloads.target.arch, 'arm64');
