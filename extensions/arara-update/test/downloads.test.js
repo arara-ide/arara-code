@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
+const { spawn } = require('node:child_process');
 const { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -11,6 +12,40 @@ const { setLanguage } = require('../src/i18n');
 const { newerVersion } = require('../src/version');
 
 const roots = [];
+
+it('closes the Linux installer shell after success and keeps failures visible', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'arara-update-shell-'));
+  roots.push(root);
+  const sudo = join(root, 'sudo');
+  await writeFile(sudo, '#!/bin/sh\nprintf "%s\\n" "$@" > "$ARARA_UPDATE_ARGUMENTS"\nexit "$ARARA_UPDATE_RESULT"\n', { mode: 0o700 });
+  const file = join(root, "arara ' package.deb");
+  for (const status of [0, 10]) {
+    const marker = join(root, `arguments-${status}`);
+    const child = spawn('/bin/bash', ['--noprofile', '--norc'], {
+      env: { ...process.env, PATH: `${root}:/usr/bin:/bin`, ARARA_UPDATE_ARGUMENTS: marker, ARARA_UPDATE_RESULT: String(status) },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let timer;
+    try {
+      const closed = new Promise((resolve, reject) => {
+        child.once('exit', code => resolve(code));
+        child.once('error', reject);
+        timer = setTimeout(() => reject(new Error('Installer shell stayed open after success')), 2000);
+      });
+      child.stdin.write(installAction(file, 'linux').text + '\n');
+      if (status !== 0) {
+        for (let attempt = 0; attempt < 100 && !await stat(marker).then(() => true, () => false); attempt++) await new Promise(resolve => setTimeout(resolve, 10));
+        assert.equal(child.exitCode, null);
+        child.stdin.write('exit\n');
+      }
+      assert.equal(await closed, status);
+      assert.equal(await readFile(marker, 'utf8'), `apt\ninstall\n${file}\n`);
+    } finally {
+      clearTimeout(timer);
+      if (child.exitCode === null) child.kill();
+    }
+  }
+});
 afterEach(async () => {
   setLanguage('en');
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
@@ -62,7 +97,7 @@ describe('installer preparation', () => {
       const action = installAction(ready.file, target.platform);
       assert.equal(action.kind, target.platform === 'darwin' ? 'mount-reveal' : target.format === 'deb' ? 'terminal' : target.platform === 'win32' && name.endsWith('.exe') ? 'open' : 'reveal');
       if (target.format === 'AppImage') assert.equal((await stat(ready.file)).mode & 0o777, 0o755);
-      if (action.kind === 'terminal') assert.equal(action.text, `sudo apt install '${ready.file}'`);
+      if (action.kind === 'terminal') assert.equal(action.text, `sudo apt install '${ready.file}' && exit`);
       if (action.kind === 'open' && target.platform === 'win32') {
         assert.match(action.command, /WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/);
         assert.ok(!action.args.join(' ').includes(ready.file));
