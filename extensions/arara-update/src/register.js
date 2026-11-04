@@ -77,7 +77,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
 
   const openTerminal = (verified, command, run) => {
     const previous = installTerminal?.terminal;
-    const terminal = vscode.window.createTerminal({ name: t('Arara Code {0} · Update', verified.version), cwd: dirname(verified.file), shellPath: '/bin/bash', shellArgs: ['--noprofile', '--norc'] });
+    const terminal = vscode.window.createTerminal({ name: t('Arara Code {0} · Update', verified.version), cwd: dirname(verified.file), shellPath: '/bin/bash', shellArgs: ['--noprofile', '--norc'], waitOnExit: false });
     installTerminal = { terminal, run };
     if (previous && vscode.window.terminals.includes(previous)) previous.dispose();
     terminal.show();

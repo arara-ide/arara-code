@@ -124,9 +124,10 @@ describe('update button', () => {
     const [terminal] = h.state.terminals;
     assert.equal(terminal.options.cwd, '/cache');
     assert.equal(terminal.options.shellPath, '/bin/bash');
+    assert.equal(terminal.options.waitOnExit, false);
     assert.equal(terminal.options.name, 'Arara Code 1.135.06780 · Update');
     assert.equal(terminal.shown, true);
-    assert.deepEqual(terminal.sent, [["sudo apt install '/cache/arara-code.deb'", true]]);
+    assert.deepEqual(terminal.sent, [["sudo apt install '/cache/arara-code.deb' && exit", true]]);
     assert.ok(!h.state.executed.some(call => call[0] === 'revealFileInOS'));
   });
 
@@ -168,7 +169,7 @@ describe('update button', () => {
     await h.click();
     assert.deepEqual(asked, [ready.version]);
     assert.deepEqual(prepared, [newer.version]);
-    assert.deepEqual(h.state.terminals[0].sent, [["sudo apt install '/cache/new/arara-code.deb'", true]]);
+    assert.deepEqual(h.state.terminals[0].sent, [["sudo apt install '/cache/new/arara-code.deb' && exit", true]]);
   });
 
   it('does not reinstall a version that is already on disk', async () => {
