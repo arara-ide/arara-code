@@ -1,0 +1,100 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const root = path.resolve(__dirname, '../..');
+const upstream = process.env.ARARA_UPSTREAM_SOURCE || path.join(root, '.work/vscodium/vscode');
+const { _electron: electron } = require(process.env.PLAYWRIGHT_PATH || path.join(root, '../ac-web/node_modules/playwright'));
+
+(async () => {
+  assert.equal(process.platform, 'darwin', 'this regression requires a real macOS editor');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'arara-mac-keys-'));
+  let app;
+  try {
+    const workspace = path.join(dir, 'workspace');
+    const profile = path.join(dir, 'profile');
+    await fs.mkdir(workspace);
+    await fs.mkdir(path.join(profile, 'User'), { recursive: true });
+    await fs.writeFile(path.join(profile, 'User/settings.json'), JSON.stringify({ 'workbench.startupEditor': 'none', 'security.workspace.trust.enabled': false, 'window.confirmBeforeClose': 'never', 'workbench.tips.enabled': false, 'update.mode': 'none', 'extensions.autoUpdate': false, 'editor.experimentalEditContextEnabled': false }));
+    await fs.writeFile(path.join(workspace, 'keyboard-fixture.txt'), 'original\n');
+    const { DatabaseSync } = require('node:sqlite');
+    await fs.mkdir(path.join(profile, 'User/globalStorage'), { recursive: true });
+    const db = new DatabaseSync(path.join(profile, 'User/globalStorage/state.vscdb'));
+    db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
+    db.prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)').run('arara.arara-ai', JSON.stringify({ 'arara.setup.v1.completed': true }));
+    db.close();
+    const product = JSON.parse(await fs.readFile(path.join(upstream, 'product.json'), 'utf8'));
+    const env = { ...process.env, VSCODE_DEV: '1', VSCODE_CLI: '1', NODE_ENV: 'development' };
+    delete env.ELECTRON_RUN_AS_NODE;
+    app = await electron.launch({ executablePath: path.join(upstream, `.build/electron/${product.nameLong}.app/Contents/MacOS/${product.nameShort}`), args: [upstream, workspace, '--user-data-dir', profile, '--extensions-dir', path.join(dir, 'extensions'), '--disable-extensions', '--skip-welcome', '--skip-release-notes'], env, timeout: 60_000 });
+    const page = await app.firstWindow({ timeout: 60_000 });
+    await page.locator('.monaco-workbench').waitFor({ timeout: 60_000 });
+    await app.evaluate(({ dialog }) => {
+      globalThis.folderDialogs = [];
+      dialog.showOpenDialog = async (...args) => { globalThis.folderDialogs.push(args.at(-1)?.properties ?? []); return { canceled: true, filePaths: [] }; };
+    });
+    await page.bringToFront();
+    await (await app.browserWindow(page)).evaluate(win => { win.show(); win.focus(); });
+    await page.locator('.part.statusbar').waitFor();
+    await page.waitForTimeout(2000);
+    await page.locator('.part.editor').click({ position: { x: 60, y: 120 } });
+    console.log('IDE ready');
+    const quick = page.locator('.quick-input-widget');
+    const search = async key => {
+      console.log('Search shortcut:', key);
+      await page.keyboard.press(key);
+      await quick.waitFor({ state: 'visible' });
+      await page.keyboard.type('keyboard-fixture');
+      const row = quick.locator('.monaco-list-row').filter({ hasText: 'keyboard-fixture.txt' }).first();
+      await row.waitFor();
+      await quick.locator('input').first().focus();
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Enter');
+      await quick.waitFor({ state: 'hidden' });
+      await page.locator('.monaco-editor textarea').first().waitFor();
+    };
+    await search('Meta+p');
+    await search('Control+e');
+    await page.keyboard.press('Meta+k');
+    await page.keyboard.press('Meta+o');
+    await page.waitForTimeout(300);
+    const dialogs = await app.evaluate(() => globalThis.folderDialogs);
+    assert.equal(dialogs.length, 1, 'Cmd+K Cmd+O invokes the native folder picker');
+    assert.ok(dialogs[0].includes('openDirectory'));
+    await page.keyboard.press('Meta+Shift+p');
+    await quick.waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await page.locator('.monaco-editor .view-lines').first().click();
+    await page.keyboard.press('Meta+ArrowDown');
+    await page.keyboard.type('saved-by-mac-shortcut');
+    await page.locator('.tab.dirty').waitFor();
+    await page.keyboard.press('Meta+s');
+    await page.locator('.tab.dirty').waitFor({ state: 'hidden' });
+    assert.match(await fs.readFile(path.join(workspace, 'keyboard-fixture.txt'), 'utf8'), /saved-by-mac-shortcut/);
+    await page.keyboard.press('Meta+z');
+    await page.keyboard.press('Meta+s');
+    await page.waitForTimeout(300);
+    assert.equal(await fs.readFile(path.join(workspace, 'keyboard-fixture.txt'), 'utf8'), 'original\n');
+    await page.keyboard.press('Meta+f');
+    await page.locator('.find-widget.visible').waitFor();
+    await page.keyboard.press('Escape');
+    const sidebar = page.locator('.part.sidebar');
+    await sidebar.waitFor({ state: 'visible' });
+    await page.keyboard.press('Meta+b');
+    await sidebar.waitFor({ state: 'hidden' });
+    await page.keyboard.press('Meta+b');
+    await sidebar.waitFor({ state: 'visible' });
+    await page.keyboard.press('Meta+j');
+    await page.locator('.part.panel').waitFor({ state: 'visible' });
+    await page.keyboard.press('Meta+j');
+    await page.locator('.part.panel').waitFor({ state: 'hidden' });
+    console.log('PASS: real macOS IDE, Ctrl+E/Cmd+P file search, Cmd+K Cmd+O folder picker, Cmd+Shift+P palette, Cmd+S save, Cmd+Z undo, Cmd+F find, Cmd+B sidebar and Cmd+J panel; isolated data, no inference.');
+  } catch (error) {
+    const page = app?.windows()[0];
+    if (page) { await page.screenshot({ path: '/tmp/arara-mac-keybindings-failure.png' }); console.log((await page.locator('body').innerText()).slice(-2500)); }
+    throw error;
+  } finally {
+    await app?.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+})().catch(error => { console.error(error); process.exitCode = 1; });

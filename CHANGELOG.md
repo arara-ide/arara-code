@@ -5,6 +5,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 ## [Não lançado]
 
 ### Novidades
+- Navegador: escolha Qualidade ou Performance e reutilize elementos inspecionados como referências clicáveis no chat.
 - App: controle os chats e bots da IDE pelo celular em um aplicativo instalável, com pareamento por código e conexão direta ao computador.
 - Chat: quem tem o plano Supporter escolhe de 1 a 8 chats por plataforma em Configurações; o padrão continua 3.
 - Chat: modo Goal acompanha o objetivo até a conclusão, com recuperação de comunicação e opção de desligar, também no Arara Bot e na Orquestra.
@@ -27,6 +28,11 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
+- Chat: reconexão fica no status temporário; falhas de conexão têm mensagem traduzida e editar sem ponto de restauração preserva os arquivos.
+- App: a fila aparece imediatamente no desktop, permite edição entre as duas telas e permanece ao reconectar o celular.
+- Navegador no macOS: a automação usa uma aplicação própria e permite abrir o Chrome pessoal ao mesmo tempo.
+- Chat: compactação tenta o recurso nativo antes do resumo e evita reenviar histórico grande demais ao editar mensagens.
+- Editor no macOS: Cmd+K, Cmd+O abre pasta e Ctrl+E busca arquivos, preservando Cmd+P e os atalhos personalizados.
 - Instalação: corrigida a geração do pacote universal para Macs Intel e Apple Silicon.
 - Inicialização: janelas sem pasta mostram o Explorer e ações para abrir pasta e projetos recentes, mesmo enquanto a tela inicial carrega.
 - Chat: Nova conversa durante uma resposta abre a conversa já parada, sem o "Pensando…" da resposta anterior, e encerra os subagentes dela.

@@ -1,0 +1,31 @@
+Arara Code: make folder chords and Control+E available on macOS.
+
+Why a patch: these native workbench defaults are registered before extensions
+load. Product configuration cannot add a platform-specific secondary binding
+to these registrations. Keep every existing platform and user override intact.
+Touches: src/vs/workbench/browser/actions/workspaceActions.ts,
+         src/vs/workbench/browser/actions/quickAccessActions.ts
+
+--- a/src/vs/workbench/browser/actions/workspaceActions.ts
++++ b/src/vs/workbench/browser/actions/workspaceActions.ts
+@@ -67,6 +67,9 @@
+ 			keybinding: {
+ 				weight: KeybindingWeight.WorkbenchContrib,
+ 				primary: undefined,
++				mac: {
++					primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyO)
++				},
+ 				linux: {
+ 					primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyO)
+ 				},
+--- a/src/vs/workbench/browser/actions/quickAccessActions.ts
++++ b/src/vs/workbench/browser/actions/quickAccessActions.ts
+@@ -25,7 +25,7 @@
+ const globalQuickAccessKeybinding = {
+ 	primary: KeyMod.CtrlCmd | KeyCode.KeyP,
+ 	secondary: [KeyMod.CtrlCmd | KeyCode.KeyE],
+-	mac: { primary: KeyMod.CtrlCmd | KeyCode.KeyP, secondary: undefined }
++	mac: { primary: KeyMod.CtrlCmd | KeyCode.KeyP, secondary: [KeyMod.WinCtrl | KeyCode.KeyE] }
+ };
+ 
+ KeybindingsRegistry.registerCommandAndKeybindingRule({
