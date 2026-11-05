@@ -8,7 +8,7 @@ reviews:
   auto_review:
     enabled: true
     ignore_usernames:
-      - "gabsrodrigues-dev"
+      - "gabsdk"
     drafts: false
     base_branches:
       - ".*"
