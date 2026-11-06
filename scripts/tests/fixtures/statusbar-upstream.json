@@ -1,0 +1,7 @@
+{
+  "commit": "930bd54db7a4c82b23a2244d360df04176524bfc",
+  "files": {
+    "src/vs/workbench/browser/parts/statusbar/statusbarPart.ts": "/*---------------------------------------------------------------------------------------------\n *  Copyright (c) Microsoft Corporation. All rights reserved.\n *  Licensed under the MIT License. See License.txt in the project root for license information.\n *--------------------------------------------------------------------------------------------*/\n\tprotected override createContentArea(parent: HTMLElement): HTMLElement {\n\t\tthis.element = parent;\n\n\t\t// Track focus within container\n\t\tconst scopedContextKeyService = this._register(this.contextKeyService.createScoped(this.element));\n\t\tStatusBarFocused.bindTo(scopedContextKeyService).set(true);\n",
+    "src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css": "/*---------------------------------------------------------------------------------------------\n *  Copyright (c) Microsoft Corporation. All rights reserved.\n *  Licensed under the MIT License. See License.txt in the project root for license information.\n *--------------------------------------------------------------------------------------------*/\n\n.monaco-workbench .part.statusbar {\n\tbox-sizing: border-box;\n\tcursor: default;\n"
+  }
+}
