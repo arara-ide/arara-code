@@ -1,0 +1,44 @@
+Arara Code: hide editor metadata and formatter status in optimized access.
+
+Why a patch: extension APIs cannot hide built-in status bar entries or entries
+owned by another extension without changing persisted user visibility choices.
+The existing extension-controlled arara.ui.hideAdvanced context gates only
+presentation; commands, formatting and stored visibility remain unchanged.
+Touches: statusbarPart.ts and media/statusbarpart.css.
+
+--- a/src/vs/workbench/browser/parts/statusbar/statusbarPart.ts
++++ b/src/vs/workbench/browser/parts/statusbar/statusbarPart.ts
+@@ -445,6 +445,14 @@
+ 	protected override createContentArea(parent: HTMLElement): HTMLElement {
+ 		this.element = parent;
+ 
++		const updateAdvancedVisibility = () => {
++			parent.classList.toggle('arara-hide-advanced', !!this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced'));
++		};
++		updateAdvancedVisibility();
++		this._register(this.contextKeyService.onDidChangeContext(event => {
++			if (event.affectsSome(new Set(['arara.ui.hideAdvanced']))) { updateAdvancedVisibility(); }
++		}));
++
+ 		// Track focus within container
+ 		const scopedContextKeyService = this._register(this.contextKeyService.createScoped(this.element));
+ 		StatusBarFocused.bindTo(scopedContextKeyService).set(true);
+--- a/src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css
++++ b/src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css
+@@ -2,6 +2,16 @@
+  *  Copyright (c) Microsoft Corporation. All rights reserved.
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
++
++.monaco-workbench .part.statusbar.arara-hide-advanced .statusbar-item[id="status.editor.mode"],
++.monaco-workbench .part.statusbar.arara-hide-advanced .statusbar-item[id="status.editor.eol"],
++.monaco-workbench .part.statusbar.arara-hide-advanced .statusbar-item[id="status.editor.encoding"],
++.monaco-workbench .part.statusbar.arara-hide-advanced .statusbar-item[id="status.editor.indentation"],
++.monaco-workbench .part.statusbar.arara-hide-advanced .statusbar-item[id="status.editor.selection"],
++.monaco-workbench .part.statusbar.arara-hide-advanced .statusbar-item[id="esbenp.prettier-vscode.prettier.status"],
++.monaco-workbench .part.statusbar.arara-hide-advanced .statusbar-item[id="esbenp.prettier-vscode"] {
++	display: none !important;
++}
+ 
+ .monaco-workbench .part.statusbar {
+ 	box-sizing: border-box;

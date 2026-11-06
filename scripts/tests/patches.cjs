@@ -27,4 +27,5 @@ try {
   assert.ok(source.includes("id: 'arara.openSettings'"), 'preserves the settings menu contribution');
   assert.ok(source.includes('Arara settings'), 'preserves the localized English source message');
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+execFileSync(process.execPath, [path.join(__dirname, 'optimized-statusbar.cjs')], { stdio: 'inherit' });
 console.log(`PASS: ${count} patches, invalid hunk regressions and actual launcher source applied by Git.`);
