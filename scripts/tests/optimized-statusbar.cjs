@@ -5,14 +5,14 @@ const os = require('node:os');
 const vm = require('node:vm');
 const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
-const upstream = path.join(root, '.work/vscodium/vscode');
+const upstream = require('./fixtures/statusbar-upstream.json');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arara-statusbar-patch-'));
 const files = ['src/vs/workbench/browser/parts/statusbar/statusbarPart.ts', 'src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css'];
 try {
   for (const file of files) {
     const target = path.join(dir, file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, execFileSync('git', ['show', `HEAD:${file}`], { cwd: upstream }));
+    fs.writeFileSync(target, upstream.files[file]);
   }
   execFileSync('git', ['apply', '--check', path.join(root, 'patches/code/0042-optimized-statusbar.patch')], { cwd: dir });
   execFileSync('git', ['apply', path.join(root, 'patches/code/0042-optimized-statusbar.patch')], { cwd: dir });
@@ -46,5 +46,5 @@ try {
   const selectors = [...css.matchAll(/arara-hide-advanced \.statusbar-item\[id="([^"]+)"\]/g)].map(match => match[1]);
   assert.deepEqual(selectors, ['status.editor.mode', 'status.editor.eol', 'status.editor.encoding', 'status.editor.indentation', 'status.editor.selection', 'esbenp.prettier-vscode.prettier.status', 'esbenp.prettier-vscode']);
   assert.match(css, /arara-hide-advanced[\s\S]*display: none !important/);
-  console.log('PASS: patch applies to upstream, 3 initial states, unrelated context, repeated mode changes and 7 scoped selectors');
+  console.log('PASS: patch applies to pinned upstream fixture, 3 initial states, unrelated context, repeated mode changes and 7 scoped selectors');
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
