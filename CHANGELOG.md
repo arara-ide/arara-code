@@ -5,6 +5,9 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 ## [Não lançado]
 
 ### Novidades
+- Obsidian: o botão de joia no topo abre o projeto no Obsidian, instala o Obsidian se faltar e mantém as notas do mapa do código sincronizadas; o botão do mapa do código saiu do topo.
+- Obsidian: clique com o botão direito no botão do topo para Abrir Obsidian ou Sincronizar vault do Obsidian.
+- Chat: a IA pesquisa e atualiza o vault do Obsidian sozinha durante a conversa e, depois de tarefas grandes, oferece atualizar o vault; o grafo agrupa as notas por tipo de arquivo.
 - Navegador: escolha Qualidade ou Performance e reutilize elementos inspecionados como referências clicáveis no chat.
 - App: controle os chats e bots da IDE pelo celular em um aplicativo instalável, com pareamento por código e conexão direta ao computador.
 - Chat: quem tem o plano Supporter escolhe de 1 a 8 chats por plataforma em Configurações; o padrão continua 3.

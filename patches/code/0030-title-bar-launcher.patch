@@ -5,8 +5,12 @@ Arara Code: gancho genérico de lançador (só ícone) na barra de título.
   Layout) com o ícone `sparkle` (estrelinha de IA).
   Só aparece com a context key `arara.ui.titleLauncher` ligada pela extensão; o clique
   roda `arara.ui.titleLauncher.run`. Ao lado do Customize Layout (order -0.5), o ícone
-  `type-hierarchy` roda `arara.codemap.show` quando a extensão liga `arara.codemap.available`. O que abre (hoje: a seção lateral do Arara AI) é
-  decisão da extensão arara-ai.
+  `ruby` roda `arara.obsidian.open` quando a extensão liga `arara.obsidian.available`. No clique direito desse
+  ícone, o menu começa por "Open Obsidian" e "Sync Obsidian vault" (que rodam `arara.obsidian.open` e
+  `arara.obsidian.sync`), seguidos do Hide e do menu normal da barra de título (MenuId.TitleBarContext), por
+  um MenuEntryActionViewItem registrado no IActionViewItemService. O menu de contexto é o nativo do
+  workbench, igual em Linux, Windows e macOS. O que abre (hoje: a seção lateral do Arara AI e o vault do
+  Obsidian) é decisão da extensão arara-ai.
 - workbench.desktop.main.ts: importa a contribution.
 
 Why a patch: extensões não contribuem itens para o LayoutControlMenu nem para a barra
@@ -16,12 +20,24 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,97 @@
++import { addDisposableListener, EventType, getWindow } from '../../../../base/browser/dom.js';
++import { StandardMouseEvent } from '../../../../base/browser/mouseEvent.js';
++import { IAction, Separator, toAction } from '../../../../base/common/actions.js';
 +import { Codicon } from '../../../../base/common/codicons.js';
++import { Disposable } from '../../../../base/common/lifecycle.js';
 +import { localize } from '../../../../nls.js';
-+import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
++import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
++import { MenuEntryActionViewItem } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
++import { MenuId, MenuItemAction, MenuRegistry } from '../../../../platform/actions/common/actions.js';
++import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
++import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 +import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++
++const OBSIDIAN_OPEN = 'arara.obsidian.open';
++const OBSIDIAN_SYNC = 'arara.obsidian.sync';
 +
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +	group: 'navigation',
@@ -38,11 +54,11 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +	group: 'navigation',
 +	order: -0.5,
 +	command: {
-+		id: 'arara.codemap.show',
-+		title: localize('arara.codemap.show', "Code map"),
-+		icon: Codicon.typeHierarchy,
++		id: OBSIDIAN_OPEN,
++		title: localize('arara.obsidian.open', "Open Obsidian"),
++		icon: Codicon.ruby,
 +	},
-+	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.codemap.available')),
++	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.obsidian.available')),
 +});
 +
 +for (const id of [MenuId.MenubarPreferencesMenu, MenuId.GlobalActivity]) {
@@ -56,6 +72,52 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +		when: ContextKeyExpr.has('arara.ui.titleLauncher'),
 +	});
 +}
++
++class AraraLauncherActionViewItem extends MenuEntryActionViewItem {
++
++	extraActions: IAction[] = [];
++
++	override render(container: HTMLElement): void {
++		super.render(container);
++		this._register(addDisposableListener(container, EventType.CONTEXT_MENU, e => {
++			const event = new StandardMouseEvent(getWindow(container), e);
++			event.preventDefault();
++			event.stopPropagation();
++			const action = this._menuItemAction;
++			const primary = [toAction({ id: action.id, label: action.label, run: () => action.run() }), ...this.extraActions];
++			const actions = action.hideActions ? Separator.join(primary, [action.hideActions.hide]) : primary;
++			this._contextMenuService.showContextMenu({
++				getAnchor: () => event,
++				getActions: () => actions,
++				menuId: MenuId.TitleBarContext,
++				contextKeyService: this._contextKeyService,
++			});
++		}));
++	}
++}
++
++class AraraTitleLauncherContribution extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.araraTitleLauncher';
++
++	constructor(
++		@IActionViewItemService actionViewItemService: IActionViewItemService,
++		@IInstantiationService instantiationService: IInstantiationService,
++		@ICommandService commandService: ICommandService,
++	) {
++		super();
++		this._register(actionViewItemService.register(MenuId.LayoutControlMenu, OBSIDIAN_OPEN, (action, options) => {
++			if (!(action instanceof MenuItemAction)) {
++				return undefined;
++			}
++			const item = instantiationService.createInstance(AraraLauncherActionViewItem, action, options);
++			item.extraActions = [toAction({ id: OBSIDIAN_SYNC, label: localize('arara.obsidian.sync', "Sync Obsidian vault"), run: () => commandService.executeCommand(OBSIDIAN_SYNC) })];
++			return item;
++		}));
++	}
++}
++
++registerWorkbenchContribution2(AraraTitleLauncherContribution.ID, AraraTitleLauncherContribution, WorkbenchPhase.BlockRestore);
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
 @@ -199,6 +199,8 @@
