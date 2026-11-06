@@ -213,9 +213,9 @@ if [[ "${OS_NAME}" == "linux" ]]; then
     f="vscode/resources/linux/debian/${t}.template"
     grep -q arara-code-uninstall "${f}" && continue
     if [[ "${t}" == "postinst" ]]; then
-      sed -i '0,/^ln -s .*$/s||&\nln -sf /usr/share/@@NAME@@/bin/@@NAME@@-uninstall /usr/bin/@@NAME@@-uninstall|' "${f}"
+      sed -i '0,/^ln -s .*$/s||&\nln -sf /usr/share/@@NAME@@/bin/@@NAME@@-uninstall /usr/bin/@@NAME@@-uninstall\n[ -e /usr/bin/arara ] \|\| ln -s /usr/share/@@NAME@@/bin/@@NAME@@ /usr/bin/arara|' "${f}"
     else
-      printf '\nrm -f /usr/bin/@@NAME@@-uninstall\n' >> "${f}"
+      printf '\nrm -f /usr/bin/@@NAME@@-uninstall\n[ "$(readlink /usr/bin/arara)" = /usr/share/@@NAME@@/bin/@@NAME@@ ] && rm -f /usr/bin/arara\n' >> "${f}"
     fi
   done
 elif [[ "${OS_NAME}" == "windows" ]]; then
