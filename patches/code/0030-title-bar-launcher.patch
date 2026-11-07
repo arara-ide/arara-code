@@ -5,23 +5,41 @@ Arara Code: gancho genérico de lançador (só ícone) na barra de título.
   Layout) com o ícone `sparkle` (estrelinha de IA).
   Só aparece com a context key `arara.ui.titleLauncher` ligada pela extensão; o clique
   roda `arara.ui.titleLauncher.run`. Ao lado do Customize Layout (order -0.5), o ícone
-  `type-hierarchy` roda `arara.codemap.show` quando a extensão liga `arara.codemap.available`. O que abre (hoje: a seção lateral do Arara AI) é
-  decisão da extensão arara-ai.
+  do Obsidian roda `arara.obsidian.open` quando a extensão liga `arara.obsidian.available`. No clique direito desse
+  ícone, o menu começa por "Open Obsidian" e "Sync Obsidian vault" (que rodam `arara.obsidian.open` e
+  `arara.obsidian.sync`), seguidos do Hide e do menu normal da barra de título (MenuId.TitleBarContext), por
+  um MenuEntryActionViewItem registrado no IActionViewItemService. O menu de contexto é o nativo do
+  workbench, igual em Linux, Windows e macOS. O que abre (hoje: a seção lateral do Arara AI e o vault do
+  Obsidian) é decisão da extensão arara-ai.
+- araraTitleLauncher.css: aplica a silhueta SVG do Obsidian como máscara na cor do tema.
 - workbench.desktop.main.ts: importa a contribution.
 
 Why a patch: extensões não contribuem itens para o LayoutControlMenu nem para a barra
 de título (MenuId.TitleBar/LayoutControlMenu não estão no menusExtensionPoint).
 Sem lógica de produto, rede ou processo no core.
-Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts src/vs/workbench/workbench.desktop.main.ts
+Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts src/vs/workbench/workbench.desktop.main.ts
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,98 @@
++import './araraTitleLauncher.css';
++import { addDisposableListener, EventType, getWindow } from '../../../../base/browser/dom.js';
++import { StandardMouseEvent } from '../../../../base/browser/mouseEvent.js';
++import { IAction, Separator, toAction } from '../../../../base/common/actions.js';
 +import { Codicon } from '../../../../base/common/codicons.js';
++import { Disposable } from '../../../../base/common/lifecycle.js';
 +import { localize } from '../../../../nls.js';
-+import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
++import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
++import { MenuEntryActionViewItem } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
++import { MenuId, MenuItemAction, MenuRegistry } from '../../../../platform/actions/common/actions.js';
++import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
++import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 +import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++
++const OBSIDIAN_OPEN = 'arara.obsidian.open';
++const OBSIDIAN_SYNC = 'arara.obsidian.sync';
 +
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +	group: 'navigation',
@@ -38,11 +56,11 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +	group: 'navigation',
 +	order: -0.5,
 +	command: {
-+		id: 'arara.codemap.show',
-+		title: localize('arara.codemap.show', "Code map"),
-+		icon: Codicon.typeHierarchy,
++		id: OBSIDIAN_OPEN,
++		title: localize('arara.obsidian.open', "Open Obsidian"),
++		icon: Codicon.ruby,
 +	},
-+	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.codemap.available')),
++	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has('arara.obsidian.available')),
 +});
 +
 +for (const id of [MenuId.MenubarPreferencesMenu, MenuId.GlobalActivity]) {
@@ -56,6 +74,52 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
 +		when: ContextKeyExpr.has('arara.ui.titleLauncher'),
 +	});
 +}
++
++class AraraLauncherActionViewItem extends MenuEntryActionViewItem {
++
++	extraActions: IAction[] = [];
++
++	override render(container: HTMLElement): void {
++		super.render(container);
++		this._register(addDisposableListener(container, EventType.CONTEXT_MENU, e => {
++			const event = new StandardMouseEvent(getWindow(container), e);
++			event.preventDefault();
++			event.stopPropagation();
++			const action = this._menuItemAction;
++			const primary = [toAction({ id: action.id, label: action.label, run: () => action.run() }), ...this.extraActions];
++			const actions = action.hideActions ? Separator.join(primary, [action.hideActions.hide]) : primary;
++			this._contextMenuService.showContextMenu({
++				getAnchor: () => event,
++				getActions: () => actions,
++				menuId: MenuId.TitleBarContext,
++				contextKeyService: this._contextKeyService,
++			});
++		}));
++	}
++}
++
++class AraraTitleLauncherContribution extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.araraTitleLauncher';
++
++	constructor(
++		@IActionViewItemService actionViewItemService: IActionViewItemService,
++		@IInstantiationService instantiationService: IInstantiationService,
++		@ICommandService commandService: ICommandService,
++	) {
++		super();
++		this._register(actionViewItemService.register(MenuId.LayoutControlMenu, OBSIDIAN_OPEN, (action, options) => {
++			if (!(action instanceof MenuItemAction)) {
++				return undefined;
++			}
++			const item = instantiationService.createInstance(AraraLauncherActionViewItem, action, options);
++			item.extraActions = [toAction({ id: OBSIDIAN_SYNC, label: localize('arara.obsidian.sync', "Sync Obsidian vault"), run: () => commandService.executeCommand(OBSIDIAN_SYNC) })];
++			return item;
++		}));
++	}
++}
++
++registerWorkbenchContribution2(AraraTitleLauncherContribution.ID, AraraTitleLauncherContribution, WorkbenchPhase.BlockRestore);
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
 @@ -199,6 +199,8 @@
@@ -67,3 +131,13 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.cont
  // MCP
  import './contrib/mcp/electron-browser/mcp.contribution.js';
  
+
+--- /dev/null
++++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css
+@@ -0,0 +1,6 @@
++.monaco-workbench .part.titlebar .action-label.codicon-ruby::before {
++	content: "";
++	background-color: currentColor;
++	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19.355 18.538a68.967 68.959 0 0 0 1.858 -2.954 0.81 0.81 0 0 0 -0.062 -0.9c-0.516 -0.685 -1.504 -2.075 -2.042 -3.362 -0.553 -1.321 -0.636 -3.375 -0.64 -4.377a1.707 1.707 0 0 0 -0.358 -1.05l-3.198 -4.064a3.744 3.744 0 0 1 -0.076 0.543c-0.106 0.503 -0.307 1.004 -0.536 1.5 -0.134 0.29 -0.29 0.6 -0.446 0.914l-0.31 0.626c-0.516 1.068 -0.997 2.227 -1.132 3.59 -0.124 1.26 0.046 2.73 0.815 4.481 0.128 0.011 0.257 0.025 0.386 0.044a6.363 6.363 0 0 1 3.326 1.505c0.916 0.79 1.744 1.922 2.415 3.5zM8.199 22.569c0.073 0.012 0.146 0.02 0.22 0.02 0.78 0.024 2.095 0.092 3.16 0.29 0.87 0.16 2.593 0.64 4.01 1.055 1.083 0.316 2.198 -0.548 2.355 -1.664 0.114 -0.814 0.33 -1.735 0.725 -2.58l-0.01 0.005c-0.67 -1.87 -1.522 -3.078 -2.416 -3.849a5.295 5.295 0 0 0 -2.778 -1.257c-1.54 -0.216 -2.952 0.19 -3.84 0.45 0.532 2.218 0.368 4.829 -1.425 7.531zM5.533 9.938c-0.023 0.1 -0.056 0.197 -0.098 0.29L2.82 16.059a1.602 1.602 0 0 0 0.313 1.772l4.116 4.24c2.103 -3.101 1.796 -6.02 0.836 -8.3 -0.728 -1.73 -1.832 -3.081 -2.55 -3.831zM9.32 14.01c0.615 -0.183 1.606 -0.465 2.745 -0.534 -0.683 -1.725 -0.848 -3.233 -0.716 -4.577 0.154 -1.552 0.7 -2.847 1.235 -3.95 0.113 -0.235 0.223 -0.454 0.328 -0.664 0.149 -0.297 0.288 -0.577 0.419 -0.86 0.217 -0.47 0.379 -0.885 0.46 -1.27 0.08 -0.38 0.08 -0.72 -0.014 -1.043 -0.095 -0.325 -0.297 -0.675 -0.68 -1.06a1.6 1.6 0 0 0 -1.475 0.36l-4.95 4.452a1.602 1.602 0 0 0 -0.513 0.952l-0.427 2.83c0.672 0.59 2.328 2.316 3.335 4.711 0.09 0.21 0.175 0.43 0.253 0.653z'/%3E%3C/svg%3E") center / contain no-repeat;
++	width: 16px; height: 16px;
++}

@@ -1,0 +1,59 @@
+Arara Code: first launch opens in the system language using the built-in language packs.
+
+Why a patch: the main process picks the UI language before any extension runs,
+reading languagepacks.json, which the shared process only writes after the first
+window opens. Without the file, the first launch (and the setup) was English even
+with pt/es packs built in. When the file is missing, read the built-in packs'
+manifests with the same shape and hash the shared process writes later.
+Touches: src/vs/base/node/nls.ts
+
+--- a/src/vs/base/node/nls.ts
++++ b/src/vs/base/node/nls.ts
+@@ -5,6 +5,7 @@
+ 
+ import { join } from '../common/path.js';
+ import { promises } from 'fs';
++import { createHash } from 'crypto';
+ import { mark } from '../common/performance.js';
+ import { ILanguagePacks, INLSConfiguration } from '../../nls.js';
+ import { Promises } from './pfs.js';
+@@ -53,7 +54,7 @@
+ 	}
+ 
+ 	try {
+-		const languagePacks = await getLanguagePackConfigurations(userDataPath);
++		const languagePacks = await getLanguagePackConfigurations(userDataPath) ?? await getBuiltinLanguagePackConfigurations(join(nlsMetadataPath, '..', 'extensions'));
+ 		if (!languagePacks) {
+ 			return defaultNLSConfiguration(userLocale, osLocale, nlsMetadataPath);
+ 		}
+@@ -177,6 +178,30 @@
+ 	}
+ }
+ 
++async function getBuiltinLanguagePackConfigurations(extensionsPath: string): Promise<ILanguagePacks | undefined> {
++	const languagePacks: ILanguagePacks = {};
++	try {
++		for (const folder of await promises.readdir(extensionsPath)) {
++			const location = join(extensionsPath, folder);
++			let manifest;
++			try { manifest = JSON.parse(await promises.readFile(join(location, 'package.json'), 'utf-8')); } catch { continue; }
++			const id = `${manifest.publisher}.${manifest.name}`.toLowerCase();
++			for (const localization of manifest.contributes?.localizations ?? []) {
++				if (typeof localization?.languageId !== 'string' || !Array.isArray(localization.translations)) { continue; }
++				const translations: Record<string, string> = {};
++				for (const translation of localization.translations) {
++					if (typeof translation?.id === 'string' && typeof translation?.path === 'string') { translations[translation.id] = join(location, translation.path); }
++				}
++				const languageId = localization.languageId.toLowerCase();
++				languagePacks[languageId] = { hash: createHash('md5').update(id).update(manifest.version).digest('hex'), extensions: [{ extensionIdentifier: { id }, version: manifest.version }], translations, label: localization.localizedLanguageName ?? localization.languageName };
++			}
++		}
++	} catch {
++		return undefined;
++	}
++	return Object.keys(languagePacks).length ? languagePacks : undefined;
++}
++
+ function resolveLanguagePackLanguage(languagePacks: ILanguagePacks, locale: string | undefined): string | undefined {
+ 	try {
+ 		while (locale) {
