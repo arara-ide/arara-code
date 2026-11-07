@@ -47,7 +47,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Inicialização: a tela de boas-vindas abre antes da leitura do histórico e não espera a instalação das skills.
 - Atualização: instalações portáteis do Windows recebem o ZIP correspondente, com orientação para preservar os dados.
 - Editor: a tela inicial com os projetos recentes deixa de piscar quando a pasta aberta tem muitos repositórios Git.
-- Navegador: a IA espera 1 segundo depois de clicar num campo antes de digitar e não perde mais a primeira letra; campos fora da tela são alcançados com rolagem suave, também no Seu navegador.
+- Navegador: a IA espera 1 segundo depois de clicar num campo antes de digitar e não perde mais a primeira letra; campos fora da tela são alcançados com rolagem suave, também no Meu navegador.
 
 ### Removido
 - Orquestra: acessos pelo topo do chat e do Arara Bot e botões de mover bots ocultos temporariamente; comandos e dados preservados.
