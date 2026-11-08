@@ -269,7 +269,7 @@ else
   APP=""
   for APP in "VSCode-darwin-${VSCODE_ARCH}"/*.app; do break; done
   [[ -d "${APP}" ]] || { echo "! .app não encontrado em VSCode-darwin-${VSCODE_ARCH}" >&2; exit 1; }
-  codesign --force --deep --sign - "${APP}"
+  bash "${ROOT}/scripts/sign-macos.sh" "${APP}"
   OUT="${ROOT}/dist"
   mkdir -p "${OUT}"
   ditto -c -k --sequesterRsrc --keepParent "${APP}" "${OUT}/AraraCode-darwin-${VSCODE_ARCH}-${RELEASE_VERSION}.zip"

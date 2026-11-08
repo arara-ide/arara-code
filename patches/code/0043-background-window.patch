@@ -1,0 +1,103 @@
+Background windows: allow a local companion to run the extension host without showing the workbench.
+The extension API cannot control native window visibility at creation time.
+This generic CLI flag only suppresses native presentation and focus; all product,
+authentication and tool behavior remains in the private extension.
+
+--- a/src/vs/platform/environment/common/argv.ts
++++ b/src/vs/platform/environment/common/argv.ts
+@@ -121,6 +121,7 @@
+ 	'transient'?: boolean;
+ 	'use-inmemory-secretstorage'?: boolean;
+ 	'password-store'?: string;
++	'background-window'?: boolean;
+ 	'disable-workspace-trust'?: boolean;
+ 	'disable-crash-reporter'?: boolean;
+ 	'crash-reporter-directory'?: string;
+--- a/src/vs/platform/environment/node/argv.ts
++++ b/src/vs/platform/environment/node/argv.ts
+@@ -191,6 +191,7 @@
+ 	'transient': { type: 'boolean', cat: 't', description: localize('transient', "Run with temporary data and extension directories, as if launched for the first time.") },
+ 	'use-inmemory-secretstorage': { type: 'boolean', deprecates: ['disable-keytar'] },
+ 	'password-store': { type: 'string' },
++	'background-window': { type: 'boolean' },
+ 	'disable-workspace-trust': { type: 'boolean' },
+ 	'disable-crash-reporter': { type: 'boolean' },
+ 	'crash-reporter-directory': { type: 'string' },
+--- a/src/vs/platform/windows/electron-main/windowsMainService.ts
++++ b/src/vs/platform/windows/electron-main/windowsMainService.ts
+@@ -1610,6 +1610,7 @@
+ 				state,
+ 				extensionDevelopmentPath: configuration.extensionDevelopmentPath,
+ 				isExtensionTestHost: !!configuration.extensionTestsPath,
++				background: !!configuration['background-window'],
+ 				isSessionsWindow: configuration.isSessionsWindow
+ 			});
+ 			mark('code/didCreateCodeWindow');
+--- a/src/vs/platform/windows/electron-main/windowImpl.ts
++++ b/src/vs/platform/windows/electron-main/windowImpl.ts
+@@ -52,6 +52,7 @@
+ 	readonly state: IWindowState;
+ 	readonly extensionDevelopmentPath?: string[];
+ 	readonly isExtensionTestHost?: boolean;
++	readonly background?: boolean;
+ 	readonly isSessionsWindow?: boolean;
+ }
+ 
+@@ -138,6 +139,7 @@
+ 
+ 	abstract readonly id: number;
+ 
++	protected backgroundWindow = false;
+ 	protected _lastFocusTime = Date.now(); // window is shown on creation so take current time
+ 	get lastFocusTime(): number { return this._lastFocusTime; }
+ 
+@@ -343,6 +345,7 @@
+ 	}
+ 
+ 	focus(options?: { mode: FocusMode }): void {
++		if (this.backgroundWindow) { return; }
+ 		switch (options?.mode ?? FocusMode.Transfer) {
+ 			case FocusMode.Transfer:
+ 				this.doFocusWindow();
+@@ -694,6 +697,8 @@
+ 	) {
+ 		super(configurationService, stateService, environmentMainService, logService);
+ 
++		this.backgroundWindow = config.background === true;
++
+ 		//#region create browser window
+ 		{
+ 			this.configObjectUrl = this._register(protocolMainService.createIPCObjectUrl<INativeWindowConfiguration>());
+@@ -708,11 +713,13 @@
+ 				additionalArguments: [`--vscode-window-config=${this.configObjectUrl.resource.toString()}`],
+ 				v8CacheOptions: this.environmentMainService.useCodeCache ? 'bypassHeatCheck' : 'none'
+ 			};
+-			if (config.isSessionsWindow) {
++			if (config.isSessionsWindow || this.backgroundWindow) {
+ 				webPreferences.backgroundThrottling = false; // keep agents window responsive when in background
+ 			}
+ 
+ 			const options = instantiationService.invokeFunction(defaultBrowserWindowOptions, this.windowState, undefined, webPreferences);
++
++			if (this.backgroundWindow) { options.show = false; options.skipTaskbar = true; }
+ 
+ 			// Create the browser window
+ 			mark('code/willCreateCodeBrowserWindow');
+@@ -723,7 +730,7 @@
+ 			this.setWin(this._win, options);
+ 
+ 			// Apply some state after window creation
+-			this.applyState(this.windowState, hasMultipleDisplays);
++			if (!this.backgroundWindow) { this.applyState(this.windowState, hasMultipleDisplays); }
+ 
+ 			this._lastFocusTime = Date.now(); // since we show directly, we need to set the last focus time too
+ 		}
+@@ -1223,7 +1230,7 @@
+ 
+ 		// Make window visible if it did not open in N seconds because this indicates an error
+ 		// Only do this when running out of sources and not when running tests
+-		if (!this.environmentMainService.isBuilt && !this.environmentMainService.extensionTestsLocationURI) {
++		if (!this.backgroundWindow && !this.environmentMainService.isBuilt && !this.environmentMainService.extensionTestsLocationURI) {
+ 			this._register(new RunOnceScheduler(() => {
+ 				if (this._win && !this._win.isVisible() && !this._win.isMinimized()) {
+ 					this._win.show();
