@@ -48,5 +48,6 @@
     "viewType": "arara.setup",
     "completedKey": "arara.setup.v1.completed",
     "title": "Arara Code"
-  }
+  },
+  "companionHostVersion": 1
 }

@@ -19,5 +19,8 @@
   "After you continue, Arara Code will open the update in Finder and close. Drag Arara Code to Applications, choose Replace, then reopen the app.": "Al continuar, Arara Code abrirá la actualización en Finder y se cerrará. Arrastra Arara Code a Aplicaciones, elige Reemplazar y vuelve a abrir la app.",
   "$(check) Arara Code {0} is available in the Microsoft Store": "$(check) Arara Code {0} disponible en Microsoft Store",
   "Could not open the Microsoft Store. Open it and update Arara Code in Library.": "No se pudo abrir Microsoft Store. Ábrela y actualiza Arara Code en Biblioteca.",
-  "Arara Code {0} opens in the Microsoft Store. Choose Update, then reopen Arara Code.": "Arara Code {0} se abre en Microsoft Store. Elige Actualizar y luego vuelve a abrir Arara Code."
+  "Arara Code {0} opens in the Microsoft Store. Choose Update, then reopen Arara Code.": "Arara Code {0} se abre en Microsoft Store. Elige Actualizar y luego vuelve a abrir Arara Code.",
+  "Install Arara Vibes": "Instalar Arara Vibes",
+  "Arara Vibes is ready to install. Use your Arara chat in a floating window.": "Arara Vibes está listo para instalar. Usa tu chat Arara en una ventana flotante.",
+  "Arara Vibes could not be prepared. You can download it from the Arara downloads page.": "No se pudo preparar Arara Vibes. Puedes descargarlo desde la página de descargas de Arara."
 }

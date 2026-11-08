@@ -40,6 +40,7 @@ jobs:
     timeout-minutes: 360
     env:
       RELEASE_VERSION: ${{ inputs.version }}
+      ARARA_MACOS_SIGN_IDENTITY: ${{ vars.ARARA_MACOS_SIGN_IDENTITY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -111,6 +112,17 @@ jobs:
             *) echo "::error::Runner $actual não corresponde a $EXPECTED_ARCH"; exit 1 ;;
           esac
 
+      - name: Importar identidade persistente de assinatura
+        env:
+          ARARA_MACOS_SIGN_P12_BASE64: ${{ secrets.ARARA_MACOS_SIGN_P12_BASE64 }}
+          ARARA_MACOS_SIGN_PASSWORD: ${{ secrets.ARARA_MACOS_SIGN_PASSWORD }}
+        run: bash scripts/import-macos-signing.sh
+
+      - name: Testar identidade entre versões
+        run: |
+          node --test scripts/tests/macos-signing.cjs
+          node scripts/tests/macos-signing-live.cjs
+
       - name: Build
         env:
           MAX_OLD_SPACE_SIZE: '4096'
@@ -168,3 +180,7 @@ jobs:
             release/SHA256SUMS
           retention-days: 14
           if-no-files-found: error
+
+      - name: Remover chaveiro temporário
+        if: always() && env.ARARA_MACOS_SIGN_KEYCHAIN != ''
+        run: security delete-keychain "$ARARA_MACOS_SIGN_KEYCHAIN"
