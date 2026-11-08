@@ -5,13 +5,13 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
-const source = path.join(root, '.work/vscodium/vscode');
+const upstream = require('./fixtures/background-window-upstream.json');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arara-background-patch-'));
 const files = ['src/vs/platform/environment/common/argv.ts', 'src/vs/platform/environment/node/argv.ts', 'src/vs/platform/windows/electron-main/windowImpl.ts', 'src/vs/platform/windows/electron-main/windowsMainService.ts'];
 try {
   for (const file of files) {
     const target = path.join(directory, file); fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, execFileSync('git', ['show', `HEAD:${file}`], { cwd: source }));
+    fs.writeFileSync(target, upstream.files[file]);
   }
   execFileSync('git', ['apply', path.join(root, 'patches/code/0043-background-window.patch')], { cwd: directory });
   const code = fs.readFileSync(path.join(directory, files[2]), 'utf8');
