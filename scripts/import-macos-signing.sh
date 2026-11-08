@@ -22,5 +22,6 @@ security set-keychain-settings -lut 21600 "$KEYCHAIN"
 security unlock-keychain -p "$PASSWORD" "$KEYCHAIN"
 security import "$WORK/signing.p12" -k "$KEYCHAIN" -P "$ARARA_MACOS_SIGN_PASSWORD" -T /usr/bin/codesign
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$PASSWORD" "$KEYCHAIN" >/dev/null
+security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
 printf 'ARARA_MACOS_SIGN_KEYCHAIN=%s\n' "$KEYCHAIN" >> "$GITHUB_ENV"
 IMPORTED=1
