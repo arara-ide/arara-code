@@ -16,12 +16,7 @@ on:
       - '.github/workflows/**'
       - 'README.md'
       - 'AGENTS.md'
-  workflow_dispatch:
-    inputs:
-      prerelease:
-        description: 'Publicar como pre-release (versão de teste)'
-        type: boolean
-        default: true
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -355,7 +350,7 @@ jobs:
           subject-path: dist/AraraCodeSetup-x64-${{ needs.version.outputs.release }}.exe
 
   store-windows:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && !inputs.prerelease && vars.MSSTORE_PACKAGE_NAME != '' && vars.MSSTORE_PRODUCT_ID != ''
+    if: github.ref == 'refs/heads/main' && vars.MSSTORE_PACKAGE_NAME != '' && vars.MSSTORE_PRODUCT_ID != ''
     needs: [version, windows, release-windows]
     runs-on: windows-latest
     timeout-minutes: 60
@@ -418,7 +413,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release }}
       artifact: linux
-      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+      prerelease: false
 
   release-windows:
     if: github.ref == 'refs/heads/main'
@@ -429,7 +424,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release }}
       artifact: windows
-      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+      prerelease: false
 
   release-macos-x64:
     if: github.ref == 'refs/heads/main'
@@ -440,7 +435,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release }}
       artifact: macos-x64
-      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+      prerelease: false
 
   release-macos-arm64:
     if: github.ref == 'refs/heads/main'
@@ -451,4 +446,4 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release }}
       artifact: macos-arm64
-      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+      prerelease: false
