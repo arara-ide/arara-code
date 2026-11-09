@@ -332,3 +332,19 @@ test('recomputes artifact checksums instead of trusting its SHA256SUMS file', as
   const sums = f.state.assets.find(asset => asset.name === 'SHA256SUMS').bytes.toString();
   assert.equal(sums, `${hash(`package ${names[0]}`)}  ${names[0]}\n`);
 });
+
+
+test('main builds always publish stable releases and submit the Store package', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/build.yml'), 'utf8').replace(/\r\n/g, '\n');
+  const job = name => workflow.split('\n  ' + name + ':\n')[1].split(/\n  [\w-]+:\n/)[0];
+  assert.doesNotMatch(workflow, /inputs\.prerelease|github\.event_name/);
+  for (const platform of ['linux', 'windows', 'macos-x64', 'macos-arm64']) {
+    const release = job('release-' + platform);
+    assert.match(release, /if: github\.ref == 'refs\/heads\/main'/);
+    assert.match(release, /prerelease: false/);
+  }
+  const store = job('store-windows');
+  assert.match(store, /if: github\.ref == 'refs\/heads\/main' && vars\.MSSTORE_PACKAGE_NAME != '' && vars\.MSSTORE_PRODUCT_ID != ''/);
+  assert.match(store, /needs: \[version, windows, release-windows\]/);
+  assert.match(store, /msstore publish/);
+});
