@@ -2,6 +2,7 @@
 
 const { basename, dirname, join } = require('node:path');
 const { promisify } = require('node:util');
+const { installMacDmg, macMainPid } = require('./mac-install');
 const { UpdateBusy } = require('./busy');
 const { UpdateChecker } = require('./checker');
 const { UpdateDownloads, hostArch, installAction, installInstructions, updateTarget } = require('./downloads');
@@ -24,7 +25,7 @@ function platformDeps() {
     spawn: childProcess.spawn, execFile: promisify(childProcess.execFile), homedir: os.homedir,
     platform: process.platform, arch: process.arch, env: process.env, tmpdir: os.tmpdir,
     translated: () => { try { return childProcess.execFileSync('/usr/sbin/sysctl', ['-in', 'sysctl.proc_translated'], { encoding: 'utf8', timeout: 2000 }).trim() === '1'; } catch { return false; } },
-    Checker: UpdateChecker, Downloads: UpdateDownloads,
+    Checker: UpdateChecker, Downloads: UpdateDownloads, installMacDmg, macMainPid,
   };
 }
 
@@ -101,20 +102,6 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
     return appPath;
   };
 
-  const mountApp = async file => {
-    const mount = await deps.mkdtemp(join(deps.tmpdir(), 'arara-update-'));
-    let mounted = false;
-    try {
-      await deps.execFile('/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', mount, file]);
-      mounted = true;
-      await deps.execFile('/usr/bin/open', [mount]);
-    } catch (error) {
-      if (mounted) await deps.execFile('/usr/bin/hdiutil', ['detach', mount]).catch(() => {});
-      await deps.rmdir(mount).catch(() => {});
-      throw error;
-    }
-  };
-
   const install = async (run, waitInstaller) => {
     const installed = installedVersion() ?? current;
     if (ready && !newerVersion(ready.version, installed)) {
@@ -143,7 +130,16 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
       void vscode.window.showInformationMessage(t('The standard Windows installer is ready. Close Arara Code and uninstall the old UserSetup installation in Windows Settings, keeping your user data. Then run the downloaded installer to avoid duplicate installations.'));
       return;
     }
-    if (action.kind === 'extract-reveal' || action.kind === 'mount-reveal') {
+    if (action.kind === 'install-mac') {
+      const proceed = t('Continue');
+      const selected = await vscode.window.showInformationMessage(installInstructions(basename(verified.file)), { modal: true }, proceed);
+      if (selected !== proceed) return;
+      const waitPid = await deps.macMainPid(vscode.env.appRoot);
+      await deps.installMacDmg(verified.file, 'arara-code', { appRoot: vscode.env.appRoot, waitPid });
+      await vscode.commands.executeCommand('workbench.action.quit');
+      return;
+    }
+    if (action.kind === 'extract-reveal') {
       const appPath = action.kind === 'extract-reveal' ? await extractApp(verified, action.destination) : verified.file;
       const proceed = t('Continue');
       const selected = await vscode.window.showInformationMessage(
@@ -152,8 +148,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
         proceed,
       );
       if (selected !== proceed) return;
-      if (action.kind === 'mount-reveal') await mountApp(verified.file);
-      else await deps.execFile('/usr/bin/open', ['-R', appPath]);
+      await deps.execFile('/usr/bin/open', ['-R', appPath]);
       await vscode.commands.executeCommand('workbench.action.quit');
       return;
     }

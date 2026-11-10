@@ -44,7 +44,7 @@ function installerName(version, target) {
 function installInstructions(name) {
   if (name.endsWith('.AppImage')) return t('Close Arara Code and replace your previous AppImage with the downloaded file, keeping the same location and filename used by your shortcut. Then reopen the AppImage. Your settings are preserved.');
   if (name.endsWith('.exe')) return t('Open the selected installer and follow the steps to update Arara Code. Then reopen the app.');
-  if (name.endsWith('.dmg')) return t('After you continue, Arara Code will open the update in Finder and close. Drag Arara Code to Applications, choose Replace, then reopen the app.');
+  if (name.endsWith('.dmg')) return t('Arara Code will install the update in Applications and reopen automatically. Continue?');
   if (name.endsWith('.app')) return t('Close Arara Code, drag the AraraCode.app shown in Finder to Applications and choose Replace. Then reopen the app.');
   if (name.includes('-win32-') && name.endsWith('.zip')) return t('Close Arara Code, extract the downloaded ZIP and replace the portable installation folder. Keep your data folder if present. Then reopen Arara Code.');
   if (name.endsWith('.zip')) return t('Extract the selected file. Close Arara Code, drag the new app to Applications and confirm replacement. Then reopen the app.');
@@ -65,7 +65,7 @@ function windowsPowerShell(systemRoot = process.env.SystemRoot) {
 }
 
 function installAction(file, platform = process.platform, version, home, systemRoot) {
-  if (platform === 'darwin' && file.endsWith('.dmg')) return { kind: 'mount-reveal' };
+  if (platform === 'darwin' && file.endsWith('.dmg')) return { kind: 'install-mac' };
   if (platform === 'darwin' && file.endsWith('.zip') && version && home && versionPattern.test(version)) return { kind: 'extract-reveal', destination: join(home, 'Downloads', `AraraCode-${version}`) };
   if (platform === 'linux' && file.endsWith('.deb')) return { kind: 'terminal', text: `sudo apt install ${shellQuote(file)} && exit` };
   if (platform === 'win32' && file.endsWith('.exe')) return {

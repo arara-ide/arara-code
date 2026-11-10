@@ -18,6 +18,9 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: botão Fork abaixo da resposta abre uma nova conversa com as mensagens até ali, com o título "(Fork) Nome original" e numeração nos forks seguintes.
 
 ### Melhorias
+- Arara Vibes: a janela flutuante verifica e atualiza o próprio app e o Arara Code, mantendo as duas versões em dia pelo mesmo lugar.
+- Atualização: no macOS, a IDE instala a nova versão em Aplicativos e reabre sem arrastar pelo Finder; o botão de instalar o Vibes também instala o app diretamente.
+- Atualização: no Linux, a IDE prepara a reabertura por um serviço temporário do usuário e continua aberta se não conseguir prepará-lo.
 - Instalação: macOS passa a ter um DMG para Macs Intel e outro para Apple Silicon, e a atualização baixa o do seu processador.
 - WhatsApp: a conexão informa os riscos da integração não oficial e recomenda o app do Arara antes de continuar.
 - Chat: voltar ao chat 1, 2 ou 3 mostra a conversa como ela estava, já no fim e com o que chegou enquanto você estava em outro chat, sem carregar tudo de novo.

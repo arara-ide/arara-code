@@ -22,5 +22,8 @@
   "Arara Code {0} opens in the Microsoft Store. Choose Update, then reopen Arara Code.": "Arara Code {0} se abre en Microsoft Store. Elige Actualizar y luego vuelve a abrir Arara Code.",
   "Install Arara Vibes": "Instalar Arara Vibes",
   "Arara Vibes is ready to install. Use your Arara chat in a floating window.": "Arara Vibes está listo para instalar. Usa tu chat Arara en una ventana flotante.",
-  "Arara Vibes could not be prepared. You can download it from the Arara downloads page.": "No se pudo preparar Arara Vibes. Puedes descargarlo desde la página de descargas de Arara."
+  "Arara Vibes could not be prepared. You can download it from the Arara downloads page.": "No se pudo preparar Arara Vibes. Puedes descargarlo desde la página de descargas de Arara.",
+  "Arara Code will install the update in Applications and reopen automatically. Continue?": "Arara Code instalará la actualización en Aplicaciones y se abrirá automáticamente. ¿Continuar?",
+  "Installing Arara Vibes…": "Instalando Arara Vibes…",
+  "Could not prepare automatic restart. Arara Code will stay open. Close it and reopen it to use the update.": "No se pudo preparar el reinicio automático. Arara Code seguirá abierto. Ciérralo y ábrelo para usar la actualización."
 }

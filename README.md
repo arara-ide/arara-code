@@ -153,12 +153,12 @@ Para entrar na conta e usar a IA, o backend precisa estar no ar (nesta fase de t
 
 O botão **Atualizar** aparece depois que o pacote correspondente à sua instalação foi baixado e conferido com SHA-256. Se esse formato ainda não estiver no release, a IDE tenta novamente depois, sem trocar de formato.
 
-- **`.deb`:** abre um terminal com `sudo apt install` para o pacote novo. A IDE percebe a troca e pode reiniciar, com opção de adiar.
+- **`.deb`:** abre um terminal com `sudo apt install` para o pacote novo. A IDE percebe a troca, aguarda a IA e prepara um serviço temporário do usuário para reabrir após o encerramento normal, com opção de adiar. Sem um gerenciador systemd de usuário disponível, conserva a janela aberta e orienta a reabertura manual.
 - **AppImage:** mostra o arquivo novo, já executável. Feche a IDE e substitua o AppImage anterior, mantendo o local e o nome usados no seu atalho. Depois, reabra.
 - **Windows pela Microsoft Store:** o botão só aparece quando a Store já publicou uma versão mais nova que a instalada (consulta pública ao catálogo da Store a cada 30 min). O clique abre a página do Arara Code na Store para escolher Atualizar; não há download pelo GitHub.
 - **Windows instalado:** abre o instalador normal. Instalações antigas do UserSetup recebem a orientação de migração antes de executar o instalador.
 - **Windows portátil:** mostra o ZIP novo; feche a IDE e substitua a pasta portátil, preservando a pasta `data`, se existir.
-- **Linux `.tar.gz`:** mostra o arquivo novo para substituir a pasta manualmente. **macOS:** baixa o DMG do processador do Mac (Intel ou Apple Silicon, inclusive quando o app Intel roda pelo Rosetta) e o abre; feche a IDE e arraste o app para Aplicativos, confirmando a substituição.
+- **Linux `.tar.gz`:** mostra o arquivo novo para substituir a pasta manualmente. **macOS:** baixa o DMG do processador do Mac (Intel ou Apple Silicon, inclusive quando o app Intel roda pelo Rosetta) e, após sua confirmação, prepara e verifica o app, fecha normalmente, substitui a cópia em Aplicativos e reabre automaticamente. Falha de preparação ou permissão conserva a IDE aberta.
 
 As configurações e conversas são preservadas quando você mantém os dados de usuário.
 

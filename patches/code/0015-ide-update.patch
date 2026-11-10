@@ -6,9 +6,9 @@ Arara Code: botão "Atualizar" no topo e reinício automático quando o .deb nov
     arara.update.available, ligada pela extensão built-in arara-update
     (extensions/arara-update neste repositório) depois de conferir as releases
     no GitHub e baixar o instalador. O clique roda arara.update.open (extensão),
-    que abre o instalador baixado.
+    que prepara ou abre o instalador baixado.
   - Com a context key arara.update.busy (ligada e desligada pela extensão), o botão
-    vira "Atualizando", desabilitado e com ícone girando. "Reiniciar/Fechar para
+    vira "Atualizando", desabilitado e com ícone girando. "Reiniciar para
     atualizar" (arara.update.installed) sempre tem prioridade. Quando ligar e
     desligar fica na extensão.
   - O apt troca os arquivos de /usr/share/arara-code com a IDE aberta e o processo
@@ -16,9 +16,10 @@ Arara Code: botão "Atualizar" no topo e reinício automático quando o .deb nov
     e ao ganhar foco; se duas leituras seguidas mostram outra versão, liga
     arara.update.installed, avisa com contagem de 10 s (espera a IA terminar se
     arara.*.running estiver ligado) e chama o relaunch nativo: o main process sai
-    e o binário novo sobe pelo mesmo caminho. No Linux só fecha (quit): o usuário
-    reabre o binário novo. Hot exit preserva o que não foi salvo.
-    "Depois" troca o botão por "Reiniciar para atualizar" ("Fechar para atualizar" no Linux). Com várias janelas, só a
+    e o binário novo sobe pelo mesmo caminho. No Linux a extensão prepara um serviço
+    temporário do usuário que aguarda o main process sair antes de reabrir o app.
+    Se o serviço não puder iniciar, a IDE continua aberta com aviso. Hot exit preserva o que não foi salvo.
+    "Depois" troca o botão por "Reiniciar para atualizar". Com várias janelas, só a
     de menor id mostra o aviso. Desligado em modo dev (isBuilt = false).
 - media/araraUpdate.css (novo): estilo de botão para o item com texto.
 - workbench.desktop.main.ts: importa a contribution (só desktop).
@@ -27,12 +28,15 @@ Why a patch: extensão não põe item no LayoutControlMenu nem desenha botão co
 na barra de título, e só o core consegue reiniciar o app inteiro (main process);
 workbench.action.reloadWindow recarrega só a janela, com o Electron antigo.
 Revisão de segurança: lê só o product.json do próprio appRoot; não abre URL nem
-executa nada vindo da rede (a URL do botão é validada na extensão).
+executa nada vindo da rede (a URL do botão é validada na extensão). No Linux,
+o patch passa apenas o PID principal à extensão; o quit depende da preparação
+do serviço de reabertura. A extensão valida PID, caminho executável e argumentos,
+usa um serviço do próprio usuário e não eleva privilégios.
 Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts src/vs/workbench/contrib/arara/electron-browser/media/araraUpdate.css src/vs/workbench/workbench.desktop.main.ts
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,205 @@
 +import './media/araraUpdate.css';
 +import { reset } from '../../../../base/browser/dom.js';
 +import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
@@ -46,6 +50,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
 +import { MenuEntryActionViewItem } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
 +import { Action2, MenuId, MenuItemAction, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpr, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IFileService } from '../../../../platform/files/common/files.js';
 +import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
@@ -71,8 +76,11 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +
 +const notInAuxWindow = IsAuxiliaryWindowContext.negate();
 +
-+function restart(nativeHostService: INativeHostService): Promise<void> {
-+	return isLinux ? nativeHostService.quit() : nativeHostService.relaunch();
++async function restart(nativeHostService: INativeHostService, commandService: ICommandService, environmentService: INativeWorkbenchEnvironmentService): Promise<void> {
++	if (!isLinux) { return nativeHostService.relaunch(); }
++	if (await commandService.executeCommand<boolean>('arara.update.prepareRestart', environmentService.mainPid)) {
++		await nativeHostService.quit();
++	}
 +}
 +
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
@@ -98,14 +106,14 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +	constructor() {
 +		super({
 +			id: RESTART_COMMAND,
-+			title: isLinux ? localize2('arara.update.close', "Close to update") : localize2('arara.update.restart', "Restart to update"),
++			title: localize2('arara.update.restart', "Restart to update"),
 +			f1: true,
 +			precondition: UpdateInstalled,
 +			menu: { id: MenuId.LayoutControlMenu, group: 'navigation', order: -1, when: ContextKeyExpr.and(notInAuxWindow, UpdateInstalled) },
 +		});
 +	}
 +	run(accessor: ServicesAccessor): Promise<void> {
-+		return restart(accessor.get(INativeHostService));
++		return restart(accessor.get(INativeHostService), accessor.get(ICommandService), accessor.get(INativeWorkbenchEnvironmentService));
 +	}
 +});
 +
@@ -139,7 +147,8 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		@IInstantiationService instantiationService: IInstantiationService,
 +		@IContextKeyService private readonly contextKeyService: IContextKeyService,
 +		@IFileService private readonly fileService: IFileService,
-+		@INativeWorkbenchEnvironmentService environmentService: INativeWorkbenchEnvironmentService,
++		@INativeWorkbenchEnvironmentService private readonly environmentService: INativeWorkbenchEnvironmentService,
++		@ICommandService private readonly commandService: ICommandService,
 +		@IProductService private readonly productService: IProductService,
 +		@INativeHostService private readonly nativeHostService: INativeHostService,
 +		@INotificationService private readonly notificationService: INotificationService,
@@ -205,15 +214,11 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +	private async countdown(version: string): Promise<void> {
 +		let cancelled = false;
 +		const message = (s: number) => this.aiRunning()
-+			? (isLinux
-+				? localize('arara.update.waitingAiClose', "Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.", version)
-+				: localize('arara.update.waitingAi', "Arara Code {0} is installed. It will restart when the AI finishes responding.", version))
-+			: isLinux
-+				? localize('arara.update.countdownClose', "Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.", version, s)
-+				: localize('arara.update.countdown', "Arara Code {0} is installed. Restarting in {1} s to apply the update.", version, s);
++			? localize('arara.update.waitingAi', "Arara Code {0} is installed. It will restart when the AI finishes responding.", version)
++			: localize('arara.update.countdown', "Arara Code {0} is installed. Restarting in {1} s to apply the update.", version, s);
 +
 +		const handle: INotificationHandle = this.notificationService.prompt(Severity.Info, message(COUNTDOWN_S), [
-+			{ label: isLinux ? localize('arara.update.closeNow', "Close now") : localize('arara.update.now', "Restart now"), run: () => { cancelled = true; void restart(this.nativeHostService); } },
++			{ label: localize('arara.update.now', "Restart now"), run: () => { cancelled = true; void restart(this.nativeHostService, this.commandService, this.environmentService); } },
 +			{ label: localize('arara.update.later', "Later"), run: () => { cancelled = true; } },
 +		], { sticky: true, priority: NotificationPriority.URGENT, onCancel: () => { cancelled = true; } });
 +		this.prompt.value = toDisposable(() => handle.close());
@@ -231,7 +236,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		}
 +		if (!cancelled) {
 +			handle.close();
-+			await restart(this.nativeHostService);
++			await restart(this.nativeHostService, this.commandService, this.environmentService);
 +		}
 +	}
 +}

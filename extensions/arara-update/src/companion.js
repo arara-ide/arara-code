@@ -7,22 +7,40 @@ const { homedir } = require('node:os');
 const { join, basename } = require('node:path');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
+const { newerVersion } = require('./version');
 
 function installedCompanion(product, platform = process.platform, home = homedir(), env = process.env, exists = existsSync) {
   const name = product === 'arara-code' ? 'Arara Code' : 'Arara Vibes';
-  const candidates = platform === 'darwin' ? [`/Applications/${name}.app`, join(home, 'Applications', `${name}.app`)]
+  const candidates = platform === 'darwin' ? [`/Applications/${name}.app`, join(home, 'Applications', `${name}.app`), ...(product === 'arara-code' ? ['/Applications/AraraCode.app', join(home, 'Applications', 'AraraCode.app')] : [])]
     : platform === 'win32' ? [join(env.LOCALAPPDATA || home, 'Programs', product, `${name}.exe`), join(env.ProgramFiles || 'C:\\Program Files', name, `${name}.exe`)]
       : [`/usr/bin/${product}`, `/opt/${name}/${product}`, join(home, '.local', 'bin', product)];
   return candidates.find(exists);
 }
 
-function companionAsset(assets, product, platform, arch) {
+function companionAsset(assets, product, platform, arch, format) {
   if (!['arara-code', 'arara-vibes'].includes(product) || !['x64', 'arm64'].includes(arch)) return undefined;
-  const extension = platform === 'darwin' ? '.dmg' : platform === 'win32' ? '.exe' : platform === 'linux' ? '.AppImage' : undefined;
+  const extension = format ? `.${format}` : platform === 'darwin' ? '.dmg' : platform === 'win32' ? '.exe' : platform === 'linux' ? '.AppImage' : undefined;
   if (!extension) return undefined;
-  const matches = assets.filter(asset => typeof asset.name === 'string' && asset.name.endsWith(extension) && !/[\\/]/.test(asset.name));
+  const matches = assets.filter(asset => asset && typeof asset.name === 'string' && asset.name.endsWith(extension) && !/[\\/]/.test(asset.name));
   const compatible = asset => platform === 'darwin' && /universal/i.test(asset.name) || (arch === 'arm64' ? /arm64|aarch64/i.test(asset.name) : !/arm64|aarch64|ia32|armv7/i.test(asset.name));
   return matches.find(compatible);
+}
+
+async function latestCompanion(product, options = {}) {
+  if (!['arara-code', 'arara-vibes'].includes(product)) throw new Error('Unknown companion');
+  const response = await (options.fetch || fetch)(`https://api.github.com/repos/arara-ide/${product}/releases?per_page=30`, { signal: options.signal || AbortSignal.timeout(10000), headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Arara-Companion' } });
+  if (!response.ok) throw new Error(`Release check failed: HTTP ${response.status}`);
+  const releases = await response.json();
+  if (!Array.isArray(releases)) throw new Error('Invalid companion releases');
+  let latest;
+  for (const release of releases) {
+    if (!release || release.draft || release.prerelease || typeof release.tag_name !== 'string' || !/^v?\d+\.\d+\.\d+$/.test(release.tag_name) || !Array.isArray(release.assets)) continue;
+    const asset = companionAsset(release.assets, product, options.platform || process.platform, options.arch || process.arch, options.format);
+    if (!asset || !release.assets.some(item => item?.name === 'SHA256SUMS')) continue;
+    if (!latest || newerVersion(release.tag_name.replace(/^v/, ''), latest.replace(/^v/, ''))) latest = release.tag_name;
+  }
+  if (!latest) throw new Error('Compatible stable release unavailable');
+  return latest;
 }
 
 async function digest(file) {
@@ -40,7 +58,7 @@ async function prepareCompanion(product, options = {}) {
   const metadata = join(root, 'ready.json');
   try {
     const cached = JSON.parse(await readFile(metadata, 'utf8'));
-    if (typeof cached.file === 'string' && basename(cached.file) === cached.file && /^[a-f0-9]{64}$/.test(cached.sha256) && await digest(join(root, cached.file)) === cached.sha256) return join(root, cached.file);
+    if ((!options.arch || cached.arch === options.arch) && (!options.version || cached.version === options.version) && (!options.format || cached.file?.endsWith(`.${options.format}`)) && typeof cached.file === 'string' && basename(cached.file) === cached.file && /^[a-f0-9]{64}$/.test(cached.sha256) && await digest(join(root, cached.file)) === cached.sha256) return join(root, cached.file);
   } catch { }
   const base = `https://github.com/arara-ide/${product}/releases/download/`;
   const request = async url => {
@@ -48,13 +66,15 @@ async function prepareCompanion(product, options = {}) {
     if (!response.ok) throw new Error(`Companion download failed: HTTP ${response.status}`);
     return response;
   };
-  const release = await (await request(`https://api.github.com/repos/arara-ide/${product}/releases/latest`)).json();
+  if (options.version && !/^v?\d+\.\d+\.\d+$/.test(options.version)) throw new Error('Invalid companion version');
+  const release = await (await request(`https://api.github.com/repos/arara-ide/${product}/releases/${options.version ? `tags/${encodeURIComponent(options.version)}` : 'latest'}`)).json();
+  if (options.version && release.tag_name !== options.version) throw new Error('Unexpected companion release');
   if (release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error('Stable companion release unavailable');
-  const asset = companionAsset(release.assets, product, options.platform || process.platform, options.arch || process.arch);
+  const asset = companionAsset(release.assets, product, options.platform || process.platform, options.arch || process.arch, options.format);
   const sums = release.assets.find(item => item.name === 'SHA256SUMS');
   if (!asset || !sums || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > 2 * 1024 ** 3) throw new Error('Compatible companion installer unavailable');
   for (const item of [asset, sums]) {
-    if (typeof item.browser_download_url !== 'string' || !item.browser_download_url.startsWith(base) || new URL(item.browser_download_url).search || new URL(item.browser_download_url).hash) throw new Error('Invalid companion release URL');
+    if (typeof item.browser_download_url !== 'string' || !item.browser_download_url.startsWith(options.version ? `${base}${options.version}/` : base) || new URL(item.browser_download_url).search || new URL(item.browser_download_url).hash) throw new Error('Invalid companion release URL');
   }
   const checksums = await (await request(sums.browser_download_url)).text();
   const checksum = checksums.split(/\r?\n/).map(line => /^([a-fA-F0-9]{64})\s+\*?(.+)$/.exec(line)).find(match => match?.[2] === asset.name)?.[1]?.toLowerCase();
@@ -70,10 +90,10 @@ async function prepareCompanion(product, options = {}) {
     if (bytes !== asset.size || await digest(partial) !== checksum) throw new Error('Companion checksum mismatch');
     await rename(partial, target);
     const staging = join(root, `${randomUUID()}.json`);
-    await require('node:fs/promises').writeFile(staging, JSON.stringify({ file: asset.name, sha256: checksum }), { mode: 0o600 });
+    await require('node:fs/promises').writeFile(staging, JSON.stringify({ file: asset.name, sha256: checksum, version: release.tag_name, arch: options.arch || process.arch }), { mode: 0o600 });
     await rename(staging, metadata);
     return target;
   } finally { await unlink(partial).catch(() => undefined); }
 }
 
-module.exports = { installedCompanion, companionAsset, prepareCompanion };
+module.exports = { installedCompanion, companionAsset, prepareCompanion, latestCompanion, ...require('./mac-install'), ...require('./linux-install') };
