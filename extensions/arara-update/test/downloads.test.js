@@ -95,7 +95,7 @@ describe('installer preparation', () => {
       assert.deepEqual(await cache.prepare(version), ready);
       assert.equal(fetcher.calls.length, 2);
       const action = installAction(ready.file, target.platform);
-      assert.equal(action.kind, target.platform === 'darwin' ? 'mount-reveal' : target.format === 'deb' ? 'terminal' : target.platform === 'win32' && name.endsWith('.exe') ? 'open' : 'reveal');
+      assert.equal(action.kind, target.platform === 'darwin' ? 'install-mac' : target.format === 'deb' ? 'terminal' : target.platform === 'win32' && name.endsWith('.exe') ? 'open' : 'reveal');
       if (target.format === 'AppImage') assert.equal((await stat(ready.file)).mode & 0o777, 0o755);
       if (action.kind === 'terminal') assert.equal(action.text, `sudo apt install '${ready.file}' && exit`);
       if (action.kind === 'open' && target.platform === 'win32') {
@@ -227,8 +227,8 @@ describe('installation format selection', () => {
     assert.equal(installAction('C:\\cache\\Setup.exe', 'win32', undefined, undefined, 'E:\\Windows').command, 'E:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
   });
 
-  it('routes macOS disk images through confirmation, mounting and Finder', () => {
-    assert.deepEqual(installAction('/tmp/AraraCode.dmg', 'darwin'), { kind: 'mount-reveal' });
+  it('routes macOS disk images through automatic application installation', () => {
+    assert.deepEqual(installAction('/tmp/AraraCode.dmg', 'darwin'), { kind: 'install-mac' });
   });
 });
 
@@ -271,7 +271,7 @@ it('downloads the DMG of each Mac processor, prefers Apple Silicon under Rosetta
   assert.equal(hostArch('darwin', 'x64', false), 'x64');
   assert.equal(hostArch('darwin', 'arm64', false), 'arm64');
   assert.equal(hostArch('linux', 'x64', true), 'x64');
-  for (const [locale, expected] of [['en', 'After you continue'], ['pt', 'Ao continuar'], ['es', 'Al continuar']]) {
+  for (const [locale, expected] of [['en', 'Arara Code will install'], ['pt', 'O Arara Code vai instalar'], ['es', 'Arara Code instalará']]) {
     setLanguage(locale);
     assert.ok(installInstructions('AraraCode.dmg').startsWith(expected));
   }
