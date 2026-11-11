@@ -2,6 +2,7 @@ Background windows: allow a local companion to run the extension host without sh
 The extension API cannot control native window visibility at creation time.
 This generic CLI flag only suppresses native presentation and focus; all product,
 authentication and tool behavior remains in the private extension.
+On macOS, background processes use accessory activation to stay out of the Dock.
 
 --- a/src/vs/platform/environment/common/argv.ts
 +++ b/src/vs/platform/environment/common/argv.ts
@@ -59,16 +60,17 @@ authentication and tool behavior remains in the private extension.
  		switch (options?.mode ?? FocusMode.Transfer) {
  			case FocusMode.Transfer:
  				this.doFocusWindow();
-@@ -694,6 +697,8 @@
+@@ -694,6 +697,9 @@
  	) {
  		super(configurationService, stateService, environmentMainService, logService);
  
 +		this.backgroundWindow = config.background === true;
++		if (this.backgroundWindow && isMacintosh) { electron.app.setActivationPolicy('accessory'); }
 +
  		//#region create browser window
  		{
  			this.configObjectUrl = this._register(protocolMainService.createIPCObjectUrl<INativeWindowConfiguration>());
-@@ -708,11 +713,13 @@
+@@ -708,11 +714,13 @@
  				additionalArguments: [`--vscode-window-config=${this.configObjectUrl.resource.toString()}`],
  				v8CacheOptions: this.environmentMainService.useCodeCache ? 'bypassHeatCheck' : 'none'
  			};
@@ -83,7 +85,7 @@ authentication and tool behavior remains in the private extension.
  
  			// Create the browser window
  			mark('code/willCreateCodeBrowserWindow');
-@@ -723,7 +730,7 @@
+@@ -723,7 +731,7 @@
  			this.setWin(this._win, options);
  
  			// Apply some state after window creation
@@ -92,7 +94,7 @@ authentication and tool behavior remains in the private extension.
  
  			this._lastFocusTime = Date.now(); // since we show directly, we need to set the last focus time too
  		}
-@@ -1223,7 +1230,7 @@
+@@ -1223,7 +1231,7 @@
  
  		// Make window visible if it did not open in N seconds because this indicates an error
  		// Only do this when running out of sources and not when running tests

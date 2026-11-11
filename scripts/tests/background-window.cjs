@@ -27,6 +27,13 @@ try {
   const apply = vm.runInNewContext(`(function(options){${createOptions};return options})`);
   assert.deepEqual(JSON.parse(JSON.stringify(apply.call({ backgroundWindow: true }, { show: true, skipTaskbar: false }))), { show: false, skipTaskbar: true });
   assert.deepEqual(JSON.parse(JSON.stringify(apply.call({ backgroundWindow: false }, { show: true, skipTaskbar: false }))), { show: true, skipTaskbar: false });
+  const activation = /if \(this.backgroundWindow && isMacintosh\) \{ electron.app.setActivationPolicy\('accessory'\); \}/.exec(code);
+  assert.ok(activation, 'Background Mac host must not appear in the Dock');
+  for (const backgroundWindow of [false, true]) for (const isMacintosh of [false, true]) {
+    const calls = [];
+    vm.runInNewContext(`(function(){${activation[0]}})`, { isMacintosh, electron: { app: { setActivationPolicy: policy => calls.push(policy) } } }).call({ backgroundWindow });
+    assert.deepEqual(calls, backgroundWindow && isMacintosh ? ['accessory'] : []);
+  }
   assert.ok(code.includes('if (!this.backgroundWindow) { this.applyState'));
   assert.ok(code.includes('if (!this.backgroundWindow && !this.environmentMainService.isBuilt'));
   assert.ok(fs.readFileSync(path.join(directory, files[3]), 'utf8').includes("background: !!configuration['background-window']"));
