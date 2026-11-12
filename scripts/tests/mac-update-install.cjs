@@ -3,11 +3,37 @@
 const assert = require('node:assert/strict');
 const { spawn, execFile } = require('node:child_process');
 const { promisify } = require('node:util');
-const { mkdtemp, mkdir, writeFile, readFile, access, rm } = require('node:fs/promises');
+const { mkdtemp, mkdir, writeFile, readFile, access, rm, copyFile, readdir, cp } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { once } = require('node:events');
-const { SWAP_SCRIPT } = require('../../extensions/arara-update/src/mac-install');
+const { SWAP_SCRIPT, installMacDmg } = require('../../extensions/arara-update/src/mac-install');
+
+async function checkGatekeeper(directory) {
+  const run = promisify(execFile);
+  const home = join(directory, 'manual');
+  const payload = join(home, 'payload');
+  const source = join(payload, 'Arara Code.app');
+  const destination = join(home, 'Applications', 'Arara Code.app');
+  const plist = '<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.arara.code</string><key>CFBundleExecutable</key><string>fixture</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>';
+  await mkdir(join(source, 'Contents/MacOS'), { recursive: true });
+  await mkdir(join(destination, 'Contents'), { recursive: true });
+  await writeFile(join(source, 'Contents/Info.plist'), plist);
+  await writeFile(join(destination, 'Contents/Info.plist'), plist);
+  await writeFile(join(destination, 'old'), 'previous');
+  await copyFile('/usr/bin/true', join(source, 'Contents/MacOS/fixture'));
+  await run('/usr/bin/codesign', ['--force', '--sign', '-', source]);
+  await cp(source, destination, { recursive: true });
+  const image = join(home, 'fixture.dmg');
+  await run('/usr/bin/hdiutil', ['create', '-srcfolder', payload, '-volname', 'Arara Gatekeeper Fixture', '-fs', 'HFS+', '-format', 'UDZO', image]);
+  await assert.rejects(installMacDmg(process.env.ARARA_UPDATE_DMG || image, 'arara-code', {
+    home, appRoot: join(destination, 'Contents/Resources/app'), tmpdir: home, waitPid: process.pid,
+  }), error => error.code === 'ERR_MAC_GATEKEEPER_REJECTED' && error.cause.code === 3);
+  assert.equal(await readFile(join(destination, 'old'), 'utf8'), 'previous');
+  assert.deepEqual(await readdir(join(home, 'Applications')), ['Arara Code.app']);
+  assert.ok(!(await readdir(home)).some(name => name.startsWith('arara-install-')));
+  console.log('PASS: real DMG, codesign and Gatekeeper rejection preserve the installed app and clean temporary files');
+}
 
 (async () => {
   assert.equal(process.platform, 'darwin', 'Run this integration test on macOS');
@@ -37,5 +63,6 @@ const { SWAP_SCRIPT } = require('../../extensions/arara-update/src/mac-install')
     assert.equal(await readFile(marker, 'utf8'), 'reopened');
     await assert.rejects(access(join(destination, 'old')));
     console.log('PASS: native Mac helper waits for exit, swaps an isolated application and reopens it without Finder');
+    await checkGatekeeper(directory);
   } finally { parent.kill(); helper?.kill(); await rm(directory, { recursive: true, force: true }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

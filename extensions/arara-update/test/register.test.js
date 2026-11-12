@@ -274,6 +274,41 @@ describe('update button', () => {
     assert.deepEqual(h.busy(), [false, true, false]);
   });
 
+  for (const [language, proceed, open, fragment] of [
+    ['en', 'Continue', 'Open installer in Finder', 'macOS blocked automatic installation'],
+    ['pt-br', 'Continuar', 'Abrir instalador no Finder', 'O macOS bloqueou a instalação automática'],
+    ['es', 'Continuar', 'Abrir instalador en Finder', 'macOS bloqueó la instalación automática'],
+  ]) {
+    for (const accept of [true, false]) {
+      it(`offers manual installation after Gatekeeper rejection in ${language}, accepted=${accept}`, async () => {
+        const h = harness({ platform: 'darwin', language });
+        const file = '/cache/update.dmg';
+        await h.found({ ...ready, file });
+        h.state.information = (_text, _options, action) => action === proceed ? proceed : accept ? open : undefined;
+        h.state.macInstall = async () => { throw Object.assign(new Error('rejected'), { code: 'ERR_MAC_GATEKEEPER_REJECTED' }); };
+        await h.click();
+        assert.ok(h.state.messages.at(-1).includes(fragment));
+        assert.deepEqual(h.state.dialogs.at(-1).slice(1), [{ modal: true }, open]);
+        assert.deepEqual(h.state.execFiles, accept ? [['/usr/bin/open', [file]]] : []);
+        assert.equal(h.state.errors.length, 0);
+        assert.ok(!h.state.executed.some(([command]) => command === 'workbench.action.quit'));
+        assert.deepEqual(h.busy(), [false, true, false]);
+      });
+    }
+  }
+
+  it('reports a Finder failure during manual installation and allows another attempt', async () => {
+    const h = harness({ platform: 'darwin' });
+    await h.found({ ...ready, file: '/cache/update.dmg' });
+    h.state.information = (_text, _options, action) => action;
+    h.state.macInstall = async () => { throw Object.assign(new Error('rejected'), { code: 'ERR_MAC_GATEKEEPER_REJECTED' }); };
+    h.state.execFile = async () => { throw new Error('Finder unavailable'); };
+    await h.click();
+    assert.equal(h.state.errors.length, 1);
+    assert.deepEqual(h.busy(), [false, true, false]);
+    assert.ok(!h.state.executed.some(([command]) => command === 'workbench.action.quit'));
+  });
+
   it('leaves Finder closed and allows retry when the macOS modal is dismissed', async () => {
     const h = harness({ platform: 'darwin' });
     await h.found({ ...ready, file: '/cache/AraraCode-darwin-x64-1.135.06780.zip' });

@@ -25,5 +25,7 @@
   "Arara Vibes could not be prepared. You can download it from the Arara downloads page.": "Não foi possível preparar o Arara Vibes. Você pode baixá-lo na página de downloads do Arara.",
   "Arara Code will install the update in Applications and reopen automatically. Continue?": "O Arara Code vai instalar a atualização em Aplicativos e reabrir automaticamente. Continuar?",
   "Installing Arara Vibes…": "Instalando o Arara Vibes…",
-  "Could not prepare automatic restart. Arara Code will stay open. Close it and reopen it to use the update.": "Não foi possível preparar o reinício automático. O Arara Code continuará aberto. Feche e reabra para usar a atualização."
+  "Could not prepare automatic restart. Arara Code will stay open. Close it and reopen it to use the update.": "Não foi possível preparar o reinício automático. O Arara Code continuará aberto. Feche e reabra para usar a atualização.",
+  "Open installer in Finder": "Abrir instalador no Finder",
+  "macOS blocked automatic installation. Open the installer in Finder, close Arara Code, drag the new app to Applications and choose Replace. When reopening, follow any approval requested by macOS in System Settings > Privacy & Security.": "O macOS bloqueou a instalação automática. Abra o instalador no Finder, feche o Arara Code, arraste o novo app para Aplicativos e escolha Substituir. Ao reabrir, siga a aprovação que o macOS solicitar em Ajustes do Sistema > Privacidade e Segurança."
 }
