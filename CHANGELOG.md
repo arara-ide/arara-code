@@ -34,6 +34,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
+- Atualização: no macOS, versões assinadas pelo mesmo autor atualizam e reabrem automaticamente; instalações sem identidade persistente oferecem o instalador no Finder quando necessário.
 - Chat: reconexão fica no status temporário; falhas de conexão têm mensagem traduzida e editar sem ponto de restauração preserva os arquivos.
 - App: a fila aparece imediatamente no desktop, permite edição entre as duas telas e permanece ao reconectar o celular.
 - Navegador no macOS: a automação usa uma aplicação própria e permite abrir o Chrome pessoal ao mesmo tempo.

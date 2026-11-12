@@ -6,6 +6,8 @@ const fs = require('node:fs/promises');
 const { homedir, tmpdir } = require('node:os');
 const { join, dirname } = require('node:path');
 
+const MAC_GATEKEEPER_REJECTED = 'ERR_MAC_GATEKEEPER_REJECTED';
+
 const PRODUCTS = {
   'arara-code': { name: 'Arara Code.app', id: 'com.arara.code' },
   'arara-vibes': { name: 'Arara Vibes.app', id: 'br.app.code.arara.vibes' },
@@ -55,6 +57,32 @@ async function macMainPid(appRoot, execFile = promisify(execute)) {
   return Number(matches[0][1]);
 }
 
+function macUpdateRequirement(output, product) {
+  const lines = output.split('\n').filter(line => line.startsWith('designated => '));
+  if (lines.length !== 1) return null;
+  const match = /^designated => (identifier "([a-zA-Z0-9.-]+)" and certificate leaf = H"[a-fA-F0-9]{40}")$/.exec(lines[0]);
+  return match && match[2] === PRODUCTS[product]?.id ? `=${match[1]}` : null;
+}
+
+async function verifyMacUpdate(incoming, destination, product, execFile) {
+  await execFile('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--all-architectures', incoming]);
+  if (destination) {
+    const signature = await execFile('/usr/bin/codesign', ['--display', '--requirements', '-', destination]);
+    const requirement = macUpdateRequirement(`${signature.stdout || ''}\n${signature.stderr || ''}`, product);
+    if (requirement) {
+      await execFile('/usr/bin/codesign', ['--verify', '--strict', '--all-architectures', '--ignore-resources', '-R', requirement, destination]);
+      await execFile('/usr/bin/codesign', ['--verify', '--strict', '--all-architectures', '-R', requirement, incoming]);
+      return;
+    }
+  }
+  try {
+    await execFile('/usr/sbin/spctl', ['--assess', '--type', 'execute', incoming]);
+  } catch (error) {
+    if (error.code !== 3) throw error;
+    throw Object.assign(new Error('macOS rejected automatic installation', { cause: error }), { code: MAC_GATEKEEPER_REJECTED });
+  }
+}
+
 async function installMacDmg(file, product, options = {}, deps = {}) {
   const info = PRODUCTS[product];
   if (!info || !file.endsWith('.dmg')) throw new Error('Invalid application installer');
@@ -98,8 +126,7 @@ async function installMacDmg(file, product, options = {}, deps = {}) {
     await io.chmod(stage, 0o700);
     const incoming = join(stage, 'incoming.app');
     await execFile('/usr/bin/ditto', ['--norsrc', '--noextattr', '--noacl', source, incoming]);
-    await execFile('/usr/bin/codesign', ['--verify', '--deep', '--strict', incoming]);
-    await execFile('/usr/sbin/spctl', ['--assess', '--type', 'execute', incoming]);
+    await verifyMacUpdate(incoming, destinationInfo ? destination : undefined, product, execFile);
     await identity(incoming);
     if (options.waitPid) {
       const script = join(stage, 'install.sh');
@@ -129,8 +156,10 @@ async function installMacDmg(file, product, options = {}, deps = {}) {
   } finally {
     if (mounted) await execFile('/usr/bin/hdiutil', ['detach', mount]).catch(() => {});
     await io.rmdir(mount).catch(() => {});
-    if (stage && !handedOff && !await io.lstat(join(stage, 'previous.app')).catch(() => null)) await io.rm(stage, { recursive: true, force: true });
+    if (stage && !handedOff && !await io.lstat(join(stage, 'previous.app')).catch(() => null)) {
+      await io.rm(stage, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }).catch(error => console.warn('[arara update] Installer cleanup failed', error));
+    }
   }
 }
 
-module.exports = { installMacDmg, macDestination, macMainPid, SWAP_SCRIPT };
+module.exports = { installMacDmg, macDestination, macMainPid, macUpdateRequirement, SWAP_SCRIPT, MAC_GATEKEEPER_REJECTED };

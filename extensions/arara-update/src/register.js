@@ -2,7 +2,7 @@
 
 const { basename, dirname, join } = require('node:path');
 const { promisify } = require('node:util');
-const { installMacDmg, macMainPid } = require('./mac-install');
+const { installMacDmg, macMainPid, MAC_GATEKEEPER_REJECTED } = require('./mac-install');
 const { UpdateBusy } = require('./busy');
 const { UpdateChecker } = require('./checker');
 const { UpdateDownloads, hostArch, installAction, installInstructions, updateTarget } = require('./downloads');
@@ -135,7 +135,18 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
       const selected = await vscode.window.showInformationMessage(installInstructions(basename(verified.file)), { modal: true }, proceed);
       if (selected !== proceed) return;
       const waitPid = await deps.macMainPid(vscode.env.appRoot);
-      await deps.installMacDmg(verified.file, 'arara-code', { appRoot: vscode.env.appRoot, waitPid });
+      try {
+        await deps.installMacDmg(verified.file, 'arara-code', { appRoot: vscode.env.appRoot, waitPid });
+      } catch (error) {
+        if (error.code !== MAC_GATEKEEPER_REJECTED) throw error;
+        const open = t('Open installer in Finder');
+        const selected = await vscode.window.showInformationMessage(
+          t('macOS blocked automatic installation. Open the installer in Finder, close Arara Code, drag the new app to Applications and choose Replace. When reopening, follow any approval requested by macOS in System Settings > Privacy & Security.'),
+          { modal: true }, open,
+        );
+        if (selected === open) await deps.execFile('/usr/bin/open', [verified.file]);
+        return;
+      }
       await vscode.commands.executeCommand('workbench.action.quit');
       return;
     }
