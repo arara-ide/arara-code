@@ -1,0 +1,28 @@
+name: Configure Vibes Store credentials
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Configure matching Store credentials in Vibes
+        env:
+          GH_TOKEN: ${{ secrets.VIBES_STORE_SETUP_TOKEN }}
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN"
+          for name in MSSTORE_TENANT_ID MSSTORE_SELLER_ID MSSTORE_CLIENT_ID MSSTORE_CLIENT_SECRET; do
+            test -n "${!name}"
+            printf '%s' "${!name}" | gh secret set "$name" --repo arara-ide/arara-vibes
+          done

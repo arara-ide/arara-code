@@ -53,7 +53,7 @@ jobs:
           node scripts/tests/embed-arara-orchestra.cjs
           node scripts/tests/arara-update.cjs
           node scripts/tests/terminal.cjs
-          node --test scripts/tests/publish-release.cjs scripts/tests/macos-release.cjs
+          node --test scripts/tests/publish-release.cjs scripts/tests/macos-release.cjs scripts/tests/package-msix.cjs
 
   version:
     needs: verify
