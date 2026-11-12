@@ -1,0 +1,92 @@
+Subject: [PATCH] Gate editor breakpoint affordances with the extension context
+
+The extension owns the access mode and sets arara.ui.hideAdvanced. The public
+extension API cannot suppress native breakpoint glyphs, hover hints or gutter
+mouse handlers without removing user breakpoints. This generic context gate
+preserves breakpoint ranges and debug state while hiding editor affordances.
+
+Touches: src/vs/workbench/contrib/debug/browser/breakpointEditorContribution.ts
+
+--- a/src/vs/workbench/contrib/debug/browser/breakpointEditorContribution.ts
++++ b/src/vs/workbench/contrib/debug/browser/breakpointEditorContribution.ts
+@@ -81,6 +81,9 @@
+ }
+ 
+ function getBreakpointDecorationOptions(accessor: ServicesAccessor, model: ITextModel, breakpoint: IBreakpoint, state: State, breakpointsActivated: boolean, showBreakpointsInOverviewRuler: boolean, hasOtherBreakpointsOnLine: boolean): IModelDecorationOptions {
++	if (accessor.get(IContextKeyService).getContextKeyValue('arara.ui.hideAdvanced')) {
++		return { description: 'breakpoint-decoration', stickiness: TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges };
++	}
+ 	const debugService = accessor.get(IDebugService);
+ 	const languageService = accessor.get(ILanguageService);
+ 	const labelService = accessor.get(ILabelService);
+@@ -223,7 +226,7 @@
+ 		@IDebugService private readonly debugService: IDebugService,
+ 		@IContextMenuService private readonly contextMenuService: IContextMenuService,
+ 		@IInstantiationService private readonly instantiationService: IInstantiationService,
+-		@IContextKeyService contextKeyService: IContextKeyService,
++		@IContextKeyService private readonly contextKeyService: IContextKeyService,
+ 		@IDialogService private readonly dialogService: IDialogService,
+ 		@IConfigurationService private readonly configurationService: IConfigurationService,
+ 		@ILabelService private readonly labelService: ILabelService
+@@ -240,7 +243,7 @@
+ 	 * setting on lines where breakpoint "run" actions are present.
+ 	 */
+ 	public getContextMenuActionsAtPosition(lineNumber: number, model: ITextModel) {
+-		if (!this.debugService.getAdapterManager().hasEnabledDebuggers()) {
++		if (this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced') || !this.debugService.getAdapterManager().hasEnabledDebuggers()) {
+ 			return [];
+ 		}
+ 
+@@ -253,8 +256,15 @@
+ 	}
+ 
+ 	private registerListeners(): void {
++		this.toDispose.push(this.contextKeyService.onDidChangeContext(event => {
++			if (event.affectsSome(new Set(['arara.ui.hideAdvanced']))) {
++				this.ensureBreakpointHintDecoration(-1);
++				this.closeBreakpointWidget();
++				this.setDecorationsScheduler.schedule();
++			}
++		}));
+ 		this.toDispose.push(this.editor.onMouseDown(async (e: IEditorMouseEvent) => {
+-			if (!this.debugService.getAdapterManager().hasEnabledDebuggers()) {
++			if (this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced') || !this.debugService.getAdapterManager().hasEnabledDebuggers()) {
+ 				return;
+ 			}
+ 
+@@ -364,7 +374,7 @@
+ 			 * 2. When users click on line numbers, the breakpoint hint displays immediately, however it doesn't create the breakpoint unless users click on the left gutter. On a touch screen, it's hard to click on that small area.
+ 			 */
+ 			this.toDispose.push(this.editor.onMouseMove((e: IEditorMouseEvent) => {
+-				if (!this.debugService.getAdapterManager().hasEnabledDebuggers()) {
++				if (this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced') || !this.debugService.getAdapterManager().hasEnabledDebuggers()) {
+ 					return;
+ 				}
+ 
+@@ -529,8 +539,9 @@
+ 			return;
+ 		}
+ 
++		const hideAdvanced = !!this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced');
+ 		const setCandidateDecorations = (changeAccessor: IModelDecorationsChangeAccessor, desiredCandidatePositions: BreakpointsForLine[]) => {
+-			const desiredCandidateDecorations = createCandidateDecorations(model, this.breakpointDecorations, desiredCandidatePositions);
++			const desiredCandidateDecorations = this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced') ? [] : createCandidateDecorations(model, this.breakpointDecorations, desiredCandidatePositions);
+ 			const candidateDecorationIds = changeAccessor.deltaDecorations(this.candidateDecorations.map(c => c.decorationId), desiredCandidateDecorations);
+ 			this.candidateDecorations.forEach(candidate => {
+ 				candidate.inlineWidget.dispose();
+@@ -560,10 +571,14 @@
+ 		// try to set breakpoint location candidates in the same changeDecorations()
+ 		// call to avoid flickering, if the DA responds reasonably quickly.
+ 		const session = this.debugService.getViewModel().focusedSession;
+-		const desiredCandidatePositions = debugSettings.showInlineBreakpointCandidates && session ? requestBreakpointCandidateLocations(this.editor.getModel(), desiredBreakpointDecorations.map(bp => bp.range.startLineNumber), session) : Promise.resolve([]);
++		const desiredCandidatePositions = !this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced') && debugSettings.showInlineBreakpointCandidates && session ? requestBreakpointCandidateLocations(this.editor.getModel(), desiredBreakpointDecorations.map(bp => bp.range.startLineNumber), session) : Promise.resolve([]);
+ 		const desiredCandidatePositionsRaced = await Promise.race([desiredCandidatePositions, timeout(500).then(() => undefined)]);
+ 		if (desiredCandidatePositionsRaced === undefined) { // the timeout resolved first
+ 			desiredCandidatePositions.then(v => activeCodeEditor.changeDecorations(d => setCandidateDecorations(d, v)));
++		}
++
++		if (hideAdvanced !== !!this.contextKeyService.getContextKeyValue('arara.ui.hideAdvanced')) {
++			return;
+ 		}
+ 
+ 		try {
