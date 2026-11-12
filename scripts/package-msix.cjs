@@ -15,7 +15,7 @@ function msixVersion(release) {
 
 const xml = value => String(value).replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]);
 
-function manifest({ identityName, publisher, publisherDisplayName, version, product }) {
+function manifest({ identityName, publisher, publisherDisplayName, version, product, applicationId = 'AraraCode' }) {
   const name = xml(product.nameLong);
   return `<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" IgnorableNamespaces="uap rescap">
@@ -34,15 +34,15 @@ function manifest({ identityName, publisher, publisherDisplayName, version, prod
     <Resource Language="es-ES" />
   </Resources>
   <Applications>
-    <Application Id="AraraCode" Executable="${xml(product.nameShort)}.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="${xml(applicationId)}" Executable="${xml(product.nameShort)}.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="${name}" Description="${name}" BackgroundColor="transparent" Square150x150Logo="Assets\\Square150x150Logo.png" Square44x44Logo="Assets\\Square44x44Logo.png" />
-      <Extensions>
+${product.urlProtocol ? `      <Extensions>
         <uap:Extension Category="windows.protocol">
           <uap:Protocol Name="${xml(product.urlProtocol)}">
             <uap:DisplayName>${name}</uap:DisplayName>
           </uap:Protocol>
         </uap:Extension>
-      </Extensions>
+      </Extensions>` : ''}
     </Application>
   </Applications>
   <Capabilities>
@@ -69,18 +69,18 @@ function makeappx() {
   throw new Error('makeappx.exe not found in the Windows SDK');
 }
 
-function packageMsix(appDir, outDir, release, env = process.env) {
+function packageMsix(appDir, outDir, release, env = process.env, options = {}) {
   const identityName = env.MSIX_IDENTITY_NAME;
   const publisher = env.MSIX_PUBLISHER;
   const publisherDisplayName = env.MSIX_PUBLISHER_DISPLAY_NAME;
   if (!identityName || !publisher || !publisherDisplayName) throw new Error('MSIX_IDENTITY_NAME, MSIX_PUBLISHER and MSIX_PUBLISHER_DISPLAY_NAME are required');
-  const product = JSON.parse(fs.readFileSync(path.join(appDir, 'resources', 'app', 'product.json'), 'utf8'));
+  const product = options.product || JSON.parse(fs.readFileSync(path.join(appDir, 'resources', 'app', 'product.json'), 'utf8'));
   if (!fs.existsSync(path.join(appDir, `${product.nameShort}.exe`))) throw new Error(`${product.nameShort}.exe not found in ${appDir}`);
   const scratch = fs.mkdtempSync(path.join(outDir, '.msix-'));
   try {
     const manifestPath = path.join(scratch, 'AppxManifest.xml');
-    fs.writeFileSync(manifestPath, manifest({ identityName, publisher, publisherDisplayName, version: msixVersion(release), product }));
-    const assetDir = path.join(__dirname, '..', 'branding', 'msix');
+    fs.writeFileSync(manifestPath, manifest({ identityName, publisher, publisherDisplayName, version: msixVersion(release), product, applicationId: options.applicationId }));
+    const assetDir = options.assetDir || path.join(__dirname, '..', 'branding', 'msix');
     const mapping = [
       ...filesUnder(appDir),
       [manifestPath, 'AppxManifest.xml'],
@@ -89,7 +89,7 @@ function packageMsix(appDir, outDir, release, env = process.env) {
     if (mapping.some(([source, target]) => /"/.test(source + target))) throw new Error('File names with quotes cannot be packaged');
     const mappingPath = path.join(scratch, 'mapping.txt');
     fs.writeFileSync(mappingPath, `[Files]\r\n${mapping.map(([s, t]) => `"${s}" "${t}"`).join('\r\n')}\r\n`);
-    const out = path.join(outDir, `AraraCode-x64-${release}.msix`);
+    const out = path.join(outDir, `${options.artifactName || 'AraraCode'}-x64-${release}.msix`);
     execFileSync(makeappx(), ['pack', '/f', mappingPath, '/p', out, '/o'], { stdio: 'inherit' });
     return out;
   } finally {
