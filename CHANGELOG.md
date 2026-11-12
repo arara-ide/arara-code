@@ -18,6 +18,8 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: botão Fork abaixo da resposta abre uma nova conversa com as mensagens até ali, com o título "(Fork) Nome original" e numeração nos forks seguintes.
 
 ### Melhorias
+- Editor: o modo otimizado oculta os breakpoints e o clique para criá-los; o modo completo conserva as marcações salvas.
+- Chat: responder uma pergunta entrega a resposta durante o trabalho, sem interromper a geração, e a IA pode consultá-la pelo ID.
 - Arara Vibes: a janela flutuante verifica e atualiza o próprio app e o Arara Code, mantendo as duas versões em dia pelo mesmo lugar.
 - Atualização: no macOS, a IDE instala a nova versão em Aplicativos e reabre sem arrastar pelo Finder; o botão de instalar o Vibes também instala o app diretamente.
 - Atualização: no Linux, a IDE prepara a reabertura por um serviço temporário do usuário e continua aberta se não conseguir prepará-lo.
