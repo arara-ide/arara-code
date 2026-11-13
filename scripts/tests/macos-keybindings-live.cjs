@@ -75,6 +75,32 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT_PATH || path.join
     await page.keyboard.press('Meta+s');
     await page.waitForTimeout(300);
     assert.equal(await fs.readFile(path.join(workspace, 'keyboard-fixture.txt'), 'utf8'), 'original\n');
+    const openFile = async name => {
+      await page.keyboard.press('Meta+p');
+      await quick.waitFor({ state: 'visible' });
+      await page.keyboard.type(name);
+      await quick.locator('.monaco-list-row').filter({ hasText: name }).first().waitFor();
+      await page.keyboard.press('Enter');
+      await quick.waitFor({ state: 'hidden' });
+      await page.locator('.monaco-editor .view-lines').first().click();
+    };
+    for (const name of ['second.txt', 'third.txt']) {
+      await fs.writeFile(path.join(workspace, name), 'original\n');
+      await openFile(name);
+      await page.keyboard.press('Meta+ArrowDown');
+      await page.keyboard.type('save-all-fixture');
+    }
+    await page.keyboard.press('Meta+Shift+s');
+    await page.waitForFunction(() => document.querySelectorAll('.tab.dirty').length === 0);
+    for (const name of ['second.txt', 'third.txt']) assert.match(await fs.readFile(path.join(workspace, name), 'utf8'), /save-all-fixture/);
+    const activeTab = () => page.locator('.tab.active').getAttribute('data-resource-name');
+    assert.equal(await activeTab(), 'third.txt');
+    await page.keyboard.press('Control+Shift+Tab');
+    assert.equal(await activeTab(), 'second.txt');
+    await page.keyboard.press('Control+Tab');
+    assert.equal(await activeTab(), 'third.txt');
+    await page.keyboard.press('Control+Tab');
+    assert.equal(await activeTab(), 'keyboard-fixture.txt');
     await page.keyboard.press('Meta+f');
     await page.locator('.find-widget.visible').waitFor();
     await page.keyboard.press('Escape');
@@ -88,7 +114,7 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT_PATH || path.join
     await page.locator('.part.panel').waitFor({ state: 'visible' });
     await page.keyboard.press('Meta+j');
     await page.locator('.part.panel').waitFor({ state: 'hidden' });
-    console.log('PASS: real macOS IDE, Ctrl+E/Cmd+P file search, Cmd+K Cmd+O folder picker, Cmd+Shift+P palette, Cmd+S save, Cmd+Z undo, Cmd+F find, Cmd+B sidebar and Cmd+J panel; isolated data, no inference.');
+    console.log('PASS: real macOS IDE, Ctrl+E/Cmd+P file search, Cmd+K Cmd+O folder picker, Cmd+Shift+P palette, Cmd+S save, Cmd+Shift+S saves multiple dirty files, Ctrl+Tab/Ctrl+Shift+Tab visual order and wrap, Cmd+Z undo, Cmd+F find, Cmd+B sidebar and Cmd+J panel; isolated data, no inference.');
   } catch (error) {
     const page = app?.windows()[0];
     if (page) { await page.screenshot({ path: '/tmp/arara-mac-keybindings-failure.png' }); console.log((await page.locator('body').innerText()).slice(-2500)); }
