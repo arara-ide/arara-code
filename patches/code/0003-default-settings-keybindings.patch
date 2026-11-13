@@ -121,12 +121,12 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +		return araraDefaultKeybindings;
 +	}
 +	return araraDefaultKeybindings
-+		.filter(binding => ['ctrl+tab', 'ctrl+shift+tab', 'ctrl+shift+s'].includes(binding.key ?? ''))
++		.filter(binding => binding.command === 'workbench.action.terminal.new' || ['ctrl+tab', 'ctrl+shift+tab', 'ctrl+shift+s'].includes(binding.key ?? ''))
 +		.map(binding => binding.key === 'ctrl+shift+s' ? { ...binding, key: 'cmd+shift+s' } : binding);
 +}
 --- /dev/null
 +++ b/src/vs/workbench/test/common/arara.defaults.test.ts
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,44 @@
 +/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
 +
 +import assert from 'assert';
@@ -158,10 +158,14 @@ Touches: src/vs/workbench/common/arara.defaults.ts (new),
 +		}
 +	});
 +
-+	test('platform defaults preserve native macOS bindings outside save and tabs', () => {
++	test('platform defaults preserve native macOS bindings outside terminal, save and tabs', () => {
 +		assert.strictEqual(getAraraDefaultKeybindings(false), araraDefaultKeybindings);
 +		const mac = getAraraDefaultKeybindings(true);
-+		assert.strictEqual(mac.length, 6);
++		assert.strictEqual(mac.length, 8);
++		for (const key of ["ctrl+shift+`", "ctrl+shift+'"]) {
++			assert.ok(mac.some(binding => binding.key === key && binding.command === 'workbench.action.terminal.new'
++				&& binding.when === 'terminalProcessSupported || terminalHasBeenCreated'));
++		}
 +		assert.ok(mac.some(binding => binding.key === 'cmd+shift+s' && binding.command === 'saveAll'));
 +		assert.ok(mac.some(binding => binding.key === 'ctrl+tab' && binding.command === 'workbench.action.nextEditor'));
 +		assert.ok(mac.some(binding => binding.key === 'ctrl+shift+tab' && binding.command === 'workbench.action.previousEditor'));

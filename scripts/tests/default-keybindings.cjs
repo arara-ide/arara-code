@@ -37,11 +37,48 @@ const ts = require(path.join(root, '../arara-ai/node_modules/typescript'));
       }
       const custom = new KeybindingResolver(defaults, [binding('ctrl+Tab', 'custom.next')], () => {});
       assert.equal(custom.resolve(empty, [], 'ctrl+Tab').commandId, 'custom.next');
-      if (mac) assert.equal(rules.length, 6, 'only tab navigation and save all change on macOS');
     }
+    const { MacLinuxKeyboardMapper } = await load('workbench/services/keybinding/common/macLinuxKeyboardMapper.js');
+    const { ContextKeyExpr } = await load('platform/contextkey/common/contextkey.js');
+    const { KeymapInfo } = await load('workbench/services/keybinding/common/keymapInfo.js');
+    const rules = context.exports.getAraraDefaultKeybindings(true);
+    for (const layout of ['en', 'pt']) {
+      let mapping;
+      const layoutSource = fs.readFileSync(path.join(upstream, `src/vs/workbench/services/keybinding/browser/keyboardLayouts/${layout}.darwin.ts`), 'utf8').replace(/^import .*;$/gm, '');
+      vm.runInNewContext(ts.transpileModule(layoutSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
+        exports: {}, KeyboardLayoutContribution: { INSTANCE: { registerKeyboardLayout(info) { mapping = info.mapping; } } }
+      });
+      const raw = new KeymapInfo({ id: layout }, [], mapping).mapping;
+      const mapper = new MacLinuxKeyboardMapper(layout === 'en', raw, false, 2);
+      const binding = rule => mapper.resolveKeybinding(KeybindingParser.parseKeybinding(rule.key)).map(resolved => new ResolvedKeybindingItem(resolved, rule.command, undefined, ContextKeyExpr.deserialize(rule.when), true, null, false));
+      const defaults = rules.flatMap(binding);
+      const resolver = new KeybindingResolver(defaults, [], () => {});
+      const supported = { getValue(key) { return key === 'terminalProcessSupported'; } };
+      const created = { getValue(key) { return key === 'terminalHasBeenCreated'; } };
+      const empty = { getValue() {} };
+      const codes = new Set(['Backquote', Object.keys(raw).find(code => raw[code].value === "'")]);
+      for (const code of codes) {
+        assert.ok(code, `${layout}: apostrophe key exists`);
+        const event = { ctrlKey: true, shiftKey: true, altKey: false, metaKey: false, code };
+        const dispatch = mapper.resolveKeyboardEvent(event).getDispatchChords()[0];
+        assert.equal(resolver.resolve(supported, [], dispatch)?.commandId, 'workbench.action.terminal.new', `${layout}: Ctrl+Shift+${code}`);
+        assert.equal(resolver.resolve(created, [], dispatch)?.commandId, 'workbench.action.terminal.new');
+        assert.notEqual(resolver.resolve(empty, [], dispatch)?.commandId, 'workbench.action.terminal.new', 'terminal availability is required');
+        const plain = mapper.resolveKeyboardEvent({ ...event, shiftKey: false }).getDispatchChords()[0];
+        assert.notEqual(resolver.resolve(supported, [], plain)?.commandId, 'workbench.action.terminal.new');
+      }
+      const custom = new KeybindingResolver(defaults, binding({ key: "ctrl+shift+'", command: 'custom.terminal' }), () => {});
+      const removed = new KeybindingResolver(defaults, binding({ key: "ctrl+shift+'", command: '-workbench.action.terminal.new' }), () => {});
+      for (const resolved of mapper.resolveKeybinding(KeybindingParser.parseKeybinding("ctrl+shift+'"))) {
+        const dispatch = resolved.getDispatchChords()[0];
+        assert.equal(custom.resolve(supported, [], dispatch)?.commandId, 'custom.terminal');
+        assert.notEqual(removed.resolve(supported, [], dispatch)?.commandId, 'workbench.action.terminal.new');
+      }
+    }
+    assert.equal(rules.length, 8, 'only terminal creation, tab navigation and save all change on macOS');
     assert.match(fs.readFileSync(path.join(upstream, 'src/vs/workbench/contrib/files/browser/fileConstants.ts'), 'utf8'), /SAVE_ALL_COMMAND_ID = 'saveAll'/);
     const patch = fs.readFileSync(path.join(root, 'patches/code/0003-default-settings-keybindings.patch'), 'utf8');
     assert.match(patch, /getAraraDefaultKeybindings\(isMacintosh\)\.map/);
-    console.log('PASS: save all, visual tab order and user overrides on macOS, Windows and Linux.');
+    console.log('PASS: save all and tabs on all platforms; terminal shortcuts with English/Portuguese native macOS mappings, availability, modifiers and user overrides/removals.');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
