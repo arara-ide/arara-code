@@ -23,10 +23,22 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT_PATH || path.join
     db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
     db.prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)').run('arara.arara-ai', JSON.stringify({ 'arara.setup.v1.completed': true }));
     db.close();
+    const fixture = path.join(dir, 'fixture');
+    const terminalCount = path.join(dir, 'terminal-count.json');
+    await fs.mkdir(fixture);
+    await fs.writeFile(path.join(fixture, 'package.json'), JSON.stringify({ name: 'terminal-keyboard-fixture', publisher: 'arara', version: '0.0.1', engines: { vscode: '^1.100.0' }, main: './extension.cjs', activationEvents: ['*'] }));
+    await fs.writeFile(path.join(fixture, 'extension.cjs'), `const vscode = require('vscode');
+const fs = require('node:fs');
+exports.activate = context => {
+  const record = () => fs.writeFileSync(${JSON.stringify(terminalCount)}, JSON.stringify(vscode.window.terminals.length));
+  context.subscriptions.push(vscode.window.onDidOpenTerminal(record), vscode.window.onDidCloseTerminal(record));
+  record();
+};
+`);
     const product = JSON.parse(await fs.readFile(path.join(upstream, 'product.json'), 'utf8'));
     const env = { ...process.env, VSCODE_DEV: '1', VSCODE_CLI: '1', NODE_ENV: 'development' };
     delete env.ELECTRON_RUN_AS_NODE;
-    app = await electron.launch({ executablePath: path.join(upstream, `.build/electron/${product.nameLong}.app/Contents/MacOS/${product.nameShort}`), args: [upstream, workspace, '--user-data-dir', profile, '--extensions-dir', path.join(dir, 'extensions'), '--disable-extensions', '--skip-welcome', '--skip-release-notes'], env, timeout: 60_000 });
+    app = await electron.launch({ executablePath: path.join(upstream, `.build/electron/${product.nameLong}.app/Contents/MacOS/${product.nameShort}`), args: [upstream, workspace, '--user-data-dir', profile, '--extensions-dir', path.join(dir, 'extensions'), '--disable-extensions', '--extensionDevelopmentPath', fixture, '--skip-welcome', '--skip-release-notes'], env, timeout: 60_000 });
     const page = await app.firstWindow({ timeout: 60_000 });
     await page.locator('.monaco-workbench').waitFor({ timeout: 60_000 });
     await app.evaluate(({ dialog }) => {
@@ -78,10 +90,10 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT_PATH || path.join
     const openFile = async name => {
       await page.keyboard.press('Meta+p');
       await quick.waitFor({ state: 'visible' });
-      await page.keyboard.type(name);
-      await quick.locator('.monaco-list-row').filter({ hasText: name }).first().waitFor();
-      await page.keyboard.press('Enter');
+      await quick.locator('input').first().fill(name);
+      await quick.locator('.monaco-list-row').filter({ hasText: name }).first().dblclick();
       await quick.waitFor({ state: 'hidden' });
+      await page.waitForFunction(expected => document.querySelector('.tab.active')?.getAttribute('data-resource-name') === expected, name);
       await page.locator('.monaco-editor .view-lines').first().click();
     };
     for (const name of ['second.txt', 'third.txt']) {
@@ -114,7 +126,19 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT_PATH || path.join
     await page.locator('.part.panel').waitFor({ state: 'visible' });
     await page.keyboard.press('Meta+j');
     await page.locator('.part.panel').waitFor({ state: 'hidden' });
-    console.log('PASS: real macOS IDE, Ctrl+E/Cmd+P file search, Cmd+K Cmd+O folder picker, Cmd+Shift+P palette, Cmd+S save, Cmd+Shift+S saves multiple dirty files, Ctrl+Tab/Ctrl+Shift+Tab visual order and wrap, Cmd+Z undo, Cmd+F find, Cmd+B sidebar and Cmd+J panel; isolated data, no inference.');
+    const activationDeadline = Date.now() + 15_000;
+    while (!await fs.access(terminalCount).then(() => true, () => false) && Date.now() < activationDeadline) await page.waitForTimeout(100);
+    let count = JSON.parse(await fs.readFile(terminalCount, 'utf8'));
+    for (const key of ['Control+Shift+Backquote', 'Control+Shift+Quote']) {
+      await page.locator('.monaco-editor .view-lines').first().click();
+      await page.keyboard.press(key);
+      count++;
+      const deadline = Date.now() + 15_000;
+      while (JSON.parse(await fs.readFile(terminalCount, 'utf8')) !== count && Date.now() < deadline) await page.waitForTimeout(100);
+      assert.equal(JSON.parse(await fs.readFile(terminalCount, 'utf8')), count, `${key} creates exactly one terminal`);
+      await page.locator('.terminal-wrapper .xterm-helper-textarea:visible').first().waitFor();
+    }
+    console.log('PASS: real macOS IDE, Ctrl+E/Cmd+P file search, Cmd+K Cmd+O folder picker, Cmd+Shift+P palette, Cmd+S save, Cmd+Shift+S saves multiple dirty files, Ctrl+Tab/Ctrl+Shift+Tab visual order and wrap, Cmd+Z undo, Cmd+F find, Cmd+B sidebar and Cmd+J panel, Ctrl+Shift+Backquote/Quote each create a terminal; isolated data, no inference.');
   } catch (error) {
     const page = app?.windows()[0];
     if (page) { await page.screenshot({ path: '/tmp/arara-mac-keybindings-failure.png' }); console.log((await page.locator('body').innerText()).slice(-2500)); }
