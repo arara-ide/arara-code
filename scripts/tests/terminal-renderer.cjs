@@ -4,25 +4,32 @@ const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const { execFileSync } = require('node:child_process');
+const { stripTypeScriptTypes } = require('node:module');
 const root = path.resolve(__dirname, '../..');
-const ts = require(path.join(root, '../arara-ai/node_modules/typescript'));
+const upstream = require('./fixtures/terminal-renderer-upstream.json');
 const patch = path.join(root, 'patches/code/0045-terminal-renderer.patch');
-const upstream = path.join(root, '.work/vscodium/vscode');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arara-terminal-renderer-'));
 const historyFile = 'src/vs/workbench/contrib/terminalContrib/history/common/history.ts';
 const allFile = 'src/vs/workbench/contrib/terminal/terminal.all.ts';
 const rendererFile = 'src/vs/workbench/contrib/terminal/browser/terminalRenderer.ts';
 const transpile = source => {
-  const result = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, experimentalDecorators: true }, reportDiagnostics: true });
-  assert.deepEqual(result.diagnostics, []);
-  return result.outputText;
+  const exported = [];
+  const transformed = stripTypeScriptTypes(source, { mode: 'transform' })
+    .replace(/^\s*@[A-Za-z_$][\w$]*\r?\n/gm, '')
+    .replace(/^import\s+\{([^}]+)\}\s+from\s+(['"][^'"]+['"]);?/gm, (_, names, from) => `const {${names.replace(/\b(\w+)\s+as\s+(\w+)\b/g, '$1: $2')}} = require(${from});`)
+    .replace(/\bimport\(/g, '(id => Promise.resolve(require(id)))(')
+    .replace(/^export\s+(async\s+function|function|class|const|let|var)\s+([A-Za-z_$][\w$]*)/gm, (_, kind, name) => {
+      exported.push(name);
+      return `${kind} ${name}`;
+    });
+  return exported.length ? `${transformed}\nObject.assign(exports, { ${exported.join(', ')} });` : transformed;
 };
 
 async function main() {
   try {
     const originals = new Map();
     for (const relative of [historyFile, allFile]) {
-      const content = execFileSync('git', ['show', `HEAD:${relative}`], { cwd: upstream });
+      const content = Buffer.from(upstream.files[relative], 'utf8');
       const file = path.join(directory, relative);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, content);

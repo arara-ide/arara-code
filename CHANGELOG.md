@@ -5,7 +5,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 ## [Não lançado]
 
 ### Novidades
-- Terminal: sugere comandos dos últimos mil registros em texto apagado e completa a linha ao segurar TAB por 250 ms, com progresso na própria tecla.
+- Terminal: sugere comandos em texto apagado e completa a linha ao segurar TAB por 250 ms com progresso na própria tecla, permitindo escolher entre os últimos 1000 comandos (padrão), últimos 5 minutos, 1 hora, 1 dia ou desativar em Configurações.
 - Obsidian: o botão de joia no topo abre o projeto no Obsidian, instala o Obsidian se faltar e mantém as notas do mapa do código sincronizadas; o botão do mapa do código saiu do topo.
 - Obsidian: clique com o botão direito no botão do topo para Abrir Obsidian ou Sincronizar vault do Obsidian.
 - Chat: a IA pesquisa e atualiza o vault do Obsidian sozinha durante a conversa e, depois de tarefas grandes, oferece atualizar o vault; o grafo agrupa as notas por tipo de arquivo.
