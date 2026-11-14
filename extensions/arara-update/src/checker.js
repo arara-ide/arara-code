@@ -3,7 +3,7 @@
 const { newerVersion } = require('./version');
 const { installerName } = require('./downloads');
 
-const CHECK_INTERVAL_MS = 5 * 60_000;
+const CHECK_INTERVAL_MS = 20 * 60_000;
 const RELEASES_URL = 'https://api.github.com/repos/arara-ide/arara-code/releases?per_page=100';
 
 const defaultTimer = (fn, ms) => {
