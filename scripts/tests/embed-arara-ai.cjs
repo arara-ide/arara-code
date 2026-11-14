@@ -35,6 +35,7 @@ try {
     'package.nls.es.json': '{"test":"Configuración"}',
     'dist/extension.js': '// extension bundle',
     'media/chat.css': 'body {}',
+    'media/terminal-history.js': 'export const attach = () => ({ dispose() {} });',
     'media/marked.min.js': '// markdown',
     'themes/arara.json': '{}',
   };

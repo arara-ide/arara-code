@@ -37,3 +37,33 @@ it('reads the real public Store catalog when ARARA_LIVE_STORE=1', { skip: proces
   assert.match(info.latest, /^\d+\.\d+\.\d{5}$/);
   console.log('Store version:', info.latest);
 });
+
+it('discovers only the installed Store package with a validated location and bounded process', () => {
+  const { installedStoreCompanion } = require('../src/store');
+  const calls = [];
+  const run = (...args) => { calls.push(args); return 'C:\\Program Files\\WindowsApps\\AraraCode.AraraCode_1.2.3.0_x64__test'; };
+  assert.equal(installedStoreCompanion('arara-code', () => true, run), 'C:\\Program Files\\WindowsApps\\AraraCode.AraraCode_1.2.3.0_x64__test\\Arara Code.exe');
+  assert.match(calls[0][1].at(-1), /Get-AppxPackage -Name 'AraraCode.AraraCode'/);
+  assert.equal(calls[0][2].timeout, 10000);
+  assert.equal(installedStoreCompanion('arara-code', () => false, run), undefined);
+  for (const location of ['', 'relative', 'C:\\app\nC:\\other']) assert.equal(installedStoreCompanion('arara-code', () => true, () => location), undefined);
+  assert.equal(installedStoreCompanion('arara-code', () => true, () => { throw Error('Unavailable'); }), undefined);
+  assert.throws(() => installedStoreCompanion("unknown'"), /Unknown/);
+});
+
+it('checks both companions through their Store products and rejects manual Windows downloads', async () => {
+  const { latestCompanion, prepareCompanion } = require('../src/companion');
+  const ids = { 'arara-code': ['9PLLLF8RWMMM', 'AraraCode.AraraCode'], 'arara-vibes': ['9NGWH23J0M16', 'AraraCode.AraraVibes'] };
+  for (const [product, [id, name]] of Object.entries(ids)) {
+    const requests = [];
+    const fetch = async url => {
+      requests.push(url);
+      return { ok: true, json: async () => ({ Products: [{ DisplaySkuAvailabilities: [{ Sku: { Properties: { Packages: [{ PackageFullName: `${name}_1.135.7347.0_x64__test` }] } } }] }] }) };
+    };
+    assert.equal(await latestCompanion(product, { platform: 'win32', fetch }), '1.135.07347');
+    assert.equal(requests.length, 1); assert.match(requests[0], new RegExp(`^https://displaycatalog.mp.microsoft.com/.*bigIds=${id}&`));
+    await assert.rejects(prepareCompanion(product, { platform: 'win32', fetch }), /Microsoft Store/);
+    assert.equal(requests.length, 1);
+    await assert.rejects(latestCompanion(product, { platform: 'win32', fetch: async () => ({ ok: true, json: async () => ({}) }) }), /unavailable/);
+  }
+});

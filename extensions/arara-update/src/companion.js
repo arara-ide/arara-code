@@ -8,8 +8,13 @@ const { join, basename } = require('node:path');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { newerVersion } = require('./version');
+const { installedStoreCompanion, latestStoreVersion } = require('./store');
 
 function installedCompanion(product, platform = process.platform, home = homedir(), env = process.env, exists = existsSync) {
+  if (platform === 'win32') {
+    const installed = installedStoreCompanion(product, exists);
+    if (installed) return installed;
+  }
   const name = product === 'arara-code' ? 'Arara Code' : 'Arara Vibes';
   const candidates = platform === 'darwin' ? [`/Applications/${name}.app`, join(home, 'Applications', `${name}.app`), ...(product === 'arara-code' ? ['/Applications/AraraCode.app', join(home, 'Applications', 'AraraCode.app')] : [])]
     : platform === 'win32' ? [join(env.LOCALAPPDATA || home, 'Programs', product, `${name}.exe`), join(env.ProgramFiles || 'C:\\Program Files', name, `${name}.exe`)]
@@ -28,6 +33,7 @@ function companionAsset(assets, product, platform, arch, format) {
 
 async function latestCompanion(product, options = {}) {
   if (!['arara-code', 'arara-vibes'].includes(product)) throw new Error('Unknown companion');
+  if ((options.platform || process.platform) === 'win32') return latestStoreVersion(product, options);
   const response = await (options.fetch || fetch)(`https://api.github.com/repos/arara-ide/${product}/releases?per_page=30`, { signal: options.signal || AbortSignal.timeout(10000), headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Arara-Companion' } });
   if (!response.ok) throw new Error(`Release check failed: HTTP ${response.status}`);
   const releases = await response.json();
@@ -51,6 +57,7 @@ async function digest(file) {
 
 async function prepareCompanion(product, options = {}) {
   if (!['arara-code', 'arara-vibes'].includes(product)) throw new Error('Unknown companion');
+  if ((options.platform || process.platform) === 'win32') throw new Error('Use the Microsoft Store to install or update this product');
   const root = options.root || join(homedir(), '.arara', 'companion-downloads', product);
   const get = options.fetch || fetch;
   const signal = options.signal || AbortSignal.timeout(30 * 60_000);
@@ -96,4 +103,4 @@ async function prepareCompanion(product, options = {}) {
   } finally { await unlink(partial).catch(() => undefined); }
 }
 
-module.exports = { installedCompanion, companionAsset, prepareCompanion, latestCompanion, ...require('./mac-install'), ...require('./linux-install') };
+module.exports = { installedCompanion, companionAsset, prepareCompanion, latestCompanion, ...require('./store'), ...require('./mac-install'), ...require('./linux-install') };
