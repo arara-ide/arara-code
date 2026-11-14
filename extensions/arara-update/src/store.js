@@ -6,7 +6,7 @@ const STORE_PRODUCT_ID = '9PLLLF8RWMMM';
 const STORE_PACKAGE = 'AraraCode.AraraCode';
 const CATALOG_URL = `https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=${STORE_PRODUCT_ID}&market=US&languages=en-us`;
 const STORE_URI = `ms-windows-store://pdp/?ProductId=${STORE_PRODUCT_ID}`;
-const CHECK_INTERVAL_MS = 30 * 60_000;
+const CHECK_INTERVAL_MS = 60 * 60_000;
 const STORE_PRODUCTS = {
   'arara-code': { id: STORE_PRODUCT_ID, package: STORE_PACKAGE, executable: 'Arara Code.exe' },
   'arara-vibes': { id: '9NGWH23J0M16', package: 'AraraCode.AraraVibes', executable: 'Arara Vibes.exe' },

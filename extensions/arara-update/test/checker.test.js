@@ -55,7 +55,7 @@ describe('UpdateChecker', () => {
     assert.equal(await checker.latest(), null);
   });
 
-  it('polls every 5 min and keeps looking for a newer release after preparing one', async () => {
+  it('polls every 20 min and keeps looking for a newer release after preparing one', async () => {
     const timer = { fn: undefined, ms: 0, disposed: false };
     const replies = [[], ['1.135.06777'], ['1.135.06777'], ['1.135.06777', '1.135.06790']];
     const fetchImpl = counting(async () => Response.json((replies.shift() ?? []).map(tag_name => ({ tag_name }))));
@@ -68,7 +68,7 @@ describe('UpdateChecker', () => {
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(fetchImpl.calls.length, 1);
     assert.equal(fetchImpl.calls[0][0], RELEASES_URL);
-    assert.equal(timer.ms, 5 * 60_000);
+    assert.equal(timer.ms, 20 * 60_000);
     assert.deepEqual(updates, []);
     timer.fn();
     await new Promise(resolve => setImmediate(resolve));
