@@ -1,0 +1,298 @@
+Arara Code: gancho genérico para um renderer de terminal fornecido pela extensão.
+
+Why a patch: as APIs estável e proposed de terminal permitem conclusões e eventos
+de execução, mas não expõem o DOM/xterm, o modelo do prompt ou keyup para uma
+camada inline. Este gancho carrega apenas um módulo local indicado pelo comando
+arara.terminal.renderer (contrato v1); sugestões, histórico persistido, atalhos,
+temporização e apresentação ficam na extensão privada. A leitura nativa do
+histórico ganha uma opção compatível para preservar ocorrências repetidas.
+Sem rede, heurística de produto, consumo de IA ou execução automática.
+
+Touches: src/vs/workbench/contrib/terminal/terminal.all.ts
+src/vs/workbench/contrib/terminal/browser/terminalRenderer.ts
+src/vs/workbench/contrib/terminalContrib/history/common/history.ts
+
+--- /dev/null
++++ b/src/vs/workbench/contrib/terminal/browser/terminalRenderer.ts
+@@ -0,0 +1,67 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { Disposable, IDisposable } from '../../../../base/common/lifecycle.js';
++import { FileAccess, Schemas } from '../../../../base/common/network.js';
++import { URI } from '../../../../base/common/uri.js';
++import { TabFocus } from '../../../../editor/browser/config/tabFocus.js';
++import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
++import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
++import { TerminalCapability } from '../../../../platform/terminal/common/capabilities/capabilities.js';
++import { getShellFileHistory } from '../../terminalContrib/history/common/history.js';
++import { ITerminalContribution, IXtermTerminal } from './terminal.js';
++import { ITerminalContributionContext, registerTerminalContribution } from './terminalExtensions.js';
++
++class TerminalRenderer extends Disposable implements ITerminalContribution {
++	static readonly ID = 'arara.terminal.renderer';
++	private _xterm: IXtermTerminal | undefined;
++	private _loading = false;
++	private _attached = false;
++
++	constructor(
++		private readonly _ctx: ITerminalContributionContext,
++		@ICommandService private readonly _commands: ICommandService,
++		@IContextKeyService private readonly _contextKeys: IContextKeyService,
++		@IInstantiationService private readonly _instantiation: IInstantiationService,
++	) {
++		super();
++		this._register(_ctx.instance.onDidFocus(() => { void this._attach(); }));
++	}
++
++	xtermOpen(xterm: IXtermTerminal): void {
++		this._xterm = xterm;
++		void this._attach();
++	}
++
++	private async _attach(): Promise<void> {
++		if (!this._xterm || this._loading || this._attached || this._store.isDisposed) { return; }
++		this._loading = true;
++		try {
++			const descriptor = await this._commands.executeCommand<{ version: number; module: string; tab: string; label: string }>('arara.terminal.renderer', 1);
++			if (!descriptor || descriptor.version !== 1 || typeof descriptor.module !== 'string' || typeof descriptor.tab !== 'string' || typeof descriptor.label !== 'string') { return; }
++			const uri = URI.parse(descriptor.module);
++			if (uri.scheme !== Schemas.file && uri.scheme !== Schemas.vscodeRemote) { return; }
++			const renderer = await import(FileAccess.uriToBrowserUri(uri).toString(true)) as { attach(host: unknown): IDisposable };
++			if (this._store.isDisposed || typeof renderer.attach !== 'function') { return; }
++			this._register(renderer.attach({
++				version: 1, labels: { tab: descriptor.tab, label: descriptor.label },
++				instance: this._ctx.instance, xterm: this._xterm, commandDetection: TerminalCapability.CommandDetection,
++				executeCommand: (command: string, request: unknown) => this._commands.executeCommand(command, request),
++				tabMovesFocus: () => TabFocus.getTabFocusMode(),
++				getContext: (key: string) => this._contextKeys.getContextKeyValue(key),
++				readShellHistory: async () => {
++					const history = await this._instantiation.invokeFunction(getShellFileHistory, this._ctx.instance.shellType, true);
++					return { scope: history?.sourceResource.toString() ?? this._ctx.instance.shellType ?? 'terminal', commands: history?.commands ?? [] };
++				},
++			}));
++			this._attached = true;
++		} catch {} finally {
++			this._loading = false;
++		}
++	}
++}
++
++registerTerminalContribution(TerminalRenderer.ID, TerminalRenderer);
+--- a/src/vs/workbench/contrib/terminal/terminal.all.ts
++++ b/src/vs/workbench/contrib/terminal/terminal.all.ts
+@@ -37,3 +37,4 @@
+ import '../terminalContrib/telemetry/browser/terminal.telemetry.contribution.js';
+ import '../terminalContrib/wslRecommendation/browser/terminal.wslRecommendation.contribution.js';
+ import '../terminalContrib/voice/browser/terminal.voice.contribution.js';
++import './browser/terminalRenderer.js';
+--- a/src/vs/workbench/contrib/terminalContrib/history/common/history.ts
++++ b/src/vs/workbench/contrib/terminalContrib/history/common/history.ts
+@@ -196,9 +196,11 @@
+ 	sourceResource: URI;
+ 	commands: string[];
+ }
++const shellFileHistoryWithDuplicates: Map<TerminalShellType | undefined, IShellFileHistoryEntry | null> = new Map();
+ const shellFileHistory: Map<TerminalShellType | undefined, IShellFileHistoryEntry | null> = new Map();
+-export async function getShellFileHistory(accessor: ServicesAccessor, shellType: TerminalShellType | undefined): Promise<IShellFileHistoryEntry | undefined> {
+-	const cached = shellFileHistory.get(shellType);
++export async function getShellFileHistory(accessor: ServicesAccessor, shellType: TerminalShellType | undefined, includeDuplicates = false): Promise<IShellFileHistoryEntry | undefined> {
++	const cache = includeDuplicates ? shellFileHistoryWithDuplicates : shellFileHistory;
++	const cached = cache.get(shellType);
+ 	if (cached === null) {
+ 		return undefined;
+ 	}
+@@ -208,34 +210,35 @@
+ 	let result: IShellFileHistoryEntry | undefined;
+ 	switch (shellType) {
+ 		case PosixShellType.Bash:
+-			result = await fetchBashHistory(accessor);
++			result = await fetchBashHistory(accessor, includeDuplicates);
+ 			break;
+ 		case GeneralShellType.PowerShell:
+-			result = await fetchPwshHistory(accessor);
++			result = await fetchPwshHistory(accessor, includeDuplicates);
+ 			break;
+ 		case PosixShellType.Zsh:
+-			result = await fetchZshHistory(accessor);
++			result = await fetchZshHistory(accessor, includeDuplicates);
+ 			break;
+ 		case PosixShellType.Fish:
+-			result = await fetchFishHistory(accessor);
++			result = await fetchFishHistory(accessor, includeDuplicates);
+ 			break;
+ 		case GeneralShellType.Python:
+-			result = await fetchPythonHistory(accessor);
++			result = await fetchPythonHistory(accessor, includeDuplicates);
+ 			break;
+ 		default: return undefined;
+ 	}
+ 	if (result === undefined) {
+-		shellFileHistory.set(shellType, null);
+-		return undefined;
+-	}
+-	shellFileHistory.set(shellType, result);
++		cache.set(shellType, null);
++		return undefined;
++	}
++	cache.set(shellType, result);
+ 	return result;
+ }
+ export function clearShellFileHistory() {
+ 	shellFileHistory.clear();
+-}
+-
+-export async function fetchBashHistory(accessor: ServicesAccessor): Promise<IShellFileHistoryEntry | undefined> {
++	shellFileHistoryWithDuplicates.clear();
++}
++
++export async function fetchBashHistory(accessor: ServicesAccessor, includeDuplicates = false): Promise<IShellFileHistoryEntry | undefined> {
+ 	const fileService = accessor.get(IFileService);
+ 	const remoteAgentService = accessor.get(IRemoteAgentService);
+ 	const remoteEnvironment = await remoteAgentService.getEnvironment();
+@@ -252,6 +255,7 @@
+ 	// the output to get the
+ 	const fileLines = resolvedFile.content.split('\n');
+ 	const result: Set<string> = new Set();
++	const entries: string[] = [];
+ 	let currentLine: string;
+ 	let currentCommand: string | undefined = undefined;
+ 	let wrapChar: string | undefined = undefined;
+@@ -276,6 +280,7 @@
+ 		if (wrapChar === undefined) {
+ 			if (currentCommand.length > 0) {
+ 				result.add(currentCommand.trim());
++				entries.push(currentCommand.trim());
+ 			}
+ 			currentCommand = undefined;
+ 		}
+@@ -284,11 +289,11 @@
+ 	return {
+ 		sourceLabel,
+ 		sourceResource: resolvedFile.resource,
+-		commands: Array.from(result.values())
++		commands: includeDuplicates ? entries : Array.from(result.values())
+ 	};
+ }
+ 
+-export async function fetchZshHistory(accessor: ServicesAccessor): Promise<IShellFileHistoryEntry | undefined> {
++export async function fetchZshHistory(accessor: ServicesAccessor, includeDuplicates = false): Promise<IShellFileHistoryEntry | undefined> {
+ 	const fileService = accessor.get(IFileService);
+ 	const remoteAgentService = accessor.get(IRemoteAgentService);
+ 	const remoteEnvironment = await remoteAgentService.getEnvironment();
+@@ -305,21 +310,23 @@
+ 	const isExtendedHistory = /^:\s\d+:\d+;/.test(resolvedFile.content);
+ 	const fileLines = resolvedFile.content.split(isExtendedHistory ? /\:\s\d+\:\d+;/ : /(?<!\\)\n/);
+ 	const result: Set<string> = new Set();
++	const entries: string[] = [];
+ 	for (let i = 0; i < fileLines.length; i++) {
+ 		const sanitized = fileLines[i].replace(/\\\n/g, '\n').trim();
+ 		if (sanitized.length > 0) {
+ 			result.add(sanitized);
++			entries.push(sanitized);
+ 		}
+ 	}
+ 	return {
+ 		sourceLabel,
+ 		sourceResource: resolvedFile.resource,
+-		commands: Array.from(result.values())
++		commands: includeDuplicates ? entries : Array.from(result.values())
+ 	};
+ }
+ 
+ 
+-export async function fetchPythonHistory(accessor: ServicesAccessor): Promise<IShellFileHistoryEntry | undefined> {
++export async function fetchPythonHistory(accessor: ServicesAccessor, includeDuplicates = false): Promise<IShellFileHistoryEntry | undefined> {
+ 	const fileService = accessor.get(IFileService);
+ 	const remoteAgentService = accessor.get(IRemoteAgentService);
+ 	const remoteEnvironment = await remoteAgentService.getEnvironment();
+@@ -335,21 +342,23 @@
+ 	// Python history file is a simple text file with one command per line
+ 	const fileLines = resolvedFile.content.split('\n');
+ 	const result: Set<string> = new Set();
++	const entries: string[] = [];
+ 
+ 	fileLines.forEach(line => {
+ 		if (line.trim().length > 0) {
+ 			result.add(line.trim());
++			entries.push(line.trim());
+ 		}
+ 	});
+ 
+ 	return {
+ 		sourceLabel,
+ 		sourceResource: resolvedFile.resource,
+-		commands: Array.from(result.values())
++		commands: includeDuplicates ? entries : Array.from(result.values())
+ 	};
+ }
+ 
+-export async function fetchPwshHistory(accessor: ServicesAccessor): Promise<IShellFileHistoryEntry | undefined> {
++export async function fetchPwshHistory(accessor: ServicesAccessor, includeDuplicates = false): Promise<IShellFileHistoryEntry | undefined> {
+ 	const fileService: Pick<IFileService, 'readFile'> = accessor.get(IFileService);
+ 	const remoteAgentService: Pick<IRemoteAgentService, 'getConnection' | 'getEnvironment'> = accessor.get(IRemoteAgentService);
+ 	let folderPrefix: string | undefined;
+@@ -372,6 +381,7 @@
+ 	}
+ 	const fileLines = resolvedFile.content.split('\n');
+ 	const result: Set<string> = new Set();
++	const entries: string[] = [];
+ 	let currentLine: string;
+ 	let currentCommand: string | undefined = undefined;
+ 	let wrapChar: string | undefined = undefined;
+@@ -386,6 +396,7 @@
+ 			const sanitized = currentCommand.trim();
+ 			if (sanitized.length > 0) {
+ 				result.add(sanitized);
++				entries.push(sanitized);
+ 			}
+ 			currentCommand = undefined;
+ 			continue;
+@@ -409,6 +420,7 @@
+ 			const sanitized = currentCommand.trim();
+ 			if (sanitized.length > 0) {
+ 				result.add(sanitized);
++				entries.push(sanitized);
+ 			}
+ 			currentCommand = undefined;
+ 		} else {
+@@ -421,11 +433,11 @@
+ 	return {
+ 		sourceLabel,
+ 		sourceResource: resolvedFile.resource,
+-		commands: Array.from(result.values())
++		commands: includeDuplicates ? entries : Array.from(result.values())
+ 	};
+ }
+ 
+-export async function fetchFishHistory(accessor: ServicesAccessor): Promise<IShellFileHistoryEntry | undefined> {
++export async function fetchFishHistory(accessor: ServicesAccessor, includeDuplicates = false): Promise<IShellFileHistoryEntry | undefined> {
+ 	const fileService = accessor.get(IFileService);
+ 	const remoteAgentService = accessor.get(IRemoteAgentService);
+ 	const remoteEnvironment = await remoteAgentService.getEnvironment();
+@@ -478,6 +490,7 @@
+ 	 * - If `cmd` value is multiline , it just takes the first line. Also YAML operators like `>-` or `|-` are not supported.
+ 	 */
+ 	const result: Set<string> = new Set();
++	const entries: string[] = [];
+ 	const cmds = resolvedFile.content.split('\n')
+ 		.filter(x => x.startsWith('- cmd:'))
+ 		.map(x => x.substring(6).trimStart());
+@@ -485,12 +498,13 @@
+ 		const sanitized = sanitizeFishHistoryCmd(cmds[i]).trim();
+ 		if (sanitized.length > 0) {
+ 			result.add(sanitized);
++			entries.push(sanitized);
+ 		}
+ 	}
+ 	return {
+ 		sourceLabel,
+ 		sourceResource: resolvedFile.resource,
+-		commands: Array.from(result.values())
++		commands: includeDuplicates ? entries : Array.from(result.values())
+ 	};
+ }
+ 

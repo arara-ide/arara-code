@@ -27,5 +27,7 @@
   "Installing Arara Vibes…": "Installing Arara Vibes…",
   "Could not prepare automatic restart. Arara Code will stay open. Close it and reopen it to use the update.": "Could not prepare automatic restart. Arara Code will stay open. Close it and reopen it to use the update.",
   "Open installer in Finder": "Open installer in Finder",
-  "macOS blocked automatic installation. Open the installer in Finder, close Arara Code, drag the new app to Applications and choose Replace. When reopening, follow any approval requested by macOS in System Settings > Privacy & Security.": "macOS blocked automatic installation. Open the installer in Finder, close Arara Code, drag the new app to Applications and choose Replace. When reopening, follow any approval requested by macOS in System Settings > Privacy & Security."
+  "macOS blocked automatic installation. Open the installer in Finder, close Arara Code, drag the new app to Applications and choose Replace. When reopening, follow any approval requested by macOS in System Settings > Privacy & Security.": "macOS blocked automatic installation. Open the installer in Finder, close Arara Code, drag the new app to Applications and choose Replace. When reopening, follow any approval requested by macOS in System Settings > Privacy & Security.",
+  "Try Arara Vibes from the Microsoft Store. Use your Arara chat in a floating window.": "Try Arara Vibes from the Microsoft Store. Use your Arara chat in a floating window.",
+  "Could not open Microsoft Store. Open its Library to install Arara Vibes.": "Could not open Microsoft Store. Open its Library to install Arara Vibes."
 }

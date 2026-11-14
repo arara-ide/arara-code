@@ -7,7 +7,7 @@ const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 const upstream = require('./fixtures/background-window-upstream.json');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arara-background-patch-'));
-const files = ['src/vs/platform/environment/common/argv.ts', 'src/vs/platform/environment/node/argv.ts', 'src/vs/platform/windows/electron-main/windowImpl.ts', 'src/vs/platform/windows/electron-main/windowsMainService.ts'];
+const files = ['src/vs/platform/environment/common/argv.ts', 'src/vs/platform/environment/node/argv.ts', 'src/vs/platform/windows/electron-main/windowImpl.ts', 'src/vs/platform/windows/electron-main/windowsMainService.ts', 'src/vs/code/electron-main/app.ts'];
 try {
   for (const file of files) {
     const target = path.join(directory, file); fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -37,5 +37,14 @@ try {
   assert.ok(code.includes('if (!this.backgroundWindow) { this.applyState'));
   assert.ok(code.includes('if (!this.backgroundWindow && !this.environmentMainService.isBuilt'));
   assert.ok(fs.readFileSync(path.join(directory, files[3]), 'utf8').includes("background: !!configuration['background-window']"));
+  const application = fs.readFileSync(path.join(directory, files[4]), 'utf8');
+  const activationBody = /app.on\('activate', async \(event, hasVisibleWindows\) => \{([\s\S]*?)\n\t\t\}\);/.exec(application)[1];
+  for (const background of [false, true]) {
+    const calls = [];
+    const activate = vm.runInNewContext(`(async function(event,hasVisibleWindows){${activationBody}})`, { OpenContext: { DOCK: 'dock' }, process: { stdout: { write: value => calls.push(value) } } });
+    const instance = { environmentMainService: { args: { 'background-window': background } }, logService: { trace() {} }, windowsMainService: { openEmptyWindow: () => calls.push('window') } };
+    void activate.call(instance, {}, false);
+    assert.deepEqual(calls, [background ? 'background-window:activate\n' : 'window']);
+  }
   console.log('PASS: background patch applied to upstream; native creation visibility, focus modes and foreground behavior');
 } finally { fs.rmSync(directory, { recursive: true }); }

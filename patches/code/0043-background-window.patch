@@ -3,6 +3,8 @@ The extension API cannot control native window visibility at creation time.
 This generic CLI flag only suppresses native presentation and focus; all product,
 authentication and tool behavior remains in the private extension.
 On macOS, background processes use accessory activation to stay out of the Dock.
+A generic stdout event lets the owning companion open an independent foreground app;
+the extension API cannot intercept native Dock or Finder reactivation.
 
 --- a/src/vs/platform/environment/common/argv.ts
 +++ b/src/vs/platform/environment/common/argv.ts
@@ -103,3 +105,17 @@ On macOS, background processes use accessory activation to stay out of the Dock.
  			this._register(new RunOnceScheduler(() => {
  				if (this._win && !this._win.isVisible() && !this._win.isMinimized()) {
  					this._win.show();
+--- a/src/vs/code/electron-main/app.ts
++++ b/src/vs/code/electron-main/app.ts
+@@ -538,6 +538,11 @@
+ 			this.logService.trace('app#activate');
+ 
++			if (this.environmentMainService.args['background-window']) {
++				process.stdout.write('background-window:activate\n');
++				return;
++			}
++
+ 			// Mac only event: open new window when we get activated
+ 			if (!hasVisibleWindows) {
+ 				await this.windowsMainService?.openEmptyWindow({ context: OpenContext.DOCK });
+ 			}

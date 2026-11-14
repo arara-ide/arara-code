@@ -30,7 +30,7 @@ for (const corrupt of [false, true]) test(`companion download verifies checksums
     else {
       const file = await prepareCompanion('arara-vibes', { root, fetch, platform: 'darwin', arch: 'arm64' });
       assert.equal(file, join(root, name));
-      assert.equal(await prepareCompanion('arara-vibes', { root, fetch: () => { throw Error('Must use verified cache'); } }), file);
+      assert.equal(await prepareCompanion('arara-vibes', { root, platform: 'darwin', fetch: () => { throw Error('Must use verified cache'); } }), file);
     }
   } finally { await rm(root, { recursive: true }); }
 });
