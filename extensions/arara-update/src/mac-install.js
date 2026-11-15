@@ -7,6 +7,7 @@ const { homedir, tmpdir } = require('node:os');
 const { join, dirname } = require('node:path');
 
 const MAC_GATEKEEPER_REJECTED = 'ERR_MAC_GATEKEEPER_REJECTED';
+const MAC_APP_RUNNING = 'ERR_MAC_APP_RUNNING';
 
 const PRODUCTS = {
   'arara-code': { name: 'Arara Code.app', id: 'com.arara.code' },
@@ -48,13 +49,18 @@ function macDestination(product, appRoot, home = homedir()) {
   return join('/Applications', info.name);
 }
 
-async function macMainPid(appRoot, execFile = promisify(execute)) {
+async function macAppPids(bundle, execFile = promisify(execute)) {
+  const result = await execFile('/bin/ps', ['-axo', 'pid=,comm=']);
+  return result.stdout.split('\n').map(line => /^\s*(\d+)\s+(.+)$/.exec(line)).filter(match => match?.[2].startsWith(`${bundle}/Contents/MacOS/`)).map(match => Number(match[1]));
+}
+
+async function macMainPid(appRoot, execFile = promisify(execute), parent = process.ppid) {
   const bundle = /^(.*\.app)\/Contents(?:\/|$)/.exec(appRoot)?.[1];
   if (!bundle) throw new Error('Application bundle unavailable');
-  const result = await execFile('/bin/ps', ['-axo', 'pid=,comm=']);
-  const matches = result.stdout.split('\n').map(line => /^\s*(\d+)\s+(.+)$/.exec(line)).filter(match => match?.[2].startsWith(`${bundle}/Contents/MacOS/`));
-  if (matches.length !== 1) throw new Error('Application process unavailable');
-  return Number(matches[0][1]);
+  const pids = await macAppPids(bundle, execFile);
+  if (pids.includes(parent)) return parent;
+  if (pids.length !== 1) throw new Error('Application process unavailable');
+  return pids[0];
 }
 
 function macUpdateRequirement(output, product) {
@@ -105,14 +111,14 @@ async function installMacDmg(file, product, options = {}, deps = {}) {
   };
   if (destinationInfo) await identity(destination);
   if (options.waitPid !== undefined && (!Number.isSafeInteger(options.waitPid) || options.waitPid < 2)) throw new Error('Invalid application process');
-  if (!options.waitPid && destinationInfo) {
-    const processes = await execFile('/bin/ps', ['-axo', 'command=']);
-    if (processes.stdout.split('\n').some(line => line.trim().startsWith(`${destination}/Contents/`))) throw new Error('Close the application before installing');
+  if (!options.waitPid && destinationInfo && (await macAppPids(destination, execFile)).length) {
+    throw Object.assign(new Error('Close the application before installing'), { code: MAC_APP_RUNNING });
   }
   const mount = await io.mkdtemp(join(options.tmpdir || tmpdir(), 'arara-install-'));
   let stage;
   let mounted = false;
   let handedOff = false;
+  let installed = false;
   try {
     await execFile('/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, file]);
     mounted = true;
@@ -151,15 +157,16 @@ async function installMacDmg(file, product, options = {}, deps = {}) {
         if (destinationInfo) await io.rename(backup, destination);
         throw error;
       }
+      installed = true;
     }
     return destination;
   } finally {
     if (mounted) await execFile('/usr/bin/hdiutil', ['detach', mount]).catch(() => {});
     await io.rmdir(mount).catch(() => {});
-    if (stage && !handedOff && !await io.lstat(join(stage, 'previous.app')).catch(() => null)) {
-      await io.rm(stage, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }).catch(error => console.warn('[arara update] Installer cleanup failed', error));
+    if (stage && !handedOff && (installed || !await io.lstat(join(stage, 'previous.app')).catch(() => null))) {
+      await execFile('/bin/rm', ['-rf', stage]).catch(error => console.warn('[arara update] Installer cleanup failed', error));
     }
   }
 }
 
-module.exports = { installMacDmg, macDestination, macMainPid, macUpdateRequirement, SWAP_SCRIPT, MAC_GATEKEEPER_REJECTED };
+module.exports = { installMacDmg, macAppPids, macDestination, macMainPid, macUpdateRequirement, SWAP_SCRIPT, MAC_APP_RUNNING, MAC_GATEKEEPER_REJECTED };
