@@ -6,7 +6,9 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
-const { installMacDmg, macUpdateRequirement } = require('../../extensions/arara-update/src/mac-install');
+const { spawn } = require('node:child_process');
+const { once } = require('node:events');
+const { installMacDmg, macUpdateRequirement, MAC_APP_RUNNING } = require('../../extensions/arara-update/src/mac-install');
 
 const native = promisify(execFile);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -43,6 +45,39 @@ exports.activate = async () => {
   assert.equal(JSON.parse(await fs.readFile(marker, 'utf8')).appRoot, join(destination, 'Contents/Resources/app'));
 }
 
+async function runFromBundle(executable) {
+  const child = spawn(executable, ['-e', 'setInterval(() => {}, 1000)'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'ignore' });
+  await once(child, 'spawn');
+  await pause(500);
+  assert.equal(child.exitCode, null, `${executable} must keep running for the fixture`);
+  return child;
+}
+
+async function stopChild(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = once(child, 'exit'); child.kill(); await exited;
+}
+
+async function respectRunningApplication(image, destination, options) {
+  const main = await runFromBundle(join(destination, 'Contents/MacOS/Arara Code'));
+  try {
+    await assert.rejects(installMacDmg(image, 'arara-code', options), error => error.code === MAC_APP_RUNNING);
+    await fs.access(join(destination, 'Contents/Resources/app/previous-version'));
+  } finally { await stopChild(main); }
+  console.log('PASS: an open main application blocks the direct installation and keeps the installed copy');
+  return runFromBundle(join(destination, 'Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)'));
+}
+
+async function cleanFailedStageInsideElectron(home, image, destination) {
+  await native('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', destination]);
+  const installer = require.resolve('../../extensions/arara-update/src/mac-install');
+  const script = `require(${JSON.stringify(installer)}).installMacDmg(${JSON.stringify(image)}, 'arara-code', { home: ${JSON.stringify(home)}, appRoot: ${JSON.stringify(join(destination, 'Contents/Resources/app'))}, tmpdir: ${JSON.stringify(home)}, waitPid: process.pid }).then(() => process.exit(2), error => { process.stdout.write(String(error.code)); process.exit(require('node:fs').statSync(${JSON.stringify(join(destination, 'Contents/Resources/app/node_modules.asar'))}).isDirectory() ? 0 : 3); });`;
+  const result = await native(join(destination, 'Contents/MacOS/Arara Code'), ['-e', script], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, timeout: 180000 });
+  assert.equal(result.stdout.trim(), 'ERR_MAC_GATEKEEPER_REJECTED');
+  assert.deepEqual((await fs.readdir(join(home, 'Applications'))).filter(name => name.startsWith('.arara-install-')), []);
+  console.log('PASS: inside Electron, a rejected ad-hoc installation removes its staged bundle, including ASAR archives');
+}
+
 async function rejectDifferentSigner(home, destination, options) {
   const payload = join(home, 'other-publisher');
   const app = join(payload, 'Arara Code.app');
@@ -75,7 +110,10 @@ async function rejectDifferentSigner(home, destination, options) {
     const previous = join(destination, 'Contents/Resources/app/previous-version');
     await fs.writeFile(previous, 'previous');
     const options = { home, appRoot: join(destination, 'Contents/Resources/app'), tmpdir: home, open: false };
-    assert.equal(await installMacDmg(image, 'arara-code', options, { execFile: run }), destination);
+    const leftover = await respectRunningApplication(image, destination, options);
+    try { assert.equal(await installMacDmg(image, 'arara-code', options, { execFile: run }), destination); }
+    finally { await stopChild(leftover); }
+    console.log('PASS: a leftover helper of a closed application does not block the update');
     await assert.rejects(fs.access(previous));
     assert.ok(!calls.some(([command]) => command.endsWith('spctl')));
     await native('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--all-architectures', destination]);
@@ -84,6 +122,7 @@ async function rejectDifferentSigner(home, destination, options) {
     await rejectDifferentSigner(home, destination, options);
     await openIsolatedApp(home, destination);
     console.log('PASS: LaunchServices opens the updated release with isolated profiles and the real extension host confirms its bundle');
+    await cleanFailedStageInsideElectron(home, image, destination);
   } finally {
     await stopIsolatedApp(destination);
     await fs.rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });

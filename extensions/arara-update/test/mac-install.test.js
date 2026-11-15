@@ -6,7 +6,7 @@ const fs = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { EventEmitter } = require('node:events');
-const { installMacDmg, macDestination, macMainPid, macUpdateRequirement, SWAP_SCRIPT } = require('../src/mac-install');
+const { installMacDmg, macAppPids, macDestination, macMainPid, macUpdateRequirement, MAC_APP_RUNNING, SWAP_SCRIPT } = require('../src/mac-install');
 
 async function fixture(t) {
   const home = await fs.mkdtemp(join(tmpdir(), 'arara-mac-test-'));
@@ -15,7 +15,7 @@ async function fixture(t) {
   await fs.mkdir(join(destination, 'Contents'), { recursive: true });
   await fs.writeFile(join(destination, 'Contents/version'), 'old');
   const calls = [];
-  const state = { fail: undefined, id: 'com.arara.code', spawned: [], requirement: '', rejectPolicy: false, failRequirement: false };
+  const state = { fail: undefined, id: 'com.arara.code', spawned: [], requirement: '', rejectPolicy: false, failRequirement: false, processes: '' };
   const execFile = async (command, args) => {
     calls.push([command, args]);
     if (command === state.fail) throw new Error('Native command failed');
@@ -23,7 +23,7 @@ async function fixture(t) {
     if (command.endsWith('codesign') && args.includes('-R') && state.failRequirement === (args.at(-1) === destination ? 'installed' : 'incoming')) throw new Error('Signing identity mismatch');
     if (command.endsWith('spctl') && state.rejectPolicy) throw Object.assign(new Error('rejected'), { code: 3 });
     if (command.endsWith('PlistBuddy')) return { stdout: state.id };
-    if (command.endsWith('/ps')) return { stdout: '' };
+    if (command.endsWith('/ps')) return { stdout: state.processes.replaceAll('$DESTINATION', destination) };
     if (command.endsWith('hdiutil') && args[0] === 'attach') {
       const source = join(args[args.indexOf('-mountpoint') + 1], 'AraraCode.app', 'Contents');
       await fs.mkdir(source, { recursive: true }); await fs.writeFile(join(source, 'version'), 'new');
@@ -32,6 +32,7 @@ async function fixture(t) {
       await fs.rm(join(args[1], 'AraraCode.app'), { recursive: true });
     }
     if (command.endsWith('ditto')) await fs.cp(args.at(-2), args.at(-1), { recursive: true });
+    if (command === '/bin/rm') await fs.rm(args.at(-1), { recursive: true, force: true });
     return { stdout: '' };
   };
   const spawn = (...args) => {
@@ -50,7 +51,10 @@ test('mac destination preserves the installed bundle and rejects non-Application
 
 test('discovers the main Mac process without guessing the extension host parent', async () => {
   const run = async () => ({ stdout: '  123 /Applications/Arara Code.app/Contents/MacOS/Electron\n  456 /Applications/Arara Code.app/Contents/Frameworks/Helper\n' });
-  assert.equal(await macMainPid('/Applications/Arara Code.app/Contents/Resources/app', run), 123);
+  assert.equal(await macMainPid('/Applications/Arara Code.app/Contents/Resources/app', run, 1), 123);
+  const host = async () => ({ stdout: '  123 /Applications/Arara Code.app/Contents/MacOS/Electron\n  789 /Applications/Arara Code.app/Contents/MacOS/Electron\n' });
+  assert.equal(await macMainPid('/Applications/Arara Code.app/Contents/Resources/app', host, 789), 789);
+  await assert.rejects(macMainPid('/Applications/Arara Code.app/Contents/Resources/app', host, 1), /Application process unavailable/);
   await assert.rejects(macMainPid('/Applications/Arara Code.app/Contents/Resources/app', async () => ({ stdout: '' })));
 });
 
@@ -179,4 +183,41 @@ test('new installations still require Gatekeeper approval', async t => {
   await assert.rejects(installMacDmg('/cache/update.dmg', 'arara-code', f.options, f.deps), error => error.code === 'ERR_MAC_GATEKEEPER_REJECTED');
   await assert.rejects(fs.access(f.destination));
   assert.equal(f.state.spawned.length, 0);
+});
+
+test('lists only main executables of the application bundle', async () => {
+  const run = async () => ({ stdout: '  12 /Applications/Arara Code.app/Contents/MacOS/Arara Code\n  13 /Applications/Arara Code.app/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)\n  14 /Applications/Arara Code Copy.app/Contents/MacOS/Arara Code\n' });
+  assert.deepEqual(await macAppPids('/Applications/Arara Code.app', run), [12]);
+});
+
+test('an open application blocks the direct installation with a stable code', async t => {
+  const f = await fixture(t);
+  f.state.processes = '  77 $DESTINATION/Contents/MacOS/Arara Code\n';
+  await assert.rejects(installMacDmg('/cache/update.dmg', 'arara-code', { ...f.options, open: false }, f.deps), error => error.code === MAC_APP_RUNNING);
+  assert.equal(await fs.readFile(join(f.destination, 'Contents/version'), 'utf8'), 'old');
+  assert.ok(!f.calls.some(([command]) => command.endsWith('hdiutil')));
+});
+
+test('leftover helper processes of a closed application do not block the installation', async t => {
+  const f = await fixture(t);
+  f.state.processes = '  78 $DESTINATION/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)\n';
+  await installMacDmg('/cache/update.dmg', 'arara-code', { ...f.options, open: false }, f.deps);
+  assert.equal(await fs.readFile(join(f.destination, 'Contents/version'), 'utf8'), 'new');
+});
+
+test('removes a failed stage with the native remover so Electron archives inside the bundle are deleted', async t => {
+  const f = await fixture(t);
+  f.state.fail = '/usr/bin/codesign';
+  await assert.rejects(installMacDmg('/cache/update.dmg', 'arara-code', f.options, f.deps));
+  const removals = f.calls.filter(([command]) => command === '/bin/rm');
+  assert.equal(removals.length, 1);
+  assert.match(removals[0][1].at(-1), /\.arara-install-/);
+  assert.deepEqual(await fs.readdir(join(f.home, 'Applications')), ['Arara Code.app']);
+});
+
+test('a direct installation removes the previous copy after the new application is in place', async t => {
+  const f = await fixture(t);
+  await installMacDmg('/cache/update.dmg', 'arara-code', { ...f.options, open: false }, f.deps);
+  assert.equal(await fs.readFile(join(f.destination, 'Contents/version'), 'utf8'), 'new');
+  assert.deepEqual(await fs.readdir(join(f.home, 'Applications')), ['Arara Code.app']);
 });
