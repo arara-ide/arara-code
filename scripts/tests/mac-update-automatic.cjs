@@ -26,23 +26,46 @@ async function stopIsolatedApp(destination) {
 async function openIsolatedApp(home, destination) {
   const extension = join(home, 'fixture-extension');
   const marker = join(home, 'launched.json');
+  const installer = require.resolve('../../extensions/arara-update/src/mac-install');
+  const other = await runFromBundle(join(destination, 'Contents/MacOS/Arara Code'));
+  const probe = `require(${JSON.stringify(installer)}).macMainPid(${JSON.stringify(join(destination, 'Contents/Resources/app'))}).then(pid => process.stdout.write(String(pid)), error => { console.error(error); process.exitCode = 1; });`;
   await fs.mkdir(extension, { recursive: true });
   await fs.writeFile(join(extension, 'package.json'), JSON.stringify({ name: 'update-launch-fixture', publisher: 'arara-test', version: '1.0.0', engines: { vscode: '^1.134.0' }, activationEvents: ['*'], main: './extension.js' }));
   await fs.writeFile(join(extension, 'extension.js'), `const vscode = require('vscode');
 exports.activate = async () => {
-  require('node:fs').writeFileSync(${JSON.stringify(marker)}, JSON.stringify({ appRoot: vscode.env.appRoot }));
-  await vscode.commands.executeCommand('workbench.action.quit');
+  try {
+    const assert = require('node:assert/strict');
+    const { macMainPid, macAppPids } = require(${JSON.stringify(installer)});
+    const main = await macMainPid(vscode.env.appRoot);
+    const { stdout } = await require('node:util').promisify(require('node:child_process').execFile)(process.execPath, ['-e', ${JSON.stringify(probe)}], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, timeout: 15000 });
+    const pids = await macAppPids(${JSON.stringify(destination)});
+    assert.ok(pids.includes(${other.pid}));
+    assert.ok(pids.includes(main));
+    assert.notEqual(main, ${other.pid});
+    assert.equal(Number(stdout.trim()), main);
+    require('node:fs').writeFileSync(${JSON.stringify(marker)}, JSON.stringify({ appRoot: vscode.env.appRoot, main, pids }));
+  } catch (error) {
+    require('node:fs').writeFileSync(${JSON.stringify(marker)}, JSON.stringify({ error: String(error.stack || error) }));
+  } finally {
+    await vscode.commands.executeCommand('workbench.action.quit');
+  }
 };
 `);
   const args = ['--user-data-dir', join(home, 'profile'), '--extensions-dir', join(home, 'extensions'),
     '--shared-data-dir', join(home, 'shared'), '--agent-plugins-dir', join(home, 'plugins'),
     '--agents-user-data-dir', join(home, 'agents'), '--agents-extensions-dir', join(home, 'agents-extensions'),
-    `--extensionDevelopmentPath=${extension}`, '--skip-welcome', '--skip-release-notes', '--disable-telemetry', '--disable-updates'];
+    `--extensionDevelopmentPath=${extension}`, '--skip-welcome', '--skip-release-notes', '--disable-telemetry', '--disable-updates', '--use-mock-keychain'];
   for (const name of ['arara-update', 'arara-ai', 'arara-bot', 'arara-orchestra']) args.push('--disable-extension', `arara.${name}`);
   const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, 'config'), XDG_CACHE_HOME: join(home, 'cache') };
   delete env.ELECTRON_RUN_AS_NODE;
-  await native('/usr/bin/open', ['-W', '-n', '-a', destination, '--args', ...args], { env, timeout: 90000 });
-  assert.equal(JSON.parse(await fs.readFile(marker, 'utf8')).appRoot, join(destination, 'Contents/Resources/app'));
+  try {
+    await native('/usr/bin/open', ['-W', '-n', '-a', destination, '--args', ...args], { env, timeout: 90000 });
+    const result = JSON.parse(await fs.readFile(marker, 'utf8'));
+    assert.equal(result.error, undefined, result.error);
+    assert.equal(result.appRoot, join(destination, 'Contents/Resources/app'));
+    assert.ok(result.pids.length >= 2);
+    console.log('PASS: the real extension host and its nested helper select their own main process while another instance uses the same bundle');
+  } finally { await stopChild(other); }
 }
 
 async function runFromBundle(executable) {

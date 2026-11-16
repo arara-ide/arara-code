@@ -49,16 +49,32 @@ function macDestination(product, appRoot, home = homedir()) {
   return join('/Applications', info.name);
 }
 
+async function macProcesses(execFile) {
+  const result = await execFile('/bin/ps', ['-ww', '-axo', 'pid=,ppid=,comm=']);
+  return result.stdout.split('\n').map(line => /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line)).filter(Boolean)
+    .map(match => ({ pid: Number(match[1]), parent: Number(match[2]), executable: match[3] }));
+}
+
+function macBundlePids(bundle, processes) {
+  return processes.filter(entry => entry.executable.startsWith(`${bundle}/Contents/MacOS/`)).map(entry => entry.pid);
+}
+
 async function macAppPids(bundle, execFile = promisify(execute)) {
-  const result = await execFile('/bin/ps', ['-axo', 'pid=,comm=']);
-  return result.stdout.split('\n').map(line => /^\s*(\d+)\s+(.+)$/.exec(line)).filter(match => match?.[2].startsWith(`${bundle}/Contents/MacOS/`)).map(match => Number(match[1]));
+  return macBundlePids(bundle, await macProcesses(execFile));
 }
 
 async function macMainPid(appRoot, execFile = promisify(execute), parent = process.ppid) {
   const bundle = /^(.*\.app)\/Contents(?:\/|$)/.exec(appRoot)?.[1];
   if (!bundle) throw new Error('Application bundle unavailable');
-  const pids = await macAppPids(bundle, execFile);
-  if (pids.includes(parent)) return parent;
+  const processes = await macProcesses(execFile);
+  const pids = macBundlePids(bundle, processes);
+  const parents = new Map(processes.map(entry => [entry.pid, entry.parent]));
+  const visited = new Set();
+  while (parent > 1 && !visited.has(parent)) {
+    if (pids.includes(parent)) return parent;
+    visited.add(parent);
+    parent = parents.get(parent);
+  }
   if (pids.length !== 1) throw new Error('Application process unavailable');
   return pids[0];
 }
