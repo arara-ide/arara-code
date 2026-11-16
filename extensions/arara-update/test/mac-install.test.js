@@ -50,12 +50,43 @@ test('mac destination preserves the installed bundle and rejects non-Application
 });
 
 test('discovers the main Mac process without guessing the extension host parent', async () => {
-  const run = async () => ({ stdout: '  123 /Applications/Arara Code.app/Contents/MacOS/Electron\n  456 /Applications/Arara Code.app/Contents/Frameworks/Helper\n' });
+  const run = async () => ({ stdout: '  123 1 /Applications/Arara Code.app/Contents/MacOS/Electron\n  456 123 /Applications/Arara Code.app/Contents/Frameworks/Helper\n' });
   assert.equal(await macMainPid('/Applications/Arara Code.app/Contents/Resources/app', run, 1), 123);
-  const host = async () => ({ stdout: '  123 /Applications/Arara Code.app/Contents/MacOS/Electron\n  789 /Applications/Arara Code.app/Contents/MacOS/Electron\n' });
+  const host = async () => ({ stdout: '  123 1 /Applications/Arara Code.app/Contents/MacOS/Electron\n  789 1 /Applications/Arara Code.app/Contents/MacOS/Electron\n' });
   assert.equal(await macMainPid('/Applications/Arara Code.app/Contents/Resources/app', host, 789), 789);
   await assert.rejects(macMainPid('/Applications/Arara Code.app/Contents/Resources/app', host, 1), /Application process unavailable/);
   await assert.rejects(macMainPid('/Applications/Arara Code.app/Contents/Resources/app', async () => ({ stdout: '' })));
+});
+
+test('follows the extension host ancestry when another process uses the same application bundle', async () => {
+  const processes = [
+    '  123 1 /Applications/Arara Code.app/Contents/MacOS/Arara Code',
+    '  456 123 /Applications/Arara Code.app/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)',
+    '  789 1 /Applications/Arara Code.app/Contents/MacOS/Arara Code',
+    '  890 789 /Applications/Arara Code.app/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)',
+    '  901 456 /usr/local/bin/node',
+    '  902 789 /Applications/Arara Code.app/Contents/MacOS/Arara Code',
+  ];
+  const run = async (_command, args) => ({ stdout: processes.map(line => args.includes('pid=,comm=') ? line.replace(/^(\s*\d+)\s+\d+/, '$1') : line).join('\n') });
+  const appRoot = '/Applications/Arara Code.app/Contents/Resources/app';
+  assert.equal(await macMainPid(appRoot, run, 456), 123);
+  assert.equal(await macMainPid(appRoot, run, 901), 123);
+  assert.equal(await macMainPid(appRoot, run, 890), 789);
+  assert.equal(await macMainPid(appRoot, run, 902), 902);
+  await assert.rejects(macMainPid(appRoot, run, 999), /Application process unavailable/);
+});
+
+test('rejects missing or cyclic ancestry instead of choosing another application instance', async () => {
+  const run = async () => ({ stdout: [
+    '  123 1 /Applications/Arara Code.app/Contents/MacOS/Arara Code',
+    '  789 1 /Applications/Arara Code.app/Contents/MacOS/Arara Code',
+    '  456 457 /usr/local/bin/node',
+    '  457 456 /usr/local/bin/node',
+    'invalid process row',
+  ].join('\n') });
+  const appRoot = '/Applications/Arara Code.app/Contents/Resources/app';
+  await assert.rejects(macMainPid(appRoot, run, 456), /Application process unavailable/);
+  await assert.rejects(macMainPid(appRoot, run, 999), /Application process unavailable/);
 });
 
 test('stages, verifies and hands off without replacing a running application', async t => {
@@ -186,13 +217,13 @@ test('new installations still require Gatekeeper approval', async t => {
 });
 
 test('lists only main executables of the application bundle', async () => {
-  const run = async () => ({ stdout: '  12 /Applications/Arara Code.app/Contents/MacOS/Arara Code\n  13 /Applications/Arara Code.app/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)\n  14 /Applications/Arara Code Copy.app/Contents/MacOS/Arara Code\n' });
+  const run = async () => ({ stdout: '  12 1 /Applications/Arara Code.app/Contents/MacOS/Arara Code\n  13 12 /Applications/Arara Code.app/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)\n  14 1 /Applications/Arara Code Copy.app/Contents/MacOS/Arara Code\n' });
   assert.deepEqual(await macAppPids('/Applications/Arara Code.app', run), [12]);
 });
 
 test('an open application blocks the direct installation with a stable code', async t => {
   const f = await fixture(t);
-  f.state.processes = '  77 $DESTINATION/Contents/MacOS/Arara Code\n';
+  f.state.processes = '  77 1 $DESTINATION/Contents/MacOS/Arara Code\n';
   await assert.rejects(installMacDmg('/cache/update.dmg', 'arara-code', { ...f.options, open: false }, f.deps), error => error.code === MAC_APP_RUNNING);
   assert.equal(await fs.readFile(join(f.destination, 'Contents/version'), 'utf8'), 'old');
   assert.ok(!f.calls.some(([command]) => command.endsWith('hdiutil')));
@@ -200,7 +231,7 @@ test('an open application blocks the direct installation with a stable code', as
 
 test('leftover helper processes of a closed application do not block the installation', async t => {
   const f = await fixture(t);
-  f.state.processes = '  78 $DESTINATION/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)\n';
+  f.state.processes = '  78 1 $DESTINATION/Contents/Frameworks/Arara Code Helper (Plugin).app/Contents/MacOS/Arara Code Helper (Plugin)\n';
   await installMacDmg('/cache/update.dmg', 'arara-code', { ...f.options, open: false }, f.deps);
   assert.equal(await fs.readFile(join(f.destination, 'Contents/version'), 'utf8'), 'new');
 });
