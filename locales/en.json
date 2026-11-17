@@ -23,6 +23,8 @@
   "Arara settings": "Arara settings",
   "Open Obsidian": "Open Obsidian",
   "Sync Obsidian vault": "Sync Obsidian vault",
+  "Export Obsidian workspace": "Export Obsidian workspace",
+  "Import Obsidian workspace": "Import Obsidian workspace",
   "Recent projects": "Recent projects",
   "Open folder": "Open folder",
   "Show all recent…": "Show all recent…"

@@ -40,7 +40,8 @@
   ],
   "extensionEnabledApiProposals": {
     "arara.arara-ai": [
-      "quickPickSortByLabel"
+      "quickPickSortByLabel",
+      "environmentPower"
     ]
   },
   "startupWebview": {
