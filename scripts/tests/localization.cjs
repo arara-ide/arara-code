@@ -18,6 +18,16 @@ for (const [locale, expected] of [['pt-BR', 'Atualizar'], ['pt_PT', 'Atualizar']
   assert.equal(localize('constructor'), 'constructor');
   assert.equal(localize('Arara Code {0} is installed. It will restart when the AI finishes responding.').includes('{0}'), true);
 }
+for (const [locale, expected] of [['pt-BR', 'Adicionar ao chat'], ['es-MX', 'Añadir al chat'], ['en', 'Add to chat']]) {
+  const localize = vm.runInNewContext(source + '; localizeAraraMessage', { _VSCODE_NLS_LANGUAGE: locale });
+  assert.equal(localize('Add to chat'), expected);
+  assert.notEqual(localize('Read Terminal Buffer'), '');
+  assert.notEqual(localize('A newer Arara Code is installed and waits for a restart'), '');
+}
+for (const [locale, key] of [['pt-BR', 'Read Terminal Buffer'], ['es-MX', 'Read Terminal Buffer'], ['pt-BR', 'A newer Arara Code is installed and waits for a restart'], ['es-MX', 'A newer Arara Code is installed and waits for a restart']]) {
+  const localize = vm.runInNewContext(source + '; localizeAraraMessage', { _VSCODE_NLS_LANGUAGE: locale });
+  assert.notEqual(localize(key), key);
+}
 assert.match(patch, /message = localizeAraraMessage\(originalMessage\)/);
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arara-localization-check-'));

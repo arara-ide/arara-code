@@ -1,7 +1,16 @@
 [Desktop Entry]
 Name=@@NAME_LONG@@ - URL Handler
-Comment=Code Editing. Redefined.
-GenericName=Text Editor
+Name[pt]=@@NAME_LONG@@ - Manipulador de URLs
+Name[pt_BR]=@@NAME_LONG@@ - Manipulador de URLs
+Name[es]=@@NAME_LONG@@ - Gestor de URL
+Comment=AI code editor
+Comment[pt]=Editor de código com IA
+Comment[pt_BR]=Editor de código com IA
+Comment[es]=Editor de código con IA
+GenericName=Code Editor
+GenericName[pt]=Editor de código
+GenericName[pt_BR]=Editor de código
+GenericName[es]=Editor de código
 Exec=@@EXEC@@ --open-url %U
 Icon=@@ICON@@
 Type=Application

@@ -7,7 +7,7 @@ const { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } = require('node
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { afterEach, describe, it } = require('node:test');
-const { UpdateDownloads, hostArch, installAction, installInstructions, installerName, updateTarget, windowsPowerShell } = require('../src/downloads');
+const { UpdateDownloads, downloadedInstructions, hostArch, installAction, installInstructions, installerName, updateTarget, windowsPowerShell } = require('../src/downloads');
 const { setLanguage } = require('../src/i18n');
 const { newerVersion } = require('../src/version');
 
@@ -256,7 +256,28 @@ describe('installation instructions', () => {
   it('never shows an untranslated placeholder', () => {
     for (const locale of ['en', 'pt', 'es']) {
       setLanguage(locale);
-      for (const name of names) assert.doesNotMatch(installInstructions(name), /\{\d+\}/);
+      for (const name of names) {
+        assert.doesNotMatch(installInstructions(name), /\{\d+\}/);
+        assert.doesNotMatch(downloadedInstructions(name, version), /\{\d+\}/);
+      }
+    }
+  });
+
+  it('produces complete versioned messages per platform without composing translated fragments', () => {
+    const cases = [
+      ['en', 'AraraCode.app', `Arara Code ${version}: Close Arara Code, drag AraraCode.app`],
+      ['pt-br', 'AraraCode.app', `Arara Code ${version}: Feche o Arara Code, arraste AraraCode.app`],
+      ['es', 'AraraCode.app', `Arara Code ${version}: Cierra Arara Code, arrastra AraraCode.app`],
+      ['en', names[1], `Arara Code ${version} is downloaded.`],
+      ['pt', names[1], `O Arara Code ${version} foi baixado.`],
+      ['es', names[1], `Se descargó Arara Code ${version}.`],
+      ['pt-br', names[0], 'Mantenha a pasta data'],
+      ['es', names[6], 'contenido extraído'],
+    ];
+    for (const [locale, name, expected] of cases) {
+      setLanguage(locale);
+      const text = downloadedInstructions(name, version);
+      assert.ok(text.includes(expected), `${locale} ${name}: ${text}`);
     }
   });
 });

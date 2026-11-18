@@ -8,7 +8,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 
 --- /dev/null
 +++ b/src/vs/araraNls.ts
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,111 @@
 +/* Copyright (c) Arara Code contributors. Licensed under the MIT License. */
 +const catalogs: Record<string, Record<string, string>> = {
 +	"en": {
@@ -40,22 +40,25 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Import Obsidian workspace": "Import Obsidian workspace",
 +		"Recent projects": "Recent projects",
 +		"Open folder": "Open folder",
-+		"Show all recent…": "Show all recent…"
++		"Show all recent…": "Show all recent…",
++		"Add to chat": "Add to chat",
++		"Read Terminal Buffer": "Read Terminal Buffer",
++		"A newer Arara Code is installed and waits for a restart": "A newer Arara Code is installed and waits for a restart"
 +	},
 +	"pt": {
 +		"Update": "Atualizar",
 +		"Updating": "Atualizando",
-+		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "Arara Code {0} foi instalado. Fecha assim que a IA terminar a resposta; depois, abra o Arara Code de novo.",
-+		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "Arara Code {0} foi instalado. Reinicia assim que a IA terminar a resposta.",
-+		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "Arara Code {0} foi instalado. Fechando em {1} s para aplicar a atualização; depois, abra o Arara Code de novo.",
-+		"Arara Code {0} is installed. Restarting in {1} s to apply the update.": "Arara Code {0} foi instalado. Reiniciando em {1} s para aplicar a atualização.",
++		"Arara Code {0} is installed. It will close when the AI finishes responding; then reopen Arara Code.": "O Arara Code {0} foi instalado. Ele vai fechar assim que a IA terminar de responder; depois, abra o Arara Code de novo.",
++		"Arara Code {0} is installed. It will restart when the AI finishes responding.": "O Arara Code {0} foi instalado. Ele vai reiniciar assim que a IA terminar de responder.",
++		"Arara Code {0} is installed. Closing in {1} s to apply the update; then reopen Arara Code.": "O Arara Code {0} foi instalado. Fechando em {1} s para aplicar a atualização; depois, abra o Arara Code de novo.",
++		"Arara Code {0} is installed. Restarting in {1} s to apply the update.": "O Arara Code {0} foi instalado. Reiniciando em {1} s para aplicar a atualização.",
 +		"Close now": "Fechar agora",
 +		"Restart now": "Reiniciar agora",
 +		"Later": "Depois",
 +		"Trust this workspace?": "Confiar neste workspace?",
 +		"Trust this folder?": "Confiar nesta pasta?",
 +		"Trust everything inside '{0}'": "Confiar em tudo dentro de '{0}'",
-+		"Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Sem confiança, a pasta abre em modo restrito: o agente e as tarefas não executam nada.",
++		"Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Se não confiar, a pasta abre em modo restrito: o agente e as tarefas não executam nada.",
 +		"&&Trust": "&&Confiar",
 +		"&&Restricted mode": "&&Modo restrito",
 +		"Generate commit message with AI": "Gerar mensagem de commit com IA",
@@ -71,7 +74,10 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Import Obsidian workspace": "Importar workspace do Obsidian",
 +		"Recent projects": "Projetos recentes",
 +		"Open folder": "Abrir pasta",
-+		"Show all recent…": "Mostrar todos os recentes…"
++		"Show all recent…": "Mostrar todos os recentes…",
++		"Add to chat": "Adicionar ao chat",
++		"Read Terminal Buffer": "Ler conteúdo do terminal",
++		"A newer Arara Code is installed and waits for a restart": "Uma versão mais nova do Arara Code foi instalada e aguarda reinício"
 +	},
 +	"es": {
 +		"Update": "Actualizar",
@@ -86,7 +92,7 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Trust this workspace?": "¿Confiar en este espacio de trabajo?",
 +		"Trust this folder?": "¿Confiar en esta carpeta?",
 +		"Trust everything inside '{0}'": "Confiar en todo dentro de '{0}'",
-+		"Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Sin confianza, la carpeta se abre en modo restringido: el agente y las tareas no ejecutan nada.",
++		"Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Si no confías, la carpeta se abre en modo restringido: el agente y las tareas no ejecutan nada.",
 +		"&&Trust": "&&Confiar",
 +		"&&Restricted mode": "&&Modo restringido",
 +		"Generate commit message with AI": "Generar mensaje de commit con IA",
@@ -102,7 +108,10 @@ Touches: src/vs/nls.ts and src/vs/araraNls.ts (generated).
 +		"Import Obsidian workspace": "Importar workspace de Obsidian",
 +		"Recent projects": "Proyectos recientes",
 +		"Open folder": "Abrir carpeta",
-+		"Show all recent…": "Mostrar todos los recientes…"
++		"Show all recent…": "Mostrar todos los recientes…",
++		"Add to chat": "Añadir al chat",
++		"Read Terminal Buffer": "Leer contenido del terminal",
++		"A newer Arara Code is installed and waits for a restart": "Hay una versión más nueva de Arara Code instalada esperando un reinicio"
 +	}
 +};
 +

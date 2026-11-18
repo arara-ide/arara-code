@@ -5,8 +5,14 @@
 	<project_license>@@LICENSE@@</project_license>
 	<name>@@NAME_LONG@@</name>
 	<url type="homepage">https://github.com/arara-ide/arara-code</url>
-	<summary>Editor de código com IA</summary>
+	<summary>AI code editor</summary>
+	<summary xml:lang="pt">Editor de código com IA</summary>
+	<summary xml:lang="pt_BR">Editor de código com IA</summary>
+	<summary xml:lang="es">Editor de código con IA</summary>
 	<description>
-		<p>Arara Code é um editor baseado no Code-OSS com chat, agente e autocomplete de IA.</p>
+		<p>Arara Code is an editor based on Code-OSS with AI chat, agent and autocomplete.</p>
+		<p xml:lang="pt">Arara Code é um editor baseado no Code-OSS com chat, agente e autocomplete de IA.</p>
+		<p xml:lang="pt_BR">Arara Code é um editor baseado no Code-OSS com chat, agente e autocomplete de IA.</p>
+		<p xml:lang="es">Arara Code es un editor basado en Code-OSS con chat, agente y autocompletado con IA.</p>
 	</description>
 </component>
