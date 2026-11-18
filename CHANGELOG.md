@@ -10,6 +10,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Obsidian: clique com o botão direito no botão do topo para Abrir Obsidian ou Sincronizar vault do Obsidian.
 - Chat: a IA pesquisa e atualiza o vault do Obsidian sozinha durante a conversa e, depois de tarefas grandes, oferece atualizar o vault; o grafo agrupa as notas por tipo de arquivo.
 - Navegador: escolha Qualidade ou Performance e reutilize elementos inspecionados como referências clicáveis no chat.
+- Chat: a IA dá um título curto à conversa já no início e mostra "Renomeando conversa…" no lugar de um cartão de ferramenta, também no Arara Bot, no Arara Vibes e no app.
 - App: controle os chats e bots da IDE pelo celular em um aplicativo instalável, com pareamento por código e conexão direta ao computador.
 - Chat: quem tem o plano Supporter escolhe de 1 a 8 chats por plataforma em Configurações; o padrão continua 3.
 - Chat: modo Goal acompanha o objetivo até a conclusão, com recuperação de comunicação e opção de desligar, também no Arara Bot e na Orquestra.
