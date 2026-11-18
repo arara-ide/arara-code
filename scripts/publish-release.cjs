@@ -47,7 +47,7 @@ function releaseNotes(version, names, changelog, prerelease) {
 }
 
 async function publish({ env = process.env, dist = 'dist', changelog = 'CHANGELOG.md',
-  gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }),
+  gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 32 * 1024 * 1024 }),
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), retryMs = 5000 } = {}) {
   const version = env.RELEASE_VERSION;
   const repo = env.GITHUB_REPOSITORY;
