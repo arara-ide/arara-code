@@ -198,7 +198,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +
 +		this.handled = true;
 +		this.installed.set(true);
-+		this.logService.info(`[arara] versão ${onDisk} instalada no disco (rodando ${this.productService.version}); reiniciando`);
++		this.logService.info(`[arara] version ${onDisk} installed on disk (running ${this.productService.version}); restarting`);
 +
 +		const windows = await this.nativeHostService.getWindows({ includeAuxiliaryWindows: false });
 +		if (Math.min(...windows.map(w => w.id)) !== this.nativeHostService.windowId) {

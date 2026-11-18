@@ -35,7 +35,7 @@ Touches: src/vs/workbench/contrib/terminal/browser/terminalActions.ts
 +	});
 +	registerTerminalAction({
 +		id: 'arara.internal.addTerminalToChat',
-+		title: localize2('arara.addTerminalToChat', 'Adicionar ao chat'),
++		title: localize2('arara.addTerminalToChat', 'Add to chat'),
 +		icon: Codicon.sparkle,
 +		f1: false,
 +		menu: { id: MenuId.TerminalInstanceContext, group: 'navigation', order: 100 },

@@ -5,7 +5,7 @@ const { promisify } = require('node:util');
 const { installMacDmg, macMainPid, MAC_GATEKEEPER_REJECTED } = require('./mac-install');
 const { UpdateBusy } = require('./busy');
 const { UpdateChecker } = require('./checker');
-const { UpdateDownloads, hostArch, installAction, installInstructions, updateTarget } = require('./downloads');
+const { UpdateDownloads, downloadedInstructions, hostArch, installAction, installInstructions, updateTarget } = require('./downloads');
 const { setLanguage, t } = require('./i18n');
 const { STORE_URI, StoreChecker, isStoreInstall } = require('./store');
 const { newerVersion, productVersion } = require('./version');
@@ -151,10 +151,10 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
       return;
     }
     if (action.kind === 'extract-reveal') {
-      const appPath = action.kind === 'extract-reveal' ? await extractApp(verified, action.destination) : verified.file;
+      const appPath = await extractApp(verified, action.destination);
       const proceed = t('Continue');
       const selected = await vscode.window.showInformationMessage(
-        t('Arara Code {0}: {1}', verified.version, installInstructions(basename(appPath))),
+        downloadedInstructions(basename(appPath), verified.version),
         { modal: true },
         proceed,
       );
@@ -175,7 +175,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
     }
     await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(verified.file));
     waitInstaller();
-    void vscode.window.showInformationMessage(t('Arara Code {0} is already downloaded. {1}', verified.version, installInstructions(basename(verified.file))));
+    void vscode.window.showInformationMessage(downloadedInstructions(basename(verified.file), verified.version));
   };
 
   context.subscriptions.push(

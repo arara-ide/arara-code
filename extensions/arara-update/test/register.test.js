@@ -214,6 +214,20 @@ describe('update button', () => {
     });
   }
 
+  for (const [language, file, expected] of [
+    ['en', '/cache/arara-code-linux-x64-1.135.06780.tar.gz', 'Arara Code 1.135.06780 is downloaded. Extract the selected file.'],
+    ['pt-br', '/cache/arara-code-linux-x64-1.135.06780.tar.gz', 'O Arara Code 1.135.06780 foi baixado. Extraia o arquivo selecionado'],
+    ['es', '/cache/arara-code-linux-x64-1.135.06780.tar.gz', 'Se descargó Arara Code 1.135.06780. Extrae el archivo seleccionado'],
+  ]) {
+    it(`shows a complete translated reveal message for Linux tar.gz in ${language}`, async () => {
+      const h = harness({ platform: 'linux', language, appRoot: '/opt/arara-code/resources/app' });
+      await h.found({ ...ready, file });
+      await h.click();
+      assert.ok(h.state.executed.some(call => call[0] === 'revealFileInOS' && call[1].fsPath === file));
+      assert.ok(h.state.messages.some(text => text.startsWith(expected)), h.state.messages.join('\n'));
+    });
+  }
+
   it('waits for Continue in the macOS modal before revealing the app and quitting', async () => {
     const h = harness({ platform: 'darwin', language: 'pt-br' });
     await h.found({ ...ready, file: '/cache/AraraCode-darwin-x64-1.135.06780.zip' });

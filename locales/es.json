@@ -11,7 +11,7 @@
   "Trust this workspace?": "¿Confiar en este espacio de trabajo?",
   "Trust this folder?": "¿Confiar en esta carpeta?",
   "Trust everything inside '{0}'": "Confiar en todo dentro de '{0}'",
-  "Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Sin confianza, la carpeta se abre en modo restringido: el agente y las tareas no ejecutan nada.",
+  "Without trust, the folder opens in restricted mode: the agent and tasks do not run anything.": "Si no confías, la carpeta se abre en modo restringido: el agente y las tareas no ejecutan nada.",
   "&&Trust": "&&Confiar",
   "&&Restricted mode": "&&Modo restringido",
   "Generate commit message with AI": "Generar mensaje de commit con IA",
@@ -27,5 +27,8 @@
   "Import Obsidian workspace": "Importar workspace de Obsidian",
   "Recent projects": "Proyectos recientes",
   "Open folder": "Abrir carpeta",
-  "Show all recent…": "Mostrar todos los recientes…"
+  "Show all recent…": "Mostrar todos los recientes…",
+  "Add to chat": "Añadir al chat",
+  "Read Terminal Buffer": "Leer contenido del terminal",
+  "A newer Arara Code is installed and waits for a restart": "Hay una versión más nueva de Arara Code instalada esperando un reinicio"
 }

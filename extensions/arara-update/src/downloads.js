@@ -52,6 +52,13 @@ function installInstructions(name) {
   return t('Extract the selected file. Close Arara Code and replace the installation folder with the extracted content. Then reopen the app.');
 }
 
+function downloadedInstructions(name, version) {
+  if (name.endsWith('.app')) return t('Arara Code {0}: Close Arara Code, drag {1} shown in Finder to Applications and choose Replace. Then reopen the app.', version, name);
+  if (name.endsWith('.AppImage')) return t('Arara Code {0} is downloaded. Close Arara Code and replace your previous AppImage with the downloaded file, keeping the same location and filename used by your shortcut. Then reopen the AppImage. Your settings are preserved.', version);
+  if (name.includes('-win32-') && name.endsWith('.zip')) return t('Arara Code {0} is downloaded. Close Arara Code, extract the downloaded ZIP and replace the portable installation folder. Keep your data folder if present. Then reopen Arara Code.', version);
+  return t('Arara Code {0} is downloaded. Extract the selected file. Close Arara Code and replace the installation folder with the extracted content. Then reopen the app.', version);
+}
+
 function shellQuote(value) {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -162,4 +169,4 @@ class UpdateDownloads {
   }
 }
 
-module.exports = { INSTALLER_ENV, hostArch, UpdateDownloads, installAction, installInstructions, installerName, shellQuote, updateTarget, windowsPowerShell };
+module.exports = { INSTALLER_ENV, hostArch, UpdateDownloads, downloadedInstructions, installAction, installInstructions, installerName, shellQuote, updateTarget, windowsPowerShell };
