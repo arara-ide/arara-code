@@ -39,6 +39,15 @@ try {
   assert.doesNotThrow(() => stripTypeScriptTypes(source), 'the source applied by Git must parse');
   assert.ok(source.includes("id: 'arara.openSettings'"), 'preserves the settings menu contribution');
   assert.ok(source.includes('Arara settings'), 'preserves the localized English source message');
+  assert.match(source, /order: -3,\n\tcommand: \{\n\t\tid: `\$\{TEXT_LAUNCHER\}\.run`/, 'text launcher sits left of the AI and Obsidian launchers');
+  assert.ok(source.includes("const TEXT_LAUNCHER = 'arara.ui.titleLauncher2';"));
+  assert.ok(source.includes('createKey(`${TEXT_LAUNCHER}Available`, true)'), 'announces the hook so the extension hides its fallback');
+  assert.match(source, /OBSIDIAN_SYNC\) \}\),\n\t\t\t\ttoAction\(\{ id: OBSIDIAN_EXPORT, [^\n]*\n\t\t\t\ttoAction\(\{ id: OBSIDIAN_IMPORT, /, 'the Obsidian context menu offers sync, export and import in this order');
+  assert.ok(source.includes("const OBSIDIAN_EXPORT = 'arara.obsidian.export';") && source.includes("const OBSIDIAN_IMPORT = 'arara.obsidian.import';"));
+  assert.match(css, /\.arara-title-icon-arara \{\n\twidth: 10px;\n\theight: 10px;/);
+  assert.match(css, /\.arara-title-text-launcher \.action-label \{[^}]*font-size: 11px;/);
+  const auxPatch = fs.readFileSync(path.join(root, 'patches/code/0023-aux-bar-launcher.patch'), 'utf8');
+  assert.ok(!auxPatch.includes('auxLauncher2') && !auxPatch.includes('arara-aux-icon-arara'), 'the side bar header keeps only the Orchestra launcher');
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 execFileSync(process.execPath, [path.join(__dirname, 'editor-breakpoints.cjs')], { stdio: 'inherit' });
 execFileSync(process.execPath, [path.join(__dirname, 'optimized-statusbar.cjs')], { stdio: 'inherit' });
