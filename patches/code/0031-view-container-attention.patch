@@ -1,12 +1,13 @@
 Arara Code: generic theme-color attention hook for native view container icons.
 
 Why a patch: WebviewView.badge (stable) and the available proposed APIs only
-provide numeric badges, not the foreground of a native composite-bar icon.
-The extension owns completion/unread state and supplies a theme color id through
-_workbench.setViewContainerAttention(containerId, colorId | undefined). The core
-only stores/renders this presentation override. No provider names or product
-rules live here; selection and theme changes retain the native icon behavior.
-Touches: src/vs/workbench/browser/parts/compositeBarActions.ts
+provide numeric badges, not the foreground or running shine of a native
+composite-bar icon/label. The extension owns completion/unread/running state
+and supplies a theme color id or `{ shine: true }` through
+_workbench.setViewContainerAttention(containerId, colorId | { shine: true } | undefined).
+The core only stores/renders this presentation override. No provider names or
+product rules live here; selection and theme changes retain the native behavior.
+Touches: src/vs/workbench/browser/parts/compositeBarActions.ts, src/vs/workbench/browser/parts/media/paneCompositePart.css
 
 --- a/src/vs/workbench/browser/parts/compositeBarActions.ts
 +++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
@@ -19,20 +20,27 @@ Touches: src/vs/workbench/browser/parts/compositeBarActions.ts
  import { toDisposable, DisposableStore, MutableDisposable } from '../../../base/common/lifecycle.js';
  import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
  import { IThemeService, IColorTheme } from '../../../platform/theme/common/themeService.js';
-@@ -31,6 +31,20 @@
+@@ -31,6 +31,27 @@
  import { createConfigureKeybindingAction } from '../../../platform/actions/common/menuService.js';
  import { HoverStyle } from '../../../base/browser/ui/hover/hover.js';
  
-+const viewContainerAttention = new Map<string, string>();
++type ViewContainerAttention = string | { shine: true; delay: string };
++const viewContainerAttention = new Map<string, ViewContainerAttention>();
 +const viewContainerAttentionChanged = new Emitter<string>();
-+CommandsRegistry.registerCommand('_workbench.setViewContainerAttention', (_accessor, id: unknown, color: unknown) => {
-+	if (typeof id !== 'string' || !id || (color !== undefined && color !== null && (typeof color !== 'string' || !color))) {
++CommandsRegistry.registerCommand('_workbench.setViewContainerAttention', (_accessor, id: unknown, attention: unknown) => {
++	if (typeof id !== 'string' || !id) {
 +		return;
 +	}
-+	if (typeof color === 'string') {
-+		viewContainerAttention.set(id, color);
-+	} else {
++	if (typeof attention === 'string' && attention) {
++		viewContainerAttention.set(id, attention);
++	} else if (attention && typeof attention === 'object' && (attention as { shine?: unknown }).shine === true) {
++		const existing = viewContainerAttention.get(id);
++		const delay = typeof existing === 'object' ? existing.delay : `${(-Math.random() * 1.8).toFixed(3)}s`;
++		viewContainerAttention.set(id, { shine: true, delay });
++	} else if (attention === undefined || attention === null) {
 +		viewContainerAttention.delete(id);
++	} else {
++		return;
 +	}
 +	viewContainerAttentionChanged.fire(id);
 +});
@@ -40,7 +48,7 @@ Touches: src/vs/workbench/browser/parts/compositeBarActions.ts
  export interface ICompositeBar {
  
  	/**
-@@ -181,6 +195,9 @@
+@@ -181,6 +202,9 @@
  		this._register(action.onDidChangeCompositeBarActionItem(() => this.update()));
  		this._register(Event.filter(keybindingService.onDidUpdateKeybindings, () => this.keybindingLabel !== this.computeKeybindingLabel())(() => this.updateTitle()));
  		this._register(action.onDidChangeActivity(() => this.updateActivity()));
@@ -50,17 +58,76 @@ Touches: src/vs/workbench/browser/parts/compositeBarActions.ts
  	}
  
  	protected get compositeBarActionItem(): ICompositeBarActionItem {
-@@ -193,7 +210,12 @@
+@@ -192,21 +216,36 @@
+ 		const colors = this.options.colors(theme);
  
  		if (this.label) {
++			if (this._action.checked) {
++				viewContainerAttention.delete(this.compositeBarActionItem.id);
++			}
++			const attention = !this._action.checked ? viewContainerAttention.get(this.compositeBarActionItem.id) : undefined;
++			const shine = typeof attention === 'object' && attention.shine === true;
++			const attentionColor = typeof attention === 'string' ? attention : undefined;
++			const shineMask = shine && !!this.options.icon && !!this.compositeBarActionItem.iconUrl;
++			this.label.classList.toggle('view-container-attention-shine', shine);
++			this.label.classList.toggle('view-container-attention-shine-mask', shineMask);
++			this.label.style.setProperty('--arara-shine-delay', shine ? attention.delay : '');
  			if (this.options.icon) {
 -				const foreground = this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;
-+				if (this._action.checked) {
-+					viewContainerAttention.delete(this.compositeBarActionItem.id);
-+				}
-+				const attentionColor = !this._action.checked && viewContainerAttention.get(this.compositeBarActionItem.id);
 +				const foreground = attentionColor ? theme.getColor(attentionColor) ?? colors.inactiveForegroundColor
 +					: this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;
- 				if (this.compositeBarActionItem.iconUrl) {
+-				if (this.compositeBarActionItem.iconUrl) {
++				if (shine) {
++					this.label.style.backgroundColor = '';
++					this.label.style.color = '';
++				} else if (this.compositeBarActionItem.iconUrl) {
  					// Apply background color to activity bar item provided with iconUrls
  					this.label.style.backgroundColor = foreground ? foreground.toString() : '';
+ 					this.label.style.color = '';
+ 				} else {
+ 					// Apply foreground color to activity bar items provided with codicons
+ 					this.label.style.color = foreground ? foreground.toString() : '';
+ 					this.label.style.backgroundColor = '';
+ 				}
+ 			} else {
+-				const foreground = this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;
++				const foreground = attentionColor ? theme.getColor(attentionColor) ?? colors.inactiveForegroundColor
++					: this._action.checked ? colors.activeForegroundColor : colors.inactiveForegroundColor;
+ 				const borderBottomColor = this._action.checked ? colors.activeBorderBottomColor : null;
+-				this.label.style.color = foreground ? foreground.toString() : '';
++				this.label.style.color = shine ? '' : (foreground ? foreground.toString() : '');
+ 				this.label.style.borderBottomColor = borderBottomColor ? borderBottomColor.toString() : '';
+ 			}
+ 
+--- a/src/vs/workbench/browser/parts/media/paneCompositePart.css
++++ b/src/vs/workbench/browser/parts/media/paneCompositePart.css
+@@ -497,3 +497,26 @@
+ .monaco-workbench .pane-composite-part .part.panel .empty-pane-message-area .empty-pane-message {
+     margin: calc(var(--vscode-workbench-bottompane-font-size) * 0.923077)
+-}
+\ No newline at end of file
++}
++@keyframes view-container-attention-shine {
++	from { background-position: 100% 0; }
++	to { background-position: 0% 0; }
++}
++.monaco-workbench .action-label.view-container-attention-shine {
++	--arara-shine-base: color-mix(in srgb, var(--vscode-foreground) 55%, var(--vscode-editor-background, transparent));
++	--arara-shine-peak: var(--vscode-foreground);
++	background-image: linear-gradient(100deg, var(--arara-shine-base) 0%, var(--arara-shine-base) 40%, var(--arara-shine-peak) 50%, var(--arara-shine-base) 60%, var(--arara-shine-base) 100%);
++	background-repeat: no-repeat;
++	background-size: 300% 100%;
++	background-position: 100% 0;
++	animation: view-container-attention-shine 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
++	animation-delay: var(--arara-shine-delay, 0s) !important;
++}
++.monaco-workbench .action-label.view-container-attention-shine:not(.view-container-attention-shine-mask) {
++	color: var(--arara-shine-base);
++	-webkit-background-clip: text;
++	background-clip: text;
++	-webkit-text-fill-color: transparent;
++}
++.monaco-workbench .action-label.view-container-attention-shine.view-container-attention-shine-mask {
++	background-color: transparent !important;
++}
+

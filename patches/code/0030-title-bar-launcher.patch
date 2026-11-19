@@ -4,6 +4,9 @@ Arara Code: gancho genérico de lançador (só ícone) na barra de título.
   (order -3), um lançador com a arara do Arara Code + texto, rótulo vindo da context key
   `arara.ui.titleLauncher2` (vazio = oculto), que roda `arara.ui.titleLauncher2.run`; o core só
   define `arara.ui.titleLauncher2Available` para a extensão esconder o fallback (hoje: Arara Bot).
+  À esquerda dele (order -4), um segundo lançador igual, com rótulo da context key
+  `arara.ui.titleLauncher3`, que roda `arara.ui.titleLauncher3.run` e anuncia
+  `arara.ui.titleLauncher3Available` (hoje: Orquestra).
   Item em
   MenuId.LayoutControlMenu (order -2, à esquerda do "Atualizar" do 0015 e do Customize
   Layout) com o ícone `sparkle` (estrelinha de IA).
@@ -27,7 +30,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css 
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.contribution.ts
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,169 @@
 +import './araraTitleLauncher.css';
 +import { $, addDisposableListener, EventType, getWindow } from '../../../../base/browser/dom.js';
 +import { StandardMouseEvent } from '../../../../base/browser/mouseEvent.js';
@@ -49,6 +52,17 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css 
 +const OBSIDIAN_EXPORT = 'arara.obsidian.export';
 +const OBSIDIAN_IMPORT = 'arara.obsidian.import';
 +const TEXT_LAUNCHER = 'arara.ui.titleLauncher2';
++const LEADING_TEXT_LAUNCHER = 'arara.ui.titleLauncher3';
++
++MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
++	group: 'navigation',
++	order: -4,
++	command: {
++		id: `${LEADING_TEXT_LAUNCHER}.run`,
++		title: localize('arara.ui.titleLauncher3', "Arara"),
++	},
++	when: ContextKeyExpr.and(IsAuxiliaryWindowContext.negate(), ContextKeyExpr.has(LEADING_TEXT_LAUNCHER)),
++});
 +
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +	group: 'navigation',
@@ -119,11 +133,13 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css 
 +
 +class AraraTextLauncherActionViewItem extends AraraLauncherActionViewItem {
 +
++	launcherKey = TEXT_LAUNCHER;
++
 +	override render(container: HTMLElement): void {
 +		super.render(container);
 +		container.classList.add('arara-title-text-launcher');
 +		this._register(this._contextKeyService.onDidChangeContext(e => {
-+			if (e.affectsSome(new Set([TEXT_LAUNCHER]))) {
++			if (e.affectsSome(new Set([this.launcherKey]))) {
 +				this.updateLabel();
 +				this.updateTooltip();
 +			}
@@ -134,7 +150,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css 
 +		if (!this.label) {
 +			return;
 +		}
-+		const text = this._contextKeyService.getContextKeyValue<string>(TEXT_LAUNCHER) || this._commandAction.label;
++		const text = this._contextKeyService.getContextKeyValue<string>(this.launcherKey) || this._commandAction.label;
 +		const icon = $('span.arara-title-icon-arara');
 +		icon.setAttribute('aria-hidden', 'true');
 +		this.label.replaceChildren(icon, $('span.arara-title-launcher-label', undefined, text));
@@ -142,7 +158,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css 
 +	}
 +
 +	protected override getTooltip() {
-+		return this._contextKeyService.getContextKeyValue<string>(TEXT_LAUNCHER) || super.getTooltip();
++		return this._contextKeyService.getContextKeyValue<string>(this.launcherKey) || super.getTooltip();
 +	}
 +}
 +
@@ -157,10 +173,17 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraTitleLauncher.css 
 +		@IContextKeyService contextKeyService: IContextKeyService,
 +	) {
 +		super();
-+		contextKeyService.createKey(`${TEXT_LAUNCHER}Available`, true);
-+		this._register(actionViewItemService.register(MenuId.LayoutControlMenu, `${TEXT_LAUNCHER}.run`, (action, options) => {
-+			return action instanceof MenuItemAction ? instantiationService.createInstance(AraraTextLauncherActionViewItem, action, options) : undefined;
-+		}));
++		for (const key of [TEXT_LAUNCHER, LEADING_TEXT_LAUNCHER]) {
++			contextKeyService.createKey(`${key}Available`, true);
++			this._register(actionViewItemService.register(MenuId.LayoutControlMenu, `${key}.run`, (action, options) => {
++				if (!(action instanceof MenuItemAction)) {
++					return undefined;
++				}
++				const item = instantiationService.createInstance(AraraTextLauncherActionViewItem, action, options);
++				item.launcherKey = key;
++				return item;
++			}));
++		}
 +		this._register(actionViewItemService.register(MenuId.LayoutControlMenu, OBSIDIAN_OPEN, (action, options) => {
 +			if (!(action instanceof MenuItemAction)) {
 +				return undefined;
