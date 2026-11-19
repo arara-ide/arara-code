@@ -120,49 +120,22 @@ fi
 embed_arara_ai() {
   [[ -f "${ARARA_AI_DIR}/package.json" ]] || { echo "! ${ARARA_AI_DIR} não encontrado; build sem a extensão de IA" >&2; return 0; }
   echo "» Compilando arara-ai…"
-  ( cd "${ARARA_AI_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build )
-  local dest="${WORK}/vscode/extensions/arara-ai"
-  rm -rf "${dest}"
-  mkdir -p "${dest}"
-  jq 'del(.dependencies, .devDependencies, .scripts)' "${ARARA_AI_DIR}/package.json" > "${dest}/package.json"
-  for catalog in "${ARARA_AI_DIR}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
-  node "${ROOT}/scripts/apply-environment.cjs" "${ARARA_ENVIRONMENT}" "${dest}/package.json"
-  [[ -f "${ARARA_AI_DIR}/README.md" ]] && cp "${ARARA_AI_DIR}/README.md" "${dest}/"
-  [[ -f "${ARARA_AI_DIR}/.vscodeignore" ]] && cp "${ARARA_AI_DIR}/.vscodeignore" "${dest}/"
-  mkdir -p "${dest}/dist"
-  cp "${ARARA_AI_DIR}/dist/extension.js" "${dest}/dist/"
-  cp -r "${ARARA_AI_DIR}/media" "${ARARA_AI_DIR}/themes" "${dest}/"
+  node "${ROOT}/scripts/extension-layout.cjs" build arara-ai "${ARARA_AI_DIR}"
+  node "${ROOT}/scripts/extension-layout.cjs" stage arara-ai "${ARARA_AI_DIR}" "${WORK}/vscode/extensions/arara-ai" "${ARARA_ENVIRONMENT}"
 }
 
 embed_arara_bot() {
   [[ -f "${ARARA_BOT_DIR}/extension/package.json" ]] || { echo "! ${ARARA_BOT_DIR} não encontrado; build sem o Arara Bot" >&2; return 0; }
   echo "» Compilando arara-bot…"
-  ( cd "${ARARA_BOT_DIR}" && { [[ -d node_modules ]] || pnpm install --frozen-lockfile; } && pnpm build:server )
-  ( cd "${ARARA_BOT_DIR}/extension" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build && npm run --silent stage )
-  local src="${ARARA_BOT_DIR}/extension" dest="${WORK}/vscode/extensions/arara-bot"
-  rm -rf "${dest}"
-  mkdir -p "${dest}/dist"
-  cp "${src}/package.json" "${src}/LICENSE" "${src}/NOTICE" "${dest}/"
-  for catalog in "${src}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
-  local f
-  for f in extension hub bridge webview; do cp "${src}/dist/${f}.js" "${dest}/dist/"; done
-  cp -r "${src}/media" "${src}/server" "${src}/skills" "${dest}/"
-  test -s "${dest}/server/index.js" && test -s "${dest}/dist/webview.js"
+  node "${ROOT}/scripts/extension-layout.cjs" build arara-bot "${ARARA_BOT_DIR}"
+  node "${ROOT}/scripts/extension-layout.cjs" stage arara-bot "${ARARA_BOT_DIR}" "${WORK}/vscode/extensions/arara-bot"
 }
 
 embed_arara_orchestra() {
   [[ -f "${ARARA_ORCHESTRA_DIR}/package.json" ]] || { echo "! ${ARARA_ORCHESTRA_DIR} não encontrado; build sem a Orquestra" >&2; return 0; }
   echo "» Compilando arara-orchestra…"
-  ( cd "${ARARA_ORCHESTRA_DIR}" && { [[ -d node_modules ]] || npm ci --no-audit --no-fund; } && npm run --silent build )
-  local src="${ARARA_ORCHESTRA_DIR}" dest="${WORK}/vscode/extensions/arara-orchestra"
-  rm -rf "${dest}"
-  mkdir -p "${dest}/dist/webview"
-  cp "${src}/package.json" "${dest}/"
-  for catalog in "${src}"/package.nls*.json; do [[ ! -f "${catalog}" ]] || cp "${catalog}" "${dest}/"; done
-  cp "${src}/dist/extension.js" "${dest}/dist/"
-  cp "${src}/dist/webview/webview.js" "${dest}/dist/webview/"
-  cp -r "${src}/media" "${dest}/"
-  test -s "${dest}/dist/extension.js" && test -s "${dest}/dist/webview/webview.js"
+  node "${ROOT}/scripts/extension-layout.cjs" build arara-orchestra "${ARARA_ORCHESTRA_DIR}"
+  node "${ROOT}/scripts/extension-layout.cjs" stage arara-orchestra "${ARARA_ORCHESTRA_DIR}" "${WORK}/vscode/extensions/arara-orchestra"
 }
 
 embed_arara_update() {

@@ -40,7 +40,7 @@ try {
   };
   for (const [file, text] of Object.entries(assets)) write(path.join(bot, 'extension', file), text);
   write(path.join(bot, 'extension/src/extension.ts'), '// source');
-  const env = { ...process.env, PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, ARARA_BOT_DIR: bot, WORK: work };
+  const env = { ...process.env, PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, ROOT: root, ARARA_BOT_DIR: bot, WORK: work };
   const run = () => spawnSync('bash', [script], { env, encoding: 'utf8' });
   const result = run();
   assert.equal(result.status, 0, result.stderr);

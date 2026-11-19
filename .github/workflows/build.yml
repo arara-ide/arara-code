@@ -45,12 +45,15 @@ jobs:
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
           node --check scripts/apply-environment.cjs
+          node --check scripts/extension-layout.cjs
+          node --check scripts/update-installed.cjs
           node --check scripts/package-msix.cjs
           node scripts/tests/patches.cjs
           node scripts/tests/localization.cjs
           node scripts/tests/embed-arara-ai.cjs
           node scripts/tests/embed-arara-bot.cjs
           node scripts/tests/embed-arara-orchestra.cjs
+          node scripts/tests/update-installed.cjs
           node scripts/tests/arara-update.cjs
           node scripts/tests/terminal.cjs
           node --test scripts/tests/publish-release.cjs scripts/tests/macos-release.cjs scripts/tests/package-msix.cjs
