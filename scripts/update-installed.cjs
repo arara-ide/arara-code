@@ -19,7 +19,12 @@ function installCandidates(platform = process.platform, home = os.homedir(), env
 
 function appRoot(input) {
   const resolved = path.resolve(input);
-  const options = [resolved, path.join(resolved, 'resources', 'app'), path.join(resolved, 'Contents', 'Resources', 'app')];
+  const options = [
+    resolved,
+    path.join(resolved, 'resources', 'app'),
+    path.join(resolved, 'Resources', 'app'),
+    path.join(resolved, 'Contents', 'Resources', 'app'),
+  ];
   const found = options.find(dir => fs.existsSync(path.join(dir, 'product.json')) && fs.existsSync(path.join(dir, 'extensions')));
   return found && fs.realpathSync.native(found);
 }

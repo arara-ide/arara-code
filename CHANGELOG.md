@@ -38,6 +38,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
+- Atualização local das extensões: o instalador reconhece a pasta `Contents` do aplicativo macOS em volumes que diferenciam maiúsculas de minúsculas.
 - Atualização: no macOS, o botão encontra a instância correta da IDE mesmo com o Arara Vibes aberto e processos intermediários; falhas não deixam pastas temporárias em Aplicativos.
 - Terminal no macOS: Ctrl+Shift com acento grave ou apóstrofo abre um novo terminal nos layouts inglês e português.
 - Atualização: no macOS, versões assinadas pelo mesmo autor atualizam e reabrem automaticamente; instalações sem identidade persistente oferecem o instalador no Finder quando necessário.

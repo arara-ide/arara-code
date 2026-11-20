@@ -55,4 +55,5 @@ execFileSync(process.execPath, [path.join(__dirname, 'editor-breakpoints.cjs')],
 execFileSync(process.execPath, [path.join(__dirname, 'optimized-statusbar.cjs')], { stdio: 'inherit' });
 execFileSync(process.execPath, [path.join(__dirname, 'background-window.cjs')], { stdio: 'inherit' });
 execFileSync(process.execPath, [path.join(__dirname, 'terminal-renderer.cjs')], { stdio: 'inherit' });
+execFileSync(process.execPath, [path.join(__dirname, 'console-logger-eio.cjs')], { stdio: 'inherit' });
 console.log(`PASS: ${count} patches, invalid hunk regressions and actual launcher source applied by Git.`);

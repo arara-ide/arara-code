@@ -34,8 +34,13 @@ try {
 
   const real = fs.realpathSync.native(app);
   assert.equal(findInstallation(install), real);
-  assert.equal(findInstallation(path.join(app, '..', '..')), real);
+  assert.equal(findInstallation(path.join(install, 'Contents')), real);
   assert.equal(findInstallation(app), real);
+  const linuxInstall = path.join(dir, 'opt', 'arara-code');
+  const linuxApp = path.join(linuxInstall, 'resources', 'app');
+  write(path.join(linuxApp, 'product.json'), '{}');
+  fs.mkdirSync(path.join(linuxApp, 'extensions'));
+  assert.equal(findInstallation(linuxInstall), fs.realpathSync.native(linuxApp));
   assert.throws(() => findInstallation(path.join(dir, 'missing')), /No Arara Code installation/);
   assert.throws(() => findInstallation(undefined, [path.join(dir, 'nowhere')]), /--app <path>/);
   assert.ok(installCandidates('darwin', '/Users/u').includes('/Applications/Arara Code.app/Contents/Resources/app'));
