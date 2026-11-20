@@ -1,0 +1,179 @@
+Arara Code: honor the product list of required system extensions in all profiles.
+Why a patch: extension APIs cannot govern enablement before the extension host starts.
+Touches: product options, extension management utilities, workbench enablement,
+the bundled extension details page and the enablement service tests.
+
+--- a/src/vs/base/common/product.ts
++++ b/src/vs/base/common/product.ts
+@@ -256,6 +256,7 @@
+ 	}>;
+ 	readonly extensionsForceVersionByQuality?: readonly string[];
+ 	readonly builtInExtensionsEnabledWithAutoUpdates: readonly string[];
++	readonly requiredBuiltinExtensions?: readonly string[];
+ 	readonly sessionsWindowAllowedExtensions?: readonly string[];
+ 
+ 	readonly msftInternalDomains?: string[];
+--- a/src/vs/platform/extensionManagement/common/extensionManagementUtil.ts
++++ b/src/vs/platform/extensionManagement/common/extensionManagementUtil.ts
+@@ -5,7 +5,7 @@
+ 
+ import { compareIgnoreCase } from '../../../base/common/strings.js';
+ import { IExtensionIdentifier, IGalleryExtension, ILocalExtension, MaliciousExtensionInfo, getTargetPlatform } from './extensionManagement.js';
+-import { ExtensionIdentifier, IExtension, TargetPlatform, UNDEFINED_PUBLISHER } from '../../extensions/common/extensions.js';
++import { ExtensionIdentifier, ExtensionType, IExtension, TargetPlatform, UNDEFINED_PUBLISHER } from '../../extensions/common/extensions.js';
+ import { IFileService } from '../../files/common/files.js';
+ import { isLinux, platform } from '../../../base/common/platform.js';
+ import { URI } from '../../../base/common/uri.js';
+@@ -23,6 +23,10 @@
+ 		return true;
+ 	}
+ 	return compareIgnoreCase(a.id, b.id) === 0;
++}
++
++export function isRequiredBuiltinExtension(extension: Pick<IExtension, 'type' | 'identifier'>, requiredIds: readonly string[] | undefined): boolean {
++	return extension.type === ExtensionType.System && !!requiredIds?.some(id => areSameExtensions({ id }, extension.identifier));
+ }
+ 
+ const ExtensionKeyRegex = /^([^.]+\..+)-(\d+\.\d+\.\d+)(-(.+))?$/;
+--- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
++++ b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+@@ -8,7 +8,7 @@
+ import { Disposable, toDisposable } from '../../../../base/common/lifecycle.js';
+ import { IExtensionManagementService, IExtensionIdentifier, IGlobalExtensionEnablementService, ENABLED_EXTENSIONS_STORAGE_PATH, DISABLED_EXTENSIONS_STORAGE_PATH, InstallOperation, IAllowedExtensionsService, MaliciousExtensionInfo } from '../../../../platform/extensionManagement/common/extensionManagement.js';
+ import { IWorkbenchExtensionEnablementService, EnablementState, IExtensionManagementServerService, IWorkbenchExtensionManagementService, IExtensionManagementServer, ExtensionInstallLocation } from '../common/extensionManagement.js';
+-import { areSameExtensions, BetterMergeId, getExtensionDependencies, isMalicious } from '../../../../platform/extensionManagement/common/extensionManagementUtil.js';
++import { areSameExtensions, BetterMergeId, getExtensionDependencies, isMalicious, isRequiredBuiltinExtension } from '../../../../platform/extensionManagement/common/extensionManagementUtil.js';
+ import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
+ import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+ import { IWorkbenchEnvironmentService } from '../../environment/common/environmentService.js';
+@@ -88,7 +88,7 @@
+ 		@IChatEntitlementService private readonly chatEntitlementService: IChatEntitlementService,
+ 		@IInstantiationService instantiationService: IInstantiationService,
+ 		@ILogService private readonly logService: ILogService,
+-		@IProductService productService: IProductService
++		@IProductService private readonly productService: IProductService
+ 	) {
+ 		super();
+ 		this.storageManager = this._register(new StorageManager(storageService));
+@@ -252,7 +252,15 @@
+ 		return false;
+ 	}
+ 
+-	private throwErrorIfCannotChangeEnablement(extension: IExtension, donotCheckDependencies?: boolean): void {
++	private throwErrorIfCannotChangeEnablement(extension: IExtension, workspace = false): void {
++		if (isRequiredBuiltinExtension(extension, this.productService.requiredBuiltinExtensions) || (!workspace && this._isEnabledInEnv(extension))) {
++			throw new Error(localize('cannot change enablement environment', "Cannot change enablement of {0} extension because it is enabled in environment", extension.manifest.displayName || extension.identifier.id));
++		}
++
++		if (workspace) {
++			return this.throwErrorIfCannotChangeWorkspaceEnablement(extension);
++		}
++
+ 		if (isLanguagePackExtension(extension.manifest)) {
+ 			throw new Error(localize('cannot disable language pack extension', "Cannot change enablement of {0} extension because it contributes language packs.", extension.manifest.displayName || extension.identifier.id));
+ 		}
+@@ -261,11 +269,7 @@
+ 			throw new Error(localize('cannot disable settings sync auth extension', "Cannot change enablement of {0} extension because Settings Sync depends on it.", extension.manifest.displayName || extension.identifier.id));
+ 		}
+ 
+-		if (this._isEnabledInEnv(extension)) {
+-			throw new Error(localize('cannot change enablement environment', "Cannot change enablement of {0} extension because it is enabled in environment", extension.manifest.displayName || extension.identifier.id));
+-		}
+-
+-		this.throwErrorIfEnablementStateCannotBeChanged(extension, this.getEnablementState(extension), donotCheckDependencies);
++		this.throwErrorIfEnablementStateCannotBeChanged(extension, this.getEnablementState(extension));
+ 	}
+ 
+ 	private throwErrorIfEnablementStateCannotBeChanged(extension: IExtension, enablementStateOfExtension: EnablementState, donotCheckDependencies?: boolean): void {
+@@ -315,11 +319,7 @@
+ 
+ 		const workspace = newState === EnablementState.DisabledWorkspace || newState === EnablementState.EnabledWorkspace;
+ 		for (const extension of extensions) {
+-			if (workspace) {
+-				this.throwErrorIfCannotChangeWorkspaceEnablement(extension);
+-			} else {
+-				this.throwErrorIfCannotChangeEnablement(extension);
+-			}
++			this.throwErrorIfCannotChangeEnablement(extension, workspace);
+ 		}
+ 
+ 		const result: boolean[] = [];
+@@ -458,7 +458,9 @@
+ 			this.ensureChatExtensionInitialDisabledState();
+ 		}
+ 
+-		enablementState = this._getUserEnablementState(extension.identifier);
++		enablementState = isRequiredBuiltinExtension(extension, this.productService.requiredBuiltinExtensions)
++			? EnablementState.EnabledByEnvironment
++			: this._getUserEnablementState(extension.identifier);
+ 		const isEnabled = this.isEnabledEnablementState(enablementState);
+ 
+ 		if (isMalicious(extension.identifier, this.getMaliciousExtensionsForCheck())) {
+--- a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
++++ b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
+@@ -29,7 +29,7 @@
+ 	IGalleryExtensionVersion
+ } from '../../../../platform/extensionManagement/common/extensionManagement.js';
+ import { IWorkbenchExtensionEnablementService, EnablementState, IExtensionManagementServerService, IExtensionManagementServer, IWorkbenchExtensionManagementService, IResourceExtension } from '../../../services/extensionManagement/common/extensionManagement.js';
+-import { getGalleryExtensionTelemetryData, getLocalExtensionTelemetryData, areSameExtensions, groupByExtension, getGalleryExtensionId, findMatchingMaliciousEntry } from '../../../../platform/extensionManagement/common/extensionManagementUtil.js';
++import { getGalleryExtensionTelemetryData, getLocalExtensionTelemetryData, areSameExtensions, groupByExtension, getGalleryExtensionId, findMatchingMaliciousEntry, isRequiredBuiltinExtension } from '../../../../platform/extensionManagement/common/extensionManagementUtil.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { IHostService } from '../../../services/host/browser/host.js';
+@@ -484,6 +484,10 @@
+ 			this.telemetryService.publicLog('extensions:NotFoundReadMe', this.telemetryData);
+ 		}
+ 
++		if (isRequiredBuiltinExtension(this, this.productService.requiredBuiltinExtensions)) {
++			return `# ${this.displayName || this.name}\n\n${this.description}`;
++		}
++
+ 		if (this.type === ExtensionType.System) {
+ 			return Promise.resolve(`# ${this.displayName || this.name}
+ **Notice:** This extension is bundled with Arara Code. It can be disabled but not uninstalled.
+--- a/src/vs/workbench/services/extensionManagement/test/browser/extensionEnablementService.test.ts
++++ b/src/vs/workbench/services/extensionManagement/test/browser/extensionEnablementService.test.ts
+@@ -63,7 +63,7 @@
+ }
+ 
+ export class TestExtensionEnablementService extends ExtensionEnablementService {
+-	constructor(instantiationService: TestInstantiationService, chatEntitlementService?: IChatEntitlementService) {
++	constructor(instantiationService: TestInstantiationService, chatEntitlementService?: IChatEntitlementService, product: IProductService = productService) {
+ 		const disposables = new DisposableStore();
+ 		const storageService = createStorageService(instantiationService, disposables);
+ 		const extensionManagementServerService = instantiationService.get(IExtensionManagementServerService) ||
+@@ -105,7 +105,7 @@
+ 			chatEntitlementService ?? new TestChatEntitlementService(),
+ 			instantiationService,
+ 			new NullLogService(),
+-			productService
++			product
+ 		);
+ 		this._register(disposables);
+ 	}
+@@ -181,6 +181,25 @@
+ 		assert.strictEqual(testObject.getEnablementState(extension), EnablementState.DisabledGlobally);
+ 	});
+ 
++	for (const previous of [EnablementState.EnabledGlobally, EnablementState.DisabledGlobally, EnablementState.DisabledWorkspace]) {
++		test(`required system extension ignores user state ${previous} and rejects profile and workspace changes`, async () => {
++			const extension = aLocalExtension('pub.required', undefined, ExtensionType.System);
++			await testObject.setEnablement([extension], previous);
++			const product = { ...productService, requiredBuiltinExtensions: ['Pub.Required'] };
++			testObject = disposableStore.add(new TestExtensionEnablementService(instantiationService, undefined, product));
++			assert.strictEqual(testObject.getEnablementState(extension), EnablementState.EnabledByEnvironment);
++			assert.strictEqual(testObject.canChangeEnablement(extension), false);
++			assert.strictEqual(testObject.canChangeWorkspaceEnablement(extension), false);
++			for (const state of [EnablementState.DisabledGlobally, EnablementState.DisabledWorkspace]) {
++				await assert.rejects(testObject.setEnablement([extension], state));
++			}
++			assert.strictEqual(testObject.canChangeEnablement(aLocalExtension('pub.required')), true);
++			assert.strictEqual(testObject.canChangeEnablement(aLocalExtension('pub.optional', undefined, ExtensionType.System)), true);
++			const invalid = aLocalExtension2('pub.required', {}, { type: ExtensionType.System, isValid: false });
++			assert.strictEqual(testObject.getEnablementState(invalid), EnablementState.DisabledByInvalidExtension);
++		});
++	}
++
+ 	test('test disable an extension globally should return truthy promise', () => {
+ 		return testObject.setEnablement([aLocalExtension('pub.a')], EnablementState.DisabledGlobally)
+ 			.then(value => assert.ok(value));

@@ -21,6 +21,7 @@ assert.ok(startupPatch.includes('arara-contour'));
 assert.ok(startupPatch.includes('prefers-reduced-motion'));
 assert.ok(!startupPatch.includes('Welcome to Arara Code'));
 assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'branding/product.overlay.json'), 'utf8')).startupWebview.title, 'Arara Code');
+assert.deepEqual(require('../../branding/product.overlay.json').requiredBuiltinExtensions, ['arara.arara-ai', 'arara.arara-orchestra']);
 
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arara-launcher-patch-'));

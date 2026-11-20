@@ -38,6 +38,10 @@
   "linkProtectionTrustedDomains": [
     "*"
   ],
+  "requiredBuiltinExtensions": [
+    "arara.arara-ai",
+    "arara.arara-orchestra"
+  ],
   "extensionEnabledApiProposals": {
     "arara.arara-ai": [
       "quickPickSortByLabel",
