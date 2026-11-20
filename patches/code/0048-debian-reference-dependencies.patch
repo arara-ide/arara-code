@@ -1,0 +1,16 @@
+Arara Code: use the maintained Debian dependency list when the build selects it.
+Why a patch: the upstream packaging task otherwise always scans the binaries and obtains Chromium tools.
+Touches: build/linux/dependencies-generator.ts.
+
+--- a/build/linux/dependencies-generator.ts
++++ b/build/linux/dependencies-generator.ts
+@@ -38,6 +38,9 @@ export async function getDependencies(packageType: 'deb' | 'rpm', buildDir: stri
+ 		if (!isDebianArchString(arch)) {
+ 			throw new Error('Invalid Debian arch string ' + arch);
+ 		}
++		if (process.env.ARARA_USE_REFERENCE_DEBIAN_DEPS === '1') {
++			return [...debianGeneratedDeps[arch]];
++		}
+ 	}
+ 	if (packageType === 'rpm' && !isRpmArchString(arch)) {
+ 		throw new Error('Invalid RPM arch string ' + arch);

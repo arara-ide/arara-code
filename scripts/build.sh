@@ -254,7 +254,10 @@ if [[ "${OS_NAME}" == "linux" ]]; then
   tar czf "${OUT}/arara-code-linux-${VSCODE_ARCH}-${RELEASE_VERSION}.tar.gz" -C "${WORK}/VSCode-linux-${VSCODE_ARCH}" .
   bash "${ROOT}/scripts/package-appimage.sh" "${WORK}/VSCode-linux-${VSCODE_ARCH}" "${OUT}" "${VSCODE_ARCH}" "${RELEASE_VERSION}"
   if [[ "${BUILD_DEB}" == "yes" ]]; then
-    if ! perl -e 'use Dpkg; exit(($Dpkg::PROGVERSION =~ /^1\.(2[3-9]|[3-9]\d)/) ? 0 : 1)' 2>/dev/null; then
+    if perl -MDpkg -MDpkg::Version -e 'exit(Dpkg::Version::version_compare($Dpkg::PROGVERSION, "1.23") < 0)' 2>/dev/null; then
+      USE_REFERENCE_DEBIAN_DEPS=1
+    else
+      USE_REFERENCE_DEBIAN_DEPS=0
       DPKG_SHLIBDEPS_PL="$(cd "${WORK}/vscode" && node -p "require('os').tmpdir()")/dpkg-shlibdeps.pl"
       CHROMIUM_REV="$(cd "${WORK}/vscode" && node -p "require('./cgmanifest.json').registrations.find(r => r.component.type === 'git' && r.component.git.name === 'chromium').version")"
       curl -fsSL --retry 6 --retry-delay 15 --retry-all-errors \
@@ -264,12 +267,9 @@ if [[ "${OS_NAME}" == "linux" ]]; then
       sed -i "s|\tconst result = spawnSync('curl', \[dpkgShlibdepsUrl, '-o', dpkgShlibdepsScriptLocation\]);|\tconst result = { status: 0, stderr: '' }; // Arara: baixado e validado em scripts/build.sh|" "${WORK}/vscode/build/linux/debian/calculate-deps.ts"
       grep -q "Arara: baixado e validado" "${WORK}/vscode/build/linux/debian/calculate-deps.ts" \
         || { echo "! calculate-deps.ts mudou; ajuste o sed do dpkg-shlibdeps em scripts/build.sh" >&2; exit 1; }
-    else
-      sed -i 's|\tconst dpkgShlibdepsResult = spawnSync(.perl., cmd, { cwd: chromiumSysroot });|\tconst dpkgShlibdepsResult = { status: 0, stdout: Buffer.from(""), stderr: "" }; // Arara: dpkg novo, usa dep-lists.ts|' "${WORK}/vscode/build/linux/debian/calculate-deps.ts"
-      sed -i 's|\tconst sortedDependencies: string\[\] = Array.from(mergedDependencies)|\tif (packageType === "deb" \&\& !mergedDependencies.size) { return [...debianGeneratedDeps[arch as DebianArchString]]; }\n\tconst sortedDependencies: string[] = Array.from(mergedDependencies)|' "${WORK}/vscode/build/linux/dependencies-generator.ts"
     fi
     ( cd "${WORK}/vscode" \
-      && npm run gulp "vscode-linux-${VSCODE_ARCH}-prepare-deb" \
+      && ARARA_USE_REFERENCE_DEBIAN_DEPS="${USE_REFERENCE_DEBIAN_DEPS}" npm run gulp "vscode-linux-${VSCODE_ARCH}-prepare-deb" \
       && npm run gulp "vscode-linux-${VSCODE_ARCH}-build-deb" )
     cp "${WORK}"/vscode/.build/linux/deb/*/deb/*.deb "${OUT}/"
   fi
