@@ -1,0 +1,43 @@
+Arara Code: guarda contra loop infinito de write EIO/EPIPE no logger de console.
+
+Why a patch: quando o Arara Code é aberto a partir de um terminal ou PTY e esse
+terminal é fechado, `console.error`/`console.log` no processo principal passa a
+lançar `write EIO` ou `EPIPE`. O `ErrorTelemetry` captura a exceção não tratada
+e registra o erro novamente no `LogService`, que chama `ConsoleMainLogger` ->
+`logToConsole`, gerando recursão infinita a 100% de CPU e crescimento contínuo
+do `main.log`. Nenhuma API de extensão intercepta o `logToConsole` do processo
+principal. O patch desativa apenas o eco no console após erro de stream quebrado,
+mantendo o log em arquivo intacto.
+
+Touches: src/vs/platform/log/common/log.ts
+
+--- a/src/vs/platform/log/common/log.ts
++++ b/src/vs/platform/log/common/log.ts
+@@ -87,5 +87,6 @@
+ 
+ let isConsoleForwarding = false;
+ let isLogServiceConsoleEcho = false;
++let isConsoleOutputBroken = false;
+ 
+ function getConsoleMethod(method: ConsoleMethod): ConsoleMethodFn {
+@@ -110,12 +111,19 @@
+ 
+ function logToConsole(method: ConsoleMethod, ...args: unknown[]): void {
+-	if (isConsoleForwarding) {
++	if (isConsoleForwarding || isConsoleOutputBroken) {
+ 		return;
+ 	}
+ 	isLogServiceConsoleEcho = true;
+ 	try {
+ 		getConsoleMethod(method).apply(console, args);
++	} catch (error) {
++		const code = (error as { code?: unknown } | undefined)?.code;
++		if (code === 'EIO' || code === 'EPIPE' || code === 'ERR_STREAM_DESTROYED') {
++			isConsoleOutputBroken = true;
++			return;
++		}
++		throw error;
+ 	} finally {
+ 		isLogServiceConsoleEcho = false;
+ 	}
+ }
