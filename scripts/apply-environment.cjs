@@ -7,11 +7,8 @@ const environments = {
   production: { api: 'https://api.code.app.br', web: 'https://arara.code.app.br' },
 };
 
-try {
-  const [environment, manifestPath, ...extra] = process.argv.slice(2);
-  if (!Object.hasOwn(environments, environment) || extra.length) {
-    throw new Error('Usage: node apply-environment.cjs local|production [extension/package.json]');
-  }
+function applyEnvironment(environment, manifestPath) {
+  if (!Object.hasOwn(environments, environment)) throw new Error('Usage: node apply-environment.cjs local|production [extension/package.json]');
   const urls = environments[environment];
   if (manifestPath) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -31,8 +28,19 @@ try {
     manifest.araraEnvironment = environment;
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
   }
-  console.log(`Environment: ${environment}\nWeb: ${urls.web}\nAPI: ${urls.api}`);
-} catch (error) {
-  console.error(error.message);
-  process.exitCode = 1;
+  return urls;
+}
+
+module.exports = { applyEnvironment, environments };
+
+if (require.main === module) {
+  try {
+    const [environment, manifestPath, ...extra] = process.argv.slice(2);
+    if (extra.length) throw new Error('Usage: node apply-environment.cjs local|production [extension/package.json]');
+    const urls = applyEnvironment(environment, manifestPath);
+    console.log(`Environment: ${environment}\nWeb: ${urls.web}\nAPI: ${urls.api}`);
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
 }
