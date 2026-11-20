@@ -183,7 +183,9 @@ jobs:
 
       - name: Validar artefatos
         run: |
+          node --test scripts/tests/debian-deps.cjs
           dpkg-deb -c dist/*.deb | grep -E "applications/arara-code.desktop|extensions/arara-ai/package.json|extensions/arara-bot/package.json|extensions/arara-orchestra/package.json|bin/arara-code-uninstall"
+          dpkg-deb -f dist/*.deb Depends | grep -E '(^|, )libc6( |,|$)'
           test -x dist/AraraCode-linux-x64-*.AppImage
           APPIMAGE_EXTRACT_AND_RUN=1 timeout 120 dist/AraraCode-linux-x64-*.AppImage --version
 
