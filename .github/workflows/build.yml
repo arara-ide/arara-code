@@ -16,7 +16,20 @@ on:
       - '.github/workflows/**'
       - 'README.md'
       - 'AGENTS.md'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mac:
+        description: Build and release macOS (Intel and Apple Silicon)
+        type: boolean
+        default: true
+      linux:
+        description: Build and release Linux
+        type: boolean
+        default: true
+      windows:
+        description: Build and release Windows
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -44,6 +57,7 @@ jobs:
       - name: Validar scripts e empacotamento
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
+          node --test scripts/tests/release.cjs
           node --check scripts/apply-environment.cjs
           node --check scripts/extension-layout.cjs
           node --check scripts/update-installed.cjs
@@ -99,7 +113,7 @@ jobs:
           done
 
   linux:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && github.event.inputs.linux != 'false'
     needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -215,7 +229,7 @@ jobs:
           if-no-files-found: error
 
   windows:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && github.event.inputs.windows != 'false'
     needs: version
     runs-on: windows-2022
     timeout-minutes: 240
@@ -384,7 +398,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   macos-x64:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && github.event.inputs.mac != 'false'
     needs: version
     uses: ./.github/workflows/build-macos.yml
     with:
@@ -397,7 +411,7 @@ jobs:
     secrets: inherit
 
   macos-arm64:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development')
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development') && github.event.inputs.mac != 'false'
     needs: version
     uses: ./.github/workflows/build-macos.yml
     with:
