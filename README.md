@@ -138,6 +138,17 @@ Use Conventional Commits. Apague a branch temporária depois do merge. Não cite
 
 ## Builds e releases
 
+Para disparar a release na `main`, com `gh` autenticado:
+
+```bash
+node scripts/release.cjs
+node scripts/release.cjs --platform=MAC
+node scripts/release.cjs --platform=LINUX,WINDOWS
+node scripts/release.cjs --platform=MAC,LINUX,WINDOWS --dry-run
+```
+
+Sem `--platform`, compila todos os sistemas. `MAC` inclui Intel e Apple Silicon. A seleção exige o workflow com os inputs `mac`, `linux` e `windows` publicado na `main`; mudanças locais não entram no build remoto. `--dry-run` mostra o comando sem disparar.
+
 - **`main`:** gera e publica as releases de Linux, Windows e macOS. Cada plataforma publica sozinha, então uma falha não trava as outras.
 - **`development`:** gera pacotes de teste em **Actions → Artifacts**. Eles duram 14 dias, não viram release e não chegam aos usuários.
 
