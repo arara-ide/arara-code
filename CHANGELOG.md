@@ -5,6 +5,10 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 ## [Não lançado]
 
 ### Novidades
+- Orquestra: compartilhe uma sala para até 5 pessoas com aprovação do anfitrião, bate-papo entre participantes, cursores ao vivo e cor por pessoa nos cartões alheios.
+- Orquestra: rode agentes de cada participante no computador do anfitrião com permissões configuráveis e navegue pelos arquivos do projeto em um explorador somente leitura.
+- App: controle a Orquestra pelo celular no Arara App, acompanhe o estado das agentes e envie mensagens.
+- Orquestra: adicione cartões de terminal ao canvas.
 - Terminal: sugere comandos em texto apagado e completa a linha ao segurar TAB por 250 ms com progresso na própria tecla, permitindo escolher entre os últimos 1000 comandos (padrão), últimos 5 minutos, 1 hora, 1 dia ou desativar em Configurações.
 - Obsidian: o botão de joia no topo abre o projeto no Obsidian, instala o Obsidian se faltar e mantém as notas do mapa do código sincronizadas; o botão do mapa do código saiu do topo.
 - Obsidian: clique com o botão direito no botão do topo para Abrir Obsidian ou Sincronizar vault do Obsidian.
@@ -20,6 +24,14 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: botão Fork abaixo da resposta abre uma nova conversa com as mensagens até ali, com o título "(Fork) Nome original" e numeração nos forks seguintes.
 
 ### Melhorias
+- Orquestra: a Maestro recebe aviso automático quando todas as agentes ligadas a ela ficam paradas.
+- Orquestra: a Maestro lista todas as agentes do canvas com filtros por dono, estado, conclusão recente e arquivo.
+- Orquestra: a Maestro é avisada quando uma agente para com erro.
+- App: o aplicativo instalável passa a se chamar Arara App e o plano grátis permite 60 minutos de uso por dia.
+- Navegador: a IA pode preencher campos de senha quando você autorizar.
+- Chat: a Orquestra mantém notas de resumo no vault do Obsidian para retomar o contexto entre sessões.
+- Chat: limpar uma conversa pede confirmação antes de apagar o histórico e interromper uma resposta em andamento.
+- Chat: o seletor de assistente mostra avisos de limite de uso e acompanha o consumo de cada pedido.
 - Editor: Arara AI e Orquestra passam a ficar habilitados em todos os perfis, inclusive após atualizar uma instalação em que estavam desabilitados.
 - Editor: o modo otimizado oculta os breakpoints e o clique para criá-los; o modo completo conserva as marcações salvas.
 - Chat: responder uma pergunta entrega a resposta durante o trabalho, sem interromper a geração, e a IA pode consultá-la pelo ID.
