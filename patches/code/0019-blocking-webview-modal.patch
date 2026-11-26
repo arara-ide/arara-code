@@ -1,12 +1,14 @@
-Arara Code: generic extension-owned blocking webview modal.
+Arara Code: generic extension-owned blocking and overlay webview modals.
 
 Why a patch: the public/proposed webview API has no blocking modal, CannotClose
-capability, lifecycle veto or command admission hook. Reuse the native modal
-editor and its existing focus/layout machinery instead of intercepting DOM keys
-or reopening a closed tab. The extension supplies arara.modal.viewType and an
-exact arara.modal.allowedCommands list; clearing the viewType releases the gate.
-CannotClose prevents editor/modal dismissal. Closing the window stays possible;
-the extension resumes its flow on the next launch.
+capability, lifecycle veto, command admission hook, or transparent-frame overlay
+modal. Reuse the native modal editor and its existing focus/layout machinery
+instead of intercepting DOM keys or reopening a closed tab. The extension
+supplies arara.modal.viewType and an exact arara.modal.allowedCommands list for
+a blocking modal (clearing the viewType releases the gate; CannotClose prevents
+editor/modal dismissal; closing the window stays possible). For a dismissible
+overlay modal that keeps the workbench visible behind it, the extension supplies
+arara.overlayModal.viewType without blocking commands or hiding the workbench.
 No setup steps, provider names, business decisions or process execution here.
 Touches: command service, webview editor input/service, native modal part/CSS.
 
@@ -55,11 +57,12 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  		const activationEvent = `onCommand:${id}`;
 --- a/src/vs/workbench/contrib/webviewPanel/browser/webviewEditorInput.ts
 +++ b/src/vs/workbench/contrib/webviewPanel/browser/webviewEditorInput.ts
-@@ -24,6 +24,8 @@
+@@ -24,6 +24,9 @@
  
  export class WebviewInput extends EditorInput {
  
 +	public blocking = false;
++	public overlay = false;
 +
  	public static typeId = 'workbench.editors.webviewInput';
  
@@ -100,22 +103,24 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  	) {
  		super();
  
-@@ -280,13 +282,17 @@
+@@ -280,13 +282,19 @@
  	): WebviewInput {
  		const webview = this._webviewService.createWebviewOverlay(webviewInitInfo);
  		const webviewInput = this._instantiationService.createInstance(WebviewInput, { viewType, name: title, providedId: webviewInitInfo.providedViewType, iconPath }, webview);
 +		const blocking = this._contextKeyService.getContextKeyValue('arara.modal.viewType') === webviewInitInfo.providedViewType && !!webviewInitInfo.providedViewType;
++		const overlay = !blocking && this._contextKeyService.getContextKeyValue('arara.overlayModal.viewType') === webviewInitInfo.providedViewType && !!webviewInitInfo.providedViewType;
 +		webviewInput.blocking = blocking;
++		webviewInput.overlay = overlay;
 +		if (blocking) { webview.container.classList.add('blocking-webview-content'); }
  		this._editorService.openEditor(webviewInput, {
-+			modal: blocking ? {} : undefined,
++			modal: blocking || overlay ? {} : undefined,
  			pinned: true,
  			preserveFocus: showOptions.preserveFocus,
  			// preserve pre 1.38 behaviour to not make group active when preserveFocus: true
  			// but make sure to restore the editor to fix https://github.com/microsoft/vscode/issues/79633
  			activation: showOptions.preserveFocus ? EditorActivation.RESTORE : undefined
 -		}, showOptions.group);
-+		}, blocking ? MODAL_GROUP : showOptions.group);
++		}, blocking || overlay ? MODAL_GROUP : showOptions.group);
  		return webviewInput;
  	}
  
@@ -140,15 +145,61 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  const MODAL_BORDER_WIDTH = 1; // 1px border on each side
  const MODAL_BORDER_SIZE = MODAL_BORDER_WIDTH * 2;
  const MODAL_HEADER_HEIGHT = 33; // Fallback only — actual height is measured from the rendered header element to account for the compact-header variant.
-@@ -362,6 +362,7 @@
+@@ -362,6 +362,8 @@
  		let trackedEditor: EditorInput | undefined;
  		const updateLabel = () => {
  			const activeEditor = editorPart.activeGroup.activeEditor;
 +			modalElement.classList.toggle('blocking-modal', !!activeEditor?.hasCapability(EditorInputCapabilities.CannotClose));
++			modalElement.classList.toggle('overlay-modal', !!(activeEditor as { overlay?: boolean } | undefined)?.overlay);
  			if (activeEditor) {
  				const { labelFormat } = editorPart.partOptions;
  
-@@ -1082,6 +1083,7 @@
+@@ -667,37 +669,41 @@
+ 			let width: number;
+ 			let height: number;
+ 
+-			if (editorPart.maximized) {
++			const overlay = modalElement.classList.contains('overlay-modal');
++			if (overlay) {
++				width = containerDimension.width;
++				height = availableHeight;
++			} else if (editorPart.maximized) {
+ 				const verticalPadding = Math.max(titleBarOffset /* keep away from title bar to prevent clipping issues with WCO */, MODAL_MAXIMIZED_PADDING);
+ 				width = Math.max(containerDimension.width - MODAL_MAXIMIZED_PADDING, 0);
+ 				height = Math.max(availableHeight - verticalPadding, 0);
+ 			} else if (editorPart.size) {
+ 				width = Math.min(editorPart.size.width, containerDimension.width);
+ 				height = Math.min(editorPart.size.height, availableHeight);
+ 			} else {
+ 				width = defaultSize.width;
+ 				height = defaultSize.height;
+ 			}
+ 
+ 			height = Math.min(height, availableHeight); // Ensure the modal never exceeds available height (below the title bar)
+ 
+ 			// On first layout, clamp sidebar width if it would leave the editor too narrow
+ 			if (isFirstLayout) {
+ 				isFirstLayout = false;
+ 				sidebarResult?.clampWidth(width);
+ 			}
+ 
+ 			// Update resizable element size and constraints
+ 			resizableElement.maxSize = new Dimension(containerDimension.width, availableHeight);
+ 			resizableElement.preferredSize = defaultSize;
+ 			resizableElement.layout(height, width);
+ 
+ 			// Enable/disable sashes based on maximized state
+-			const canResize = !editorPart.maximized;
++			const canResize = !editorPart.maximized && !overlay;
+ 			resizableElement.enableSashes(canResize, canResize, canResize, canResize);
+ 
+ 			// Position: use custom position if available (clamped to bounds), otherwise center
+-			if (!editorPart.maximized && editorPart.position) {
++			if (!editorPart.maximized && !overlay && editorPart.position) {
+ 				const clampedLeft = Math.max(0, Math.min(editorPart.position.left, containerDimension.width - width));
+ 				const clampedTop = Math.max(titleBarOffset, Math.min(editorPart.position.top, titleBarOffset + availableHeight - height));
+ 				resizableElement.domNode.style.left = `${clampedLeft}px`;
+@@ -1082,6 +1088,7 @@
  	}
  
  	async close(options?: { mergeAllEditorsToMainPart?: boolean }): Promise<boolean> {
@@ -158,13 +209,19 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  		if (options?.mergeAllEditorsToMainPart) {
 --- a/src/vs/workbench/browser/parts/editor/media/modalEditorPart.css
 +++ b/src/vs/workbench/browser/parts/editor/media/modalEditorPart.css
-@@ -206,3 +206,6 @@
+@@ -206,3 +206,12 @@
  .monaco-modal-editor-block.compact-header .modal-editor-title .monaco-icon-label > .monaco-icon-label-iconpath {
  	display: none;
  }
 +
 +.monaco-modal-editor-block.blocking-modal { background: var(--vscode-editor-background); }
 +.monaco-modal-editor-block.blocking-modal .modal-editor-header { visibility: hidden; pointer-events: none; }
++.monaco-modal-editor-block.overlay-modal .modal-editor-header,
++.monaco-modal-editor-block.overlay-modal .monaco-sash { display: none; }
++.monaco-modal-editor-block.overlay-modal .modal-editor-shadow,
++.monaco-modal-editor-block.overlay-modal .modal-editor-part,
++.monaco-modal-editor-block.overlay-modal .editor-group-container,
++.monaco-modal-editor-block.overlay-modal .editor-container { background: transparent !important; border: none; box-shadow: none; }
 --- a/src/vs/workbench/services/commands/test/common/commandService.test.ts
 +++ b/src/vs/workbench/services/commands/test/common/commandService.test.ts
 @@ -3,6 +3,7 @@

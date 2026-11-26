@@ -15,6 +15,9 @@ assert.throws(() => validatePatch(fixture.replace('+1,2', '+1,3')), /incomplete 
 assert.throws(() => validatePatch('--- a/a\n+++ b/a\n@@ -1 +1 @@\n-before\n+after\n+ignored\n'), /outside a hunk/);
 validatePatch('--- a/a\n+++ b/a\n@@ -1 +1 @@\n-before\n+after\n\\ No newline at end of file\n');
 const count = checkDirectory(path.join(root, 'patches'));
+const modalPatch = fs.readFileSync(path.join(root, 'patches/code/0019-blocking-webview-modal.patch'), 'utf8');
+assert.ok(modalPatch.includes("arara.overlayModal.viewType"));
+assert.ok(modalPatch.includes('.monaco-modal-editor-block.overlay-modal'));
 const startupPatch = fs.readFileSync(path.join(root, 'patches/code/0020-startup-webview.patch'), 'utf8');
 assert.ok(startupPatch.includes('placeholder.ariaLabel = product.nameLong;'));
 assert.ok(startupPatch.includes('arara-contour'));
