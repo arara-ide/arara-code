@@ -1,0 +1,638 @@
+Arara Code: add opt-in Quick Pick badges, group headings and usage meters.
+
+Why a patch: no extension API exposes badges beside item actions, group titles above separators or second-line usage meters while preserving existing Quick Pick rendering.
+Touches: src/vs/platform/extensions/common/extensionsApiProposals.ts, src/vs/platform/quickinput/browser/media/quickInput.css, src/vs/platform/quickinput/browser/quickInputList.ts, src/vs/platform/quickinput/common/quickInput.ts, src/vs/platform/quickinput/test/browser/quickinput.test.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostQuickOpen.ts, src/vscode-dts/vscode.proposed.araraQuickPickDecorations.d.ts
+
+--- a/src/vs/platform/extensions/common/extensionsApiProposals.ts
++++ b/src/vs/platform/extensions/common/extensionsApiProposals.ts
+@@ -27,6 +27,9 @@
+ 	aiTextSearchProvider: {
+ 		proposal: 'https://raw.githubusercontent.com/microsoft/vscode/main/src/vscode-dts/vscode.proposed.aiTextSearchProvider.d.ts',
+ 	},
++	araraQuickPickDecorations: {
++		proposal: 'https://raw.githubusercontent.com/microsoft/vscode/main/src/vscode-dts/vscode.proposed.araraQuickPickDecorations.d.ts',
++	},
+ 	authIssuers: {
+ 		proposal: 'https://raw.githubusercontent.com/microsoft/vscode/main/src/vscode-dts/vscode.proposed.authIssuers.d.ts',
+ 	},
+--- a/src/vs/platform/quickinput/browser/media/quickInput.css
++++ b/src/vs/platform/quickinput/browser/media/quickInput.css
+@@ -324,11 +324,93 @@
+ 
+ .quick-input-list .quick-input-list-label-meta {
+ 	opacity: 0.7;
++	line-height: normal;
++	text-overflow: ellipsis;
++	overflow: hidden;
++}
++
++.quick-input-list .quick-input-list-badges {
++	display: flex;
++	align-items: center;
++	gap: 4px;
++	min-width: 0;
++	margin-left: 8px;
++}
++
++.quick-input-list .quick-input-list-badge {
++	min-width: 0;
++	padding: 1px 4px;
++	border-radius: var(--vscode-cornerRadius-small, 3px);
++	background: var(--vscode-badge-background);
++	color: var(--vscode-badge-foreground);
++	font-size: var(--vscode-bodyFontSize-xSmall);
++	line-height: normal;
++	white-space: nowrap;
++	overflow: hidden;
++	text-overflow: ellipsis;
++}
++
++.quick-input-list .quick-input-list-meters {
++	display: grid;
++	grid-template-columns: repeat(2, minmax(0, 1fr));
++	gap: 8px;
++	width: 100%;
++	min-width: 0;
++}
++
++.quick-input-list .quick-input-list-meter {
++	display: flex;
++	flex-direction: column;
++	gap: 2px;
++	min-width: 0;
++}
++
++.quick-input-list .quick-input-list-meter-header {
++	display: flex;
++	justify-content: space-between;
++	gap: 4px;
++	min-width: 0;
++	font-variant-numeric: tabular-nums;
++}
++
++.quick-input-list .quick-input-list-meter-label,
++.quick-input-list .quick-input-list-meter-description {
++	min-width: 0;
++	font-size: var(--vscode-bodyFontSize-xSmall);
+ 	line-height: normal;
++}
++
++.quick-input-list .quick-input-list-meter-label {
++	overflow: hidden;
+ 	text-overflow: ellipsis;
++	white-space: nowrap;
++}
++
++.quick-input-list .quick-input-list-meter-description {
++	white-space: nowrap;
++}
++
++.quick-input-list .quick-input-list-meter-track {
++	height: 4px;
++	border-radius: 2px;
++	background: var(--vscode-widget-border, var(--vscode-panel-border));
+ 	overflow: hidden;
+ }
+ 
++.quick-input-list .quick-input-list-meter-fill {
++	height: 100%;
++	border-radius: inherit;
++	background: var(--vscode-progressBar-background, var(--vscode-focusBorder));
++}
++
++.quick-input-list .quick-input-list-meter-fill-warning {
++	background: var(--vscode-editorWarning-foreground);
++}
++
++.quick-input-list .quick-input-list-meter-fill-error {
++	background: var(--vscode-editorError-foreground);
++}
++
+ .quick-input-list .monaco-list-row.focused .quick-input-list-label-meta {
+ 	opacity: 1;
+ }
+@@ -432,8 +514,26 @@
+ .quick-input-list .quick-input-list-separator-as-item {
+ 	padding: 4px 6px;
+ 	font-size: 12px;
++}
++
++.quick-input-list .quick-input-list-separator-heading {
++	box-sizing: border-box;
++	margin-top: 8px;
++	padding: 8px 6px 4px;
++	border-top: 1px solid var(--vscode-pickerGroup-border, var(--vscode-panel-border));
++	color: var(--vscode-pickerGroup-foreground, var(--vscode-foreground));
+ }
+ 
++.quick-input-list .quick-input-list-separator-heading-first {
++	margin-top: 0;
++	padding-top: 4px;
++	border-top-style: none;
++}
++
++.quick-input-list .quick-input-list-separator-heading .quick-input-list-rows {
++	margin-left: 0;
++}
++
+ /* Quick input separators as full-row item */
+ .quick-input-list .quick-input-list-separator-as-item .label-name {
+ 	font-weight: 600;
+--- a/src/vs/platform/quickinput/browser/quickInputList.ts
++++ b/src/vs/platform/quickinput/browser/quickInputList.ts
+@@ -42,7 +42,7 @@
+ import { isDark } from '../../theme/common/theme.js';
+ import { IThemeService } from '../../theme/common/themeService.js';
+ import { asCssVariable } from '../../theme/common/colorUtils.js';
+-import { IQuickPickItem, IQuickPickItemButtonEvent, IQuickPickSeparator, IQuickPickSeparatorButtonEvent, QuickPickFocus, QuickPickItem } from '../common/quickInput.js';
++import { IQuickPickItem, IQuickPickItemButtonEvent, IQuickPickItemMeter, IQuickPickSeparator, IQuickPickSeparatorButtonEvent, QuickPickFocus, QuickPickItem } from '../common/quickInput.js';
+ import { IQuickInputStyles } from './quickInput.js';
+ import { quickInputButtonsToActionArrays } from './quickInputUtils.js';
+ 
+@@ -54,12 +54,17 @@
+ 	readonly saneAriaLabel: string;
+ }
+ 
++function clampMeterValue(value: number): number {
++	return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
++}
++
+ interface IQuickPickElement extends IQuickInputItemLazyParts {
+ 	readonly hasCheckbox: boolean;
+ 	readonly index: number;
+ 	readonly item?: IQuickPickItem;
+ 	readonly saneDescription?: string;
+ 	readonly saneDetail?: string;
++	readonly meters?: readonly IQuickPickItemMeter[];
+ 	readonly saneTooltip?: string | IMarkdownString | HTMLElement;
+ 	hidden: boolean;
+ 	element?: HTMLElement;
+@@ -67,6 +72,7 @@
+ 	descriptionHighlights?: IMatch[];
+ 	detailHighlights?: IMatch[];
+ 	separator?: IQuickPickSeparator;
++	isFirstSeparator?: boolean;
+ }
+ 
+ interface IQuickInputItemTemplateData {
+@@ -77,8 +83,11 @@
+ 	label: IconLabel;
+ 	keybinding: KeybindingLabel;
+ 	detail: IconLabel;
++	detailContainer: HTMLElement;
+ 	separator: HTMLDivElement;
+ 	toolBar: ToolBar;
++	badges?: HTMLElement;
++	meters?: HTMLElement;
+ 	element: IQuickPickElement;
+ 	toDisposeElement: DisposableStore;
+ 	toDisposeTemplate: DisposableStore;
+@@ -96,10 +105,19 @@
+ 			const saneLabel = mainItem.label ?? '';
+ 			const saneSortLabel = parseLabelWithIcons(saneLabel).text.trim();
+ 
+-			const saneAriaLabel = mainItem.ariaLabel || [saneLabel, this.saneDescription, this.saneDetail]
++		const decorationAriaLabels = mainItem.type === 'separator' ? [] : [
++			...(mainItem.badges ?? []),
++			...(mainItem.meters ?? []).flatMap(meter => [meter.label, meter.description]),
++		]
+ 				.map(s => getCodiconAriaLabel(s))
+-				.filter(s => !!s)
+-				.join(', ');
++				.filter(s => !!s);
++			const saneAriaLabel = [
++				mainItem.ariaLabel || [saneLabel, this.saneDescription, this.saneDetail]
++					.map(s => getCodiconAriaLabel(s))
++					.filter(s => !!s)
++					.join(', '),
++				...decorationAriaLabels,
++			].filter(s => !!s).join(', ');
+ 
+ 			return {
+ 				saneLabel,
+@@ -194,6 +212,7 @@
+ 
+ class QuickPickItemElement extends BaseQuickPickItemElement {
+ 	readonly onChecked: Event<boolean>;
++	readonly meters?: readonly IQuickPickItemMeter[];
+ 
+ 	constructor(
+ 		index: number,
+@@ -211,6 +230,7 @@
+ 			: Event.None;
+ 
+ 		this._saneDetail = item.detail;
++		this.meters = item.meters;
+ 		this._labelHighlights = item.highlights?.label;
+ 		this._descriptionHighlights = item.highlights?.description;
+ 		this._detailHighlights = item.highlights?.detail;
+@@ -267,6 +287,7 @@
+ 		index: number,
+ 		readonly fireSeparatorButtonTriggered: (event: IQuickPickSeparatorButtonEvent) => void,
+ 		readonly separator: IQuickPickSeparator,
++		readonly isFirstSeparator: boolean,
+ 	) {
+ 		super(index, false, separator);
+ 	}
+@@ -276,9 +297,9 @@
+ 	getHeight(element: IQuickPickElement): number {
+ 
+ 		if (element instanceof QuickPickSeparatorElement) {
+-			return 30;
++			return element.separator.heading ? 44 : 30;
+ 		}
+-		return element.saneDetail ? 44 : 22;
++		return element.saneDetail || element.meters?.length ? 44 : 22;
+ 	}
+ 
+ 	getTemplateId(element: IQuickPickElement): string {
+@@ -297,6 +318,9 @@
+ 	}
+ 
+ 	getAriaLabel(element: IQuickPickElement): string | null {
++		if (element instanceof QuickPickSeparatorElement && element.separator.heading) {
++			return element.separator.label ?? element.saneAriaLabel;
++		}
+ 		return element.separator?.label
+ 			? `${element.saneAriaLabel}, ${element.separator.label}`
+ 			: element.saneAriaLabel;
+@@ -380,6 +404,7 @@
+ 
+ 		// Detail
+ 		const detailContainer = dom.append(row2, $('.quick-input-list-label-meta'));
++		data.detailContainer = detailContainer;
+ 		data.detail = new IconLabel(detailContainer, { supportHighlights: true, supportIcons: true, hoverDelegate: this.hoverDelegate });
+ 		data.toDisposeTemplate.add(data.detail);
+ 
+@@ -416,6 +441,59 @@
+ 	abstract renderElement(node: ITreeNode<IQuickPickElement, void>, index: number, data: IQuickInputItemTemplateData): void;
+ }
+ 
++function clearQuickPickDecorations(data: IQuickInputItemTemplateData): void {
++	data.badges?.remove();
++	data.badges = undefined;
++	data.meters?.remove();
++	data.meters = undefined;
++}
++
++function renderQuickPickBadges(item: IQuickPickItem, data: IQuickInputItemTemplateData): void {
++	if (!item.badges?.length) {
++		return;
++	}
++
++	const badges = $('.quick-input-list-badges');
++	for (const badgeText of item.badges) {
++		const badge = dom.append(badges, $('.quick-input-list-badge'));
++		badge.textContent = badgeText;
++	}
++	data.entry.insertBefore(badges, data.toolBar.getElement());
++	data.badges = badges;
++}
++
++function renderQuickPickMeters(item: IQuickPickItem, data: IQuickInputItemTemplateData): void {
++	if (!item.meters?.length) {
++		return;
++	}
++
++	const meters = $('.quick-input-list-meters');
++	for (const meter of item.meters.slice(0, 2)) {
++		const meterElement = dom.append(meters, $('.quick-input-list-meter'));
++		const meterHeader = dom.append(meterElement, $('.quick-input-list-meter-header'));
++		const label = dom.append(meterHeader, $('.quick-input-list-meter-label'));
++		label.textContent = meter.label;
++		if (meter.description) {
++			const description = dom.append(meterHeader, $('.quick-input-list-meter-description'));
++			description.textContent = meter.description;
++		}
++
++		const value = clampMeterValue(meter.value);
++		const track = dom.append(meterElement, $('.quick-input-list-meter-track'));
++		track.setAttribute('role', 'meter');
++		track.setAttribute('aria-valuemin', '0');
++		track.setAttribute('aria-valuemax', '100');
++		track.setAttribute('aria-valuenow', String(value));
++		track.setAttribute('aria-label', meter.description ? `${meter.label}, ${meter.description}` : meter.label);
++		const fill = dom.append(track, $('.quick-input-list-meter-fill'));
++		fill.classList.add(`quick-input-list-meter-fill-${meter.severity ?? 'normal'}`);
++		fill.style.width = `${value}%`;
++	}
++	data.detail.element.style.display = 'none';
++	data.detailContainer.append(meters);
++	data.meters = meters;
++}
++
+ class QuickPickItemElementRenderer extends BaseQuickInputListRenderer<QuickPickItemElement> {
+ 	static readonly ID = 'quickpickitem';
+ 
+@@ -470,6 +548,7 @@
+ 		data.element = element;
+ 		element.element = data.entry ?? undefined;
+ 		const mainItem: IQuickPickItem = element.item;
++		clearQuickPickDecorations(data);
+ 
+ 		element.element.classList.toggle('not-pickable', element.item.pickable === false);
+ 
+@@ -515,12 +594,13 @@
+ 		options.strikethrough = mainItem.strikethrough;
+ 		data.entry.classList.remove('quick-input-list-separator-as-item');
+ 		data.label.setLabel(element.saneLabel, element.saneDescription, options);
++		renderQuickPickBadges(mainItem, data);
+ 
+ 		// Keybinding
+ 		data.keybinding.set(mainItem.keybinding);
+ 
+ 		// Detail
+-		if (element.saneDetail) {
++		if (element.saneDetail && !mainItem.meters?.length) {
+ 			let title: IManagedHoverTooltipMarkdownString | undefined;
+ 			// If we have a tooltip, we want that to be shown and not any other hover
+ 			if (!element.saneTooltip) {
+@@ -538,9 +618,10 @@
+ 				title,
+ 				labelEscapeNewLines: true
+ 			});
+-		} else {
++		} else if (!mainItem.meters?.length) {
+ 			data.detail.element.style.display = 'none';
+ 		}
++		renderQuickPickMeters(mainItem, data);
+ 
+ 		// Separator
+ 		if (element.separator?.label) {
+@@ -569,6 +650,7 @@
+ 	}
+ 
+ 	override disposeElement(element: ITreeNode<QuickPickItemElement, void>, _index: number, data: IQuickInputItemTemplateData): void {
++		clearQuickPickDecorations(data);
+ 		this.removeItemWithSeparator(element.element);
+ 		super.disposeElement(element, _index, data);
+ 	}
+@@ -653,6 +735,8 @@
+ 			labelEscapeNewLines: true
+ 		};
+ 		data.entry.classList.add('quick-input-list-separator-as-item');
++		data.entry.classList.toggle('quick-input-list-separator-heading', !!mainItem.heading);
++		data.entry.classList.toggle('quick-input-list-separator-heading-first', !!mainItem.heading && element.isFirstSeparator);
+ 		data.label.setLabel(element.saneLabel, element.saneDescription, options);
+ 
+ 		// Separator
+@@ -1110,24 +1194,31 @@
+ 		this._inputElements = inputElements;
+ 		this._hasCheckboxes = this.parent.classList.contains('show-checkboxes');
+ 		let currentSeparatorElement: QuickPickSeparatorElement | undefined;
++		let hasSeparator = false;
+ 		this._itemElements = new Array<QuickPickItemElement>();
+ 		this._elementTree = inputElements.reduce((result, item, index) => {
+ 			let element: IQuickPickElement;
+ 			if (item.type === 'separator') {
+-				if (!item.buttons) {
++				const isFirstSeparator = !hasSeparator;
++				hasSeparator = true;
++				if (!item.buttons && !item.heading) {
++					if (currentSeparatorElement?.separator.heading) {
++						currentSeparatorElement = undefined;
++					}
+ 					// This separator will be rendered as a part of the list item
+ 					return result;
+ 				}
+ 				currentSeparatorElement = new QuickPickSeparatorElement(
+ 					index,
+ 					e => this._onSeparatorButtonTriggered.fire(e),
+-					item
++					item,
++					isFirstSeparator
+ 				);
+ 				element = currentSeparatorElement;
+ 			} else {
+ 				const previous = index > 0 ? inputElements[index - 1] : undefined;
+ 				let separator: IQuickPickSeparator | undefined;
+-				if (previous && previous.type === 'separator' && !previous.buttons) {
++				if (previous && previous.type === 'separator' && !previous.buttons && !previous.heading) {
+ 					separator = previous;
+ 				}
+ 				const qpi = new QuickPickItemElement(
+--- a/src/vs/platform/quickinput/common/quickInput.ts
++++ b/src/vs/platform/quickinput/common/quickInput.ts
+@@ -78,6 +78,8 @@
+ 	 * The detail text of the quick pick item. Shown as the second line.
+ 	 */
+ 	detail?: string;
++	badges?: readonly string[];
++	meters?: readonly IQuickPickItemMeter[];
+ 	/**
+ 	 * The tooltip for the quick pick item.
+ 	 */
+@@ -101,6 +103,13 @@
+ 	 * Defaults to true with `IQuickPick.canSelectMany`, can be false to disable picks for a single item
+ 	 */
+ 	pickable?: boolean;
++}
++
++export interface IQuickPickItemMeter {
++	label: string;
++	description?: string;
++	value: number;
++	severity?: 'normal' | 'warning' | 'error';
+ }
+ 
+ export interface IQuickPickSeparator {
+@@ -111,6 +120,7 @@
+ 	id?: string;
+ 	label?: string;
+ 	description?: string;
++	heading?: boolean;
+ 	ariaLabel?: string;
+ 	buttons?: readonly IQuickInputButton[];
+ 	tooltip?: string | IMarkdownString;
+--- a/src/vs/platform/quickinput/test/browser/quickinput.test.ts
++++ b/src/vs/platform/quickinput/test/browser/quickinput.test.ts
+@@ -20,7 +20,7 @@
+ import { toDisposable } from '../../../../base/common/lifecycle.js';
+ import { mainWindow } from '../../../../base/browser/window.js';
+ import { QuickPick } from '../../browser/quickInput.js';
+-import { IQuickPickItem, ItemActivation, isKeyModified, NO_KEY_MODS } from '../../common/quickInput.js';
++import { IQuickPickItem, IQuickPickSeparator, ItemActivation, isKeyModified, NO_KEY_MODS } from '../../common/quickInput.js';
+ import { TestInstantiationService } from '../../../instantiation/test/common/instantiationServiceMock.js';
+ import { IThemeService } from '../../../theme/common/themeService.js';
+ import { IConfigurationService } from '../../../configuration/common/configuration.js';
+@@ -382,8 +382,76 @@
+ 
+ 		assert.strictEqual(activeItemsFromEvent.length, 0);
+ 		assert.strictEqual(quickpick.activeItems.length, 0);
++	});
++
++	test('quick pick item badges render in order and are opt-in', () => {
++		const quickpick = store.add(controller.createQuickPick() as QuickPick<IQuickPickItem>);
++		quickpick.items = [{ label: 'Decorated', badges: ['Active', 'Reopens'] }];
++		quickpick.show();
++
++		const entry = fixture.querySelector('.quick-input-list-entry')!;
++		assert.deepStrictEqual(
++			[...entry.querySelectorAll('.quick-input-list-badge')].map(element => element.textContent),
++			['Active', 'Reopens']
++		);
++		assert.strictEqual(entry.querySelector('.quick-input-list-badges')?.parentElement, entry);
++
++		quickpick.items = [{ label: 'Plain' }];
++		assert.strictEqual(fixture.querySelector('.quick-input-list-badges'), null);
++	});
++
++	test('quick pick item meters replace detail and clamp values', () => {
++		const quickpick = store.add(controller.createQuickPick() as QuickPick<IQuickPickItem>);
++		quickpick.items = [{
++			label: 'Usage',
++			detail: 'Fallback detail',
++			meters: [
++				{ label: '5h', description: 'Renews soon', value: 150, severity: 'warning' },
++				{ label: '7d', value: -20, severity: 'error' },
++				{ label: 'Ignored', value: 50 },
++			]
++		}];
++		quickpick.show();
++
++		const entry = fixture.querySelector('.quick-input-list-entry')!;
++		const meterTracks = [...entry.querySelectorAll<HTMLElement>('[role="meter"]')];
++		assert.strictEqual(meterTracks.length, 2);
++		assert.deepStrictEqual(meterTracks.map(track => track.getAttribute('aria-valuenow')), ['100', '0']);
++		assert.strictEqual(meterTracks[0].getAttribute('aria-label'), '5h, Renews soon');
++		assert.strictEqual(meterTracks[0].querySelector('.quick-input-list-meter-fill')?.classList.contains('quick-input-list-meter-fill-warning'), true);
++		assert.strictEqual(meterTracks[1].querySelector('.quick-input-list-meter-fill')?.classList.contains('quick-input-list-meter-fill-error'), true);
++		assert.strictEqual(entry.querySelector('.quick-input-list-meter-fill')?.getAttribute('style'), 'width: 100%;');
++		assert.strictEqual(entry.querySelector('.quick-input-list-label-meta .monaco-icon-label')?.getAttribute('style'), 'display: none;');
++
++		quickpick.items = [{ label: 'One meter', meters: [{ label: '7d', value: 25 }] }];
++		assert.strictEqual(fixture.querySelectorAll('.quick-input-list-meter').length, 1);
++		assert.strictEqual(fixture.querySelector<HTMLElement>('.quick-input-list-meters')?.style.gridTemplateColumns, '');
+ 	});
+ 
++	test('quick pick heading separators render above groups and legacy separators stay inline', () => {
++		const quickpick = store.add(controller.createQuickPick({ useSeparators: true }) as QuickPick<IQuickPickItem, { useSeparators: true }>);
++		fixture.style.height = '200px';
++		fixture.style.width = '600px';
++		controller.layout({ height: 200, width: 600 }, 0);
++		quickpick.items = [
++			{ type: 'separator', label: 'First group', heading: true },
++			{ label: 'First item' },
++		] as Array<IQuickPickItem | IQuickPickSeparator>;
++		quickpick.show();
++
++		const headings = [...fixture.querySelectorAll('.quick-input-list-separator-heading')];
++		assert.strictEqual(headings.length, 1);
++		assert.strictEqual(headings[0].classList.contains('quick-input-list-separator-heading-first'), true);
++		assert.strictEqual(fixture.querySelector('.quick-input-list-separator')?.style.display, 'none');
++
++		quickpick.items = [
++			{ type: 'separator', label: 'Legacy group' },
++			{ label: 'Legacy item' },
++		] as Array<IQuickPickItem | IQuickPickSeparator>;
++		assert.strictEqual(fixture.querySelector('.quick-input-list-separator-heading'), null);
++		assert.strictEqual(fixture.querySelector('.quick-input-list-separator')?.textContent, 'Legacy group');
++	});
++
+ 	test('isKeyModified - returns false when no modifiers are pressed', () => {
+ 		assert.strictEqual(isKeyModified(NO_KEY_MODS), false);
+ 		assert.strictEqual(isKeyModified({ ctrlCmd: false, alt: false, shift: false }), false);
+--- a/src/vs/workbench/api/common/extHost.protocol.ts
++++ b/src/vs/workbench/api/common/extHost.protocol.ts
+@@ -721,6 +721,8 @@
+ 	alwaysShow?: boolean;
+ 	buttons?: TransferQuickInputButton[];
+ 	resourceUri?: UriComponents;
++	badges?: readonly string[];
++	meters?: readonly quickInput.IQuickPickItemMeter[];
+ 
+ 	// TODO: These properties are not used for transfer (iconPathDto is used instead) but they cannot be removed
+ 	// because this type is used as IQuickPickItem on the main thread. Ideally IQuickPickItem should also use IconPath.
+--- a/src/vs/workbench/api/common/extHostQuickOpen.ts
++++ b/src/vs/workbench/api/common/extHostQuickOpen.ts
+@@ -9,7 +9,7 @@
+ import { ExtHostCommands } from './extHostCommands.js';
+ import { IExtHostWorkspaceProvider } from './extHostWorkspace.js';
+ import { InputBox, InputBoxOptions, InputBoxValidationMessage, QuickInput, QuickInputButton, QuickPick, QuickPickItem, QuickPickItemButtonEvent, QuickPickOptions, WorkspaceFolder, WorkspaceFolderPickOptions } from 'vscode';
+-import { ExtHostQuickOpenShape, IMainContext, MainContext, TransferQuickInput, TransferQuickInputButton, TransferQuickPickItemOrSeparator } from './extHost.protocol.js';
++import { ExtHostQuickOpenShape, IMainContext, MainContext, TransferQuickInput, TransferQuickInputButton, TransferQuickPickItem, TransferQuickPickItemOrSeparator } from './extHost.protocol.js';
+ import { QuickInputButtons, QuickPickItemKind, InputBoxValidationSeverity } from './extHostTypes.js';
+ import { isCancellationError } from '../../../base/common/errors.js';
+ import { IExtensionDescription } from '../../../platform/extensions/common/extensions.js';
+@@ -20,6 +20,19 @@
+ 
+ export type Item = string | QuickPickItem;
+ 
++function checkQuickPickDecorations(extension: IExtensionDescription, item: QuickPickItem): void {
++	if (item.badges !== undefined || item.heading !== undefined || item.meters !== undefined) {
++		checkProposedApiEnabled(extension, 'araraQuickPickDecorations');
++	}
++}
++
++function transferQuickPickDecorations(item: QuickPickItem): Pick<TransferQuickPickItem, 'badges' | 'meters'> {
++	return {
++		badges: item.badges,
++		meters: item.meters,
++	};
++}
++
+ export interface ExtHostQuickOpen {
+ 	showQuickPick(extension: IExtensionDescription, itemsOrItemsPromise: QuickPickItem[] | Promise<QuickPickItem[]>, options: QuickPickOptions & { canPickMany: true }, token?: CancellationToken): Promise<QuickPickItem[] | undefined>;
+ 	showQuickPick(extension: IExtensionDescription, itemsOrItemsPromise: string[] | Promise<string[]>, options?: QuickPickOptions, token?: CancellationToken): Promise<string | undefined>;
+@@ -92,8 +105,10 @@
+ 						if (typeof item === 'string') {
+ 							pickItems.push({ label: item, handle });
+ 						} else if (item.kind === QuickPickItemKind.Separator) {
+-							pickItems.push({ type: 'separator', label: item.label });
++							checkQuickPickDecorations(extension, item);
++							pickItems.push({ type: 'separator', label: item.label, heading: item.heading });
+ 						} else {
++							checkQuickPickDecorations(extension, item);
+ 							if (item.tooltip) {
+ 								checkProposedApiEnabled(extension, 'quickPickItemTooltip');
+ 							}
+@@ -107,6 +122,7 @@
+ 								alwaysShow: item.alwaysShow,
+ 								tooltip: MarkdownString.fromStrict(item.tooltip),
+ 								resourceUri: item.resourceUri,
++								...transferQuickPickDecorations(item),
+ 								handle
+ 							});
+ 						}
+@@ -548,8 +564,10 @@
+ 			for (let handle = 0; handle < items.length; handle++) {
+ 				const item = items[handle];
+ 				if (item.kind === QuickPickItemKind.Separator) {
+-					pickItems.push({ type: 'separator', label: item.label });
++					checkQuickPickDecorations(this._extension, item);
++					pickItems.push({ type: 'separator', label: item.label, heading: item.heading });
+ 				} else {
++					checkQuickPickDecorations(this._extension, item);
+ 					if (item.tooltip) {
+ 						checkProposedApiEnabled(this._extension, 'quickPickItemTooltip');
+ 					}
+@@ -564,6 +582,7 @@
+ 						alwaysShow: item.alwaysShow,
+ 						tooltip: MarkdownString.fromStrict(item.tooltip),
+ 						resourceUri: item.resourceUri,
++						...transferQuickPickDecorations(item),
+ 						buttons: item.buttons?.map<TransferQuickInputButton>((button, i) => {
+ 							return {
+ 								iconPathDto: IconPath.from(button.iconPath),
+--- /dev/null
++++ b/src/vscode-dts/vscode.proposed.araraQuickPickDecorations.d.ts
+@@ -0,0 +1,19 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++declare module 'vscode' {
++	export interface QuickPickItemMeter {
++		label: string;
++		description?: string;
++		value: number;
++		severity?: 'normal' | 'warning' | 'error';
++	}
++
++	export interface QuickPickItem {
++		badges?: readonly string[];
++		heading?: boolean;
++		meters?: readonly QuickPickItemMeter[];
++	}
++}
