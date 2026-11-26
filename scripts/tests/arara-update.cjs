@@ -3,9 +3,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { EXTENSIONS } = require('../extension-layout.cjs');
+const { builtInExtensionsEnabledWithAutoUpdates } = require('../../branding/product.overlay.json');
 
 const root = path.resolve(__dirname, '../..');
 const extension = path.join(root, 'extensions/arara-update');
+for (const name of EXTENSIONS) assert.ok(builtInExtensionsEnabledWithAutoUpdates?.includes(`arara.${name}`), `stable must allow builtin updates for ${name}`);
 const tests = fs.readdirSync(path.join(extension, 'test')).filter(name => name.endsWith('.test.js')).map(name => path.join(extension, 'test', name));
 assert.ok(tests.length > 0, 'arara-update must have unit tests');
 const unit = spawnSync(process.execPath, ['--test', ...tests], { encoding: 'utf8' });

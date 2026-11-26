@@ -23,7 +23,8 @@ Arara Code: botão "Atualizar" no topo e reinício automático quando o .deb nov
     de menor id mostra o aviso. Desligado em modo dev (isBuilt = false).
   - Comando arara.update.restartExtensions: a extensão chama depois de instalar uma
     versão nova do arara-ai, arara-bot ou arara-orchestra; espera as mesmas context
-    keys arara.*.running ficarem desligadas e reinicia só o extension host.
+    keys arara.*.running ficarem desligadas e aplica as versões pendentes pelo
+    gerenciador de extensões, que reinicia só o extension host.
 - media/araraUpdate.css (novo): estilo de botão para o item com texto.
 - workbench.desktop.main.ts: importa a contribution (só desktop).
 
@@ -41,7 +42,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,216 @@
 +import './media/araraUpdate.css';
 +import { reset } from '../../../../base/browser/dom.js';
 +import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
@@ -65,6 +66,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +import { IProductService } from '../../../../platform/product/common/productService.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 +import { IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
++import { IExtensionsWorkbenchService } from '../../extensions/common/extensions.js';
 +import { INativeWorkbenchEnvironmentService } from '../../../services/environment/electron-browser/environmentService.js';
 +import { IHostService } from '../../../services/host/browser/host.js';
 +
@@ -95,11 +97,11 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +
 +CommandsRegistry.registerCommand(RESTART_EXTENSIONS_COMMAND, async accessor => {
 +	const contextKeyService = accessor.get(IContextKeyService);
-+	const commandService = accessor.get(ICommandService);
++	const extensionsWorkbenchService = accessor.get(IExtensionsWorkbenchService);
 +	while (aiRunning(contextKeyService)) {
 +		await timeout(1000);
 +	}
-+	await commandService.executeCommand('workbench.action.restartExtensionHost');
++	await extensionsWorkbenchService.updateRunningExtensions();
 +});
 +
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {

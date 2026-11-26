@@ -42,9 +42,8 @@ async function updateComponents({ vscode, downloads, busy, ideVersion, ideUpdate
   }
   void Promise.resolve(vscode.commands.executeCommand(RESTART_EXTENSIONS_COMMAND)).catch(error => {
     console.warn('[arara update] Extension restart failed', error);
-    busy.finish(run);
     vscode.window.setStatusBarMessage(t('$(check) Arara extensions updated. Reload the window to use them.'), 10000);
-  });
+  }).finally(() => busy.finish(run));
   return 'restarting';
 }
 

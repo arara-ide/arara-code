@@ -38,6 +38,12 @@
   "linkProtectionTrustedDomains": [
     "*"
   ],
+  "builtInExtensionsEnabledWithAutoUpdates": [
+    "GitHub.copilot-chat",
+    "arara.arara-ai",
+    "arara.arara-bot",
+    "arara.arara-orchestra"
+  ],
   "requiredBuiltinExtensions": [
     "arara.arara-ai",
     "arara.arara-orchestra"

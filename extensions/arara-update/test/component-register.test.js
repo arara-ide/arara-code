@@ -37,7 +37,7 @@ function harness({ check = { hold: false, updates: [update('arara.arara-ai', '1.
 
 describe('component updates', () => {
   it('installs every pending VSIX and restarts the extensions while showing Updating', async () => {
-    const { state, run, busy } = harness();
+    const { state, run, busy } = harness({ restart: () => new Promise(() => {}) });
     assert.equal(await run(), 'restarting');
     await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(state.request.installed.map(item => item.version), ['1.2.0', '0.4.0']);
@@ -51,6 +51,14 @@ describe('component updates', () => {
     assert.deepEqual(state.busy, [true]);
     assert.equal(busy.busy, true);
     assert.ok(state.cleanups >= 2);
+  });
+
+  it('clears Updating when applying versions completes without stopping this host', async () => {
+    const { state, run, busy } = harness();
+    assert.equal(await run(), 'restarting');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(state.busy, [true, false]);
+    assert.equal(busy.busy, false);
   });
 
   it('waits for the IDE update when the server or the local checker reports one', async () => {

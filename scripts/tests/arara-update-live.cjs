@@ -141,7 +141,7 @@ test('shipped updater installs a component through a single-use link and holds i
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(executed, [INSTALL_COMMAND, RESTART_EXTENSIONS_COMMAND]);
   assert.deepEqual(installedBytes, [payload]);
-  assert.deepEqual(busyStates, [true]);
+  assert.deepEqual(busyStates, [true, false]);
   assert.equal((await stat(join(root, 'component-update-temp')).catch(() => null)), null);
   assert.equal(await run(), 'current');
   assert.equal(requests.filter(path => path.startsWith('/v1/ide/components/download/')).length, 1);
