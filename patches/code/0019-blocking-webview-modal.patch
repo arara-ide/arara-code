@@ -108,7 +108,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
 +		webviewInput.blocking = blocking;
 +		if (blocking) { webview.container.classList.add('blocking-webview-content'); }
  		this._editorService.openEditor(webviewInput, {
-+			modal: blocking ? { maximized: true } : undefined,
++			modal: blocking ? {} : undefined,
  			pinned: true,
  			preserveFocus: showOptions.preserveFocus,
  			// preserve pre 1.38 behaviour to not make group active when preserveFocus: true
@@ -130,6 +130,16 @@ Touches: command service, webview editor input/service, native modal part/CSS.
  import { EditorInput } from '../../../common/editor/editorInput.js';
  import { ResourceLabel } from '../../labels.js';
  import { IHostService } from '../../../services/host/browser/host.js';
+@@ -43,7 +43,7 @@
+ const MODAL_MIN_WIDTH = 400;
+ const MODAL_MIN_HEIGHT = 300;
+-const MODAL_MAX_DEFAULT_WIDTH = 1400;
+-const MODAL_MAX_DEFAULT_HEIGHT = 900;
++const MODAL_MAX_DEFAULT_WIDTH = 1610;
++const MODAL_MAX_DEFAULT_HEIGHT = 1035;
+ const MODAL_BORDER_WIDTH = 1; // 1px border on each side
+ const MODAL_BORDER_SIZE = MODAL_BORDER_WIDTH * 2;
+ const MODAL_HEADER_HEIGHT = 33; // Fallback only — actual height is measured from the rendered header element to account for the compact-header variant.
 @@ -362,6 +362,7 @@
  		let trackedEditor: EditorInput | undefined;
  		const updateLabel = () => {
