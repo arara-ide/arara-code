@@ -51,6 +51,7 @@ Tudo que muda para quem usa o Arara Code. Formato: [Keep a Changelog](https://ke
 - Chat: Transferir conversa vai direto para um chat livre da plataforma escolhida e, sem chat livre, pergunta em qual chat abrir.
 
 ### Correções
+- Git: a busca automática continua ligada e roda sem abrir janelas de login. Use Buscar para autenticar quando precisar.
 - Instalação no Linux: o pacote DEB declara as bibliotecas necessárias para executar o editor.
 - Atualização local das extensões: o instalador reconhece a pasta `Contents` do aplicativo macOS em volumes que diferenciam maiúsculas de minúsculas.
 - Atualização: no macOS, o botão encontra a instância correta da IDE mesmo com o Arara Vibes aberto e processos intermediários; falhas não deixam pastas temporárias em Aplicativos.
