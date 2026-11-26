@@ -169,4 +169,4 @@ class UpdateDownloads {
   }
 }
 
-module.exports = { INSTALLER_ENV, hostArch, UpdateDownloads, downloadedInstructions, installAction, installInstructions, installerName, shellQuote, updateTarget, windowsPowerShell };
+module.exports = { INSTALLER_ENV, hostArch, sha256, UpdateDownloads, downloadedInstructions, installAction, installInstructions, installerName, shellQuote, updateTarget, windowsPowerShell };
