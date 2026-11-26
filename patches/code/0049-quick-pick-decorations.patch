@@ -519,7 +519,7 @@ Touches: src/vs/platform/extensions/common/extensionsApiProposals.ts, src/vs/pla
 +		const headings = [...fixture.querySelectorAll('.quick-input-list-separator-heading')];
 +		assert.strictEqual(headings.length, 1);
 +		assert.strictEqual(headings[0].classList.contains('quick-input-list-separator-heading-first'), true);
-+		assert.strictEqual(fixture.querySelector('.quick-input-list-separator')?.style.display, 'none');
++		assert.strictEqual(fixture.querySelector<HTMLElement>('.quick-input-list-separator')?.style.display, 'none');
 +
 +		quickpick.items = [
 +			{ type: 'separator', label: 'Legacy group' },
