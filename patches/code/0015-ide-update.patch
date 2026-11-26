@@ -21,12 +21,17 @@ Arara Code: botão "Atualizar" no topo e reinício automático quando o .deb nov
     Se o serviço não puder iniciar, a IDE continua aberta com aviso. Hot exit preserva o que não foi salvo.
     "Depois" troca o botão por "Reiniciar para atualizar". Com várias janelas, só a
     de menor id mostra o aviso. Desligado em modo dev (isBuilt = false).
+  - Comando arara.update.restartExtensions: a extensão chama depois de instalar uma
+    versão nova do arara-ai, arara-bot ou arara-orchestra; espera as mesmas context
+    keys arara.*.running ficarem desligadas e reinicia só o extension host.
 - media/araraUpdate.css (novo): estilo de botão para o item com texto.
 - workbench.desktop.main.ts: importa a contribution (só desktop).
 
 Why a patch: extensão não põe item no LayoutControlMenu nem desenha botão com texto
 na barra de título, e só o core consegue reiniciar o app inteiro (main process);
-workbench.action.reloadWindow recarrega só a janela, com o Electron antigo.
+workbench.action.reloadWindow recarrega só a janela, com o Electron antigo. Extensão
+também não lê context keys, então a espera pela IA antes de reiniciar o extension
+host fica no core.
 Revisão de segurança: lê só o product.json do próprio appRoot; não abre URL nem
 executa nada vindo da rede (a URL do botão é validada na extensão). No Linux,
 o patch passa apenas o PID principal à extensão; o quit depende da preparação
@@ -36,7 +41,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 
 --- /dev/null
 +++ b/src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contribution.ts
-@@ -0,0 +1,205 @@
+@@ -0,0 +1,215 @@
 +import './media/araraUpdate.css';
 +import { reset } from '../../../../base/browser/dom.js';
 +import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
@@ -50,7 +55,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
 +import { MenuEntryActionViewItem } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
 +import { Action2, MenuId, MenuItemAction, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
-+import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpr, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IFileService } from '../../../../platform/files/common/files.js';
 +import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
@@ -70,11 +75,16 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +const OPEN_COMMAND = 'arara.update.open';
 +const RESTART_COMMAND = 'arara.update.restart';
 +const UPDATING_COMMAND = 'arara.update.updating';
++const RESTART_EXTENSIONS_COMMAND = 'arara.update.restartExtensions';
 +const POLL_MS = 30_000;
 +const COUNTDOWN_S = 10;
 +const AI_RUNNING_KEYS = ['arara.chat.running', 'arara.codex.running', 'arara.claude.running', 'arara.antigravity.running', 'arara.kiro.running', 'arara.opencode.running'];
 +
 +const notInAuxWindow = IsAuxiliaryWindowContext.negate();
++
++function aiRunning(contextKeyService: IContextKeyService): boolean {
++	return AI_RUNNING_KEYS.some(k => contextKeyService.getContextKeyValue<boolean>(k) === true);
++}
 +
 +async function restart(nativeHostService: INativeHostService, commandService: ICommandService, environmentService: INativeWorkbenchEnvironmentService): Promise<void> {
 +	if (!isLinux) { return nativeHostService.relaunch(); }
@@ -82,6 +92,15 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		await nativeHostService.quit();
 +	}
 +}
++
++CommandsRegistry.registerCommand(RESTART_EXTENSIONS_COMMAND, async accessor => {
++	const contextKeyService = accessor.get(IContextKeyService);
++	const commandService = accessor.get(ICommandService);
++	while (aiRunning(contextKeyService)) {
++		await timeout(1000);
++	}
++	await commandService.executeCommand('workbench.action.restartExtensionHost');
++});
 +
 +MenuRegistry.appendMenuItem(MenuId.LayoutControlMenu, {
 +	group: 'navigation',
@@ -207,13 +226,9 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		void this.countdown(onDisk);
 +	}
 +
-+	private aiRunning(): boolean {
-+		return AI_RUNNING_KEYS.some(k => this.contextKeyService.getContextKeyValue<boolean>(k) === true);
-+	}
-+
 +	private async countdown(version: string): Promise<void> {
 +		let cancelled = false;
-+		const message = (s: number) => this.aiRunning()
++		const message = (s: number) => aiRunning(this.contextKeyService)
 +			? localize('arara.update.waitingAi', "Arara Code {0} is installed. It will restart when the AI finishes responding.", version)
 +			: localize('arara.update.countdown', "Arara Code {0} is installed. Restarting in {1} s to apply the update.", version, s);
 +
@@ -224,7 +239,7 @@ Touches: src/vs/workbench/contrib/arara/electron-browser/araraUpdate.contributio
 +		this.prompt.value = toDisposable(() => handle.close());
 +
 +		for (let s = COUNTDOWN_S; s > 0; s--) {
-+			while (!cancelled && this.aiRunning()) {
++			while (!cancelled && aiRunning(this.contextKeyService)) {
 +				handle.updateMessage(message(s));
 +				await timeout(1000);
 +			}

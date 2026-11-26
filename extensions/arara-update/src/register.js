@@ -4,6 +4,7 @@ const { basename, dirname, join } = require('node:path');
 const { promisify } = require('node:util');
 const { installMacDmg, macMainPid, MAC_GATEKEEPER_REJECTED } = require('./mac-install');
 const { UpdateBusy } = require('./busy');
+const { registerComponents } = require('./component-register');
 const { UpdateChecker } = require('./checker');
 const { UpdateDownloads, downloadedInstructions, hostArch, installAction, installInstructions, updateTarget } = require('./downloads');
 const { setLanguage, t } = require('./i18n');
@@ -25,7 +26,7 @@ function platformDeps() {
     spawn: childProcess.spawn, execFile: promisify(childProcess.execFile), homedir: os.homedir,
     platform: process.platform, arch: process.arch, env: process.env, tmpdir: os.tmpdir,
     translated: () => { try { return childProcess.execFileSync('/usr/sbin/sysctl', ['-in', 'sysctl.proc_translated'], { encoding: 'utf8', timeout: 2000 }).trim() === '1'; } catch { return false; } },
-    Checker: UpdateChecker, Downloads: UpdateDownloads, installMacDmg, macMainPid,
+    Checker: UpdateChecker, Downloads: UpdateDownloads, installMacDmg, macMainPid, registerComponents,
   };
 }
 
@@ -203,6 +204,7 @@ function registerUpdate(context, vscode, deps = platformDeps()) {
   void downloads.startup(current).catch(error => console.warn('[arara update] Cache cleanup failed', error)).finally(() => {
     if (!disposed) checker.start();
   });
+  void deps.registerComponents?.(context, vscode, { busy, ideVersion: current, ideUpdateReady: () => !!ready });
   return checker;
 }
 
@@ -222,6 +224,7 @@ function registerStoreUpdate(context, vscode, deps, current, setContext) {
     void vscode.window.showInformationMessage(t('Arara Code {0} opens in the Microsoft Store. Choose Update, then reopen Arara Code.', ready ?? current));
   }));
   checker.start();
+  void deps.registerComponents?.(context, vscode, { busy: new UpdateBusy(value => void setContext(UPDATE_BUSY_CONTEXT_KEY, value)), ideVersion: current, ideUpdateReady: () => !!ready });
   return checker;
 }
 
