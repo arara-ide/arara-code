@@ -113,7 +113,7 @@ Touches: command service, webview editor input/service, native modal part/CSS.
 +		webviewInput.overlay = overlay;
 +		if (blocking) { webview.container.classList.add('blocking-webview-content'); }
  		this._editorService.openEditor(webviewInput, {
-+			modal: blocking || overlay ? {} : undefined,
++			modal: blocking ? { maximized: true } : overlay ? {} : undefined,
  			pinned: true,
  			preserveFocus: showOptions.preserveFocus,
  			// preserve pre 1.38 behaviour to not make group active when preserveFocus: true

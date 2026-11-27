@@ -18,6 +18,7 @@ const count = checkDirectory(path.join(root, 'patches'));
 const modalPatch = fs.readFileSync(path.join(root, 'patches/code/0019-blocking-webview-modal.patch'), 'utf8');
 assert.ok(modalPatch.includes("arara.overlayModal.viewType"));
 assert.ok(modalPatch.includes('.monaco-modal-editor-block.overlay-modal'));
+assert.ok(modalPatch.includes('modal: blocking ? { maximized: true } : overlay ? {} : undefined'));
 const startupPatch = fs.readFileSync(path.join(root, 'patches/code/0020-startup-webview.patch'), 'utf8');
 assert.ok(startupPatch.includes('placeholder.ariaLabel = product.nameLong;'));
 assert.ok(startupPatch.includes('arara-contour'));
